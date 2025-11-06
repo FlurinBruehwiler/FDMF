@@ -170,7 +170,7 @@ public class Transaction : IDisposable
             {
                 var (_, k, v) = Cursor.GetCurrent();
 
-                if(!k.AsSpan().Slice(0, 16).SequenceEqual(prefix))
+                if(!k.AsSpan().Slice(0, 2*16).SequenceEqual(prefix))
                     break;
 
                 if (v.AsSpan()[0] == (byte)ValueTyp.Aso)

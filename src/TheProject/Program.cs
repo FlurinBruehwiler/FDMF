@@ -8,17 +8,27 @@ env.Open();
 using var transaction = new Transaction(env);
 
 var folder = new Folder(transaction);
-folder.Name = "Hallo Johnny";
+folder.Name = "child :(";
 
 var parentFolder = new Folder(transaction);
+parentFolder.Name = "parent :)";
+
 folder.Parent = parentFolder; //todo what if the assoc is non nullable?
 
-foreach (var subfolder in parentFolder.Subfolders)
+Console.WriteLine("These are the children:");
+foreach (var subfolders in parentFolder.Subfolders)
 {
-    Console.WriteLine(subfolder.Name);
+    Console.WriteLine(subfolders.Name);
 }
 
-transaction.Commit();
+folder.Parent = null;
+
+if (folder.Parent == null)
+{
+    Console.WriteLine("Has no more parent");
+}
+
+// transaction.Commit();
 
 
 
