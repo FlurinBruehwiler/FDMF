@@ -1,5 +1,4 @@
 ﻿using System.Collections;
-using System.Reflection.PortableExecutable;
 
 namespace TheProject;
 
@@ -89,13 +88,15 @@ public struct AssocCollection<T> : ICollection<T> where T : struct, ITransaction
 {
     public Guid _objId;
     public Guid _fldId;
+    public Guid _otherFld;
     public Transaction _transaction;
 
-    public AssocCollection(Transaction transaction, Guid objId, Guid fldId)
+    public AssocCollection(Transaction transaction, Guid objId, Guid fldId, Guid otherFld)
     {
         _transaction = transaction;
         _objId = objId;
         _fldId = fldId;
+        _otherFld = otherFld;
     }
 
     public AssoCollectionEnumerator<T> GetEnumerator()
@@ -115,12 +116,12 @@ public struct AssocCollection<T> : ICollection<T> where T : struct, ITransaction
 
     public void Add(T item)
     {
-        _transaction.CreateAso(_objId, _fldId, item._objId, new Guid()); //todo find other assoc field
+        _transaction.CreateAso(_objId, _fldId, item._objId, _otherFld);
     }
 
     public void Clear()
     {
-        //todo
+        _transaction.RemoveAllAso(_objId, _fldId);
     }
 
     public bool Contains(T item)
@@ -141,10 +142,10 @@ public struct AssocCollection<T> : ICollection<T> where T : struct, ITransaction
 
     public bool Remove(T item)
     {
-        throw new NotImplementedException();
+        return _transaction.RemoveAso(_objId, _fldId, item._objId, _otherFld);
     }
 
-    public int Count { get; }
+    public int Count => _transaction.GetAsoCount(_objId, _fldId);
     public bool IsReadOnly => false;
 
 }

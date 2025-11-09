@@ -93,7 +93,7 @@ foreach (var entity in model.EntityDefinitions)
         }
         else if (refField.RefType == RefType.Multiple)
         {
-            sourceBuilder.AppendLine($"public AssocCollection<{refField.OtherReferenceField.OwningEntity.Key}> {refField.Key} => new(_transaction, _objId, Fields.{refField.Key});");
+            sourceBuilder.AppendLine($"public AssocCollection<{refField.OtherReferenceField.OwningEntity.Key}> {refField.Key} => new(_transaction, _objId, Fields.{refField.Key}, {refField.OtherReferenceField.OwningEntity.Key}.Fields.{refField.OtherReferenceField.Key});");
         }
     }
 

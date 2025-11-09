@@ -17,7 +17,7 @@ public struct Folder : ITransactionObject
         get => Encoding.Unicode.GetString(_transaction.GetFldValue(_objId, Fields.Name).AsSpan());
         set => _transaction.SetFldValue(_objId, Fields.Name, Encoding.Unicode.GetBytes(value).AsSpan().AsSlice());
     }
-    public AssocCollection<Folder> Subfolders => new(_transaction, _objId, Fields.Subfolders);
+    public AssocCollection<Folder> Subfolders => new(_transaction, _objId, Fields.Subfolders, Folder.Fields.Parent);
     public Folder? Parent
     {
         get => GeneratedCodeHelper.GetNullableAssoc<Folder>(_transaction, _objId, Fields.Parent);
