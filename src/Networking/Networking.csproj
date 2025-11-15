@@ -11,4 +11,8 @@
     <PackageReference Include="MemoryPack" Version="1.21.4" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Shared\Shared.csproj" />
+  </ItemGroup>
+
 </Project>

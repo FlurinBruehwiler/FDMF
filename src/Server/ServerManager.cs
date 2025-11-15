@@ -1,5 +1,7 @@
-﻿using System.Net;
+﻿using System.Diagnostics;
+using System.Net;
 using System.Net.WebSockets;
+using Model;
 using Networking;
 
 namespace Server;
@@ -14,6 +16,26 @@ public class ServerManager
     public List<ConnectedClient> ConnectedClients = [];
     public Dictionary<Guid, PendingRequest> Callbacks = [];
 
+    private long lastMetricDump;
+    public async Task LogMetrics()
+    {
+        while (true)
+        {
+            await Task.Delay(1000);
+
+            var ellapsedSeconds = Stopwatch.GetElapsedTime(lastMetricDump).TotalSeconds;
+            foreach (var (k, v) in Logging.metrics)
+            {
+                var metricsPerSecond = (double)v / ellapsedSeconds;
+                Logging.Log(LogFlags.Performance, $"{k}: {metricsPerSecond} per Second");
+
+                Logging.metrics[k] = 0;
+            }
+
+            lastMetricDump = Stopwatch.GetTimestamp();
+        }
+    }
+
     public async Task ListenForConnections()
     {
         var url = "http://localhost:8080/connect/";
@@ -22,7 +44,7 @@ public class ServerManager
         listener.Prefixes.Add(url);
         listener.Start();
 
-        Console.WriteLine($"Listening on {url}");
+        Logging.Log(LogFlags.Info, $"Listening on {url}");
 
         while (true)
         {
@@ -31,15 +53,26 @@ public class ServerManager
             {
                 var wsContext = await context.AcceptWebSocketAsync(subProtocol: null);
 
-                Console.WriteLine("Client connected!");
+                Logging.Log(LogFlags.Info, "Client connected!");
 
                 var connectedClient = new ConnectedClient
                 {
                     ClientProcedures = new ClientProcedures(x =>
                     {
-                        x.Seek(0, SeekOrigin.Begin);
-                        using var stream = WebSocketStream.CreateWritableMessageStream(wsContext.WebSocket, WebSocketMessageType.Binary);
-                        x.CopyTo(stream);
+                        try
+                        {
+                            lock (wsContext.WebSocket)
+                            {
+                                //todo, make this an async op on a different thread maybe
+                                x.Seek(0, SeekOrigin.Begin);
+                                using var stream = WebSocketStream.CreateWritableMessageStream(wsContext.WebSocket, WebSocketMessageType.Binary);
+                                x.CopyTo(stream);
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            Logging.LogException(e);
+                        }
                     }, Callbacks)
                 };
 
@@ -47,8 +80,11 @@ public class ServerManager
 
                 _ = NetworkingClient.ProcessMessagesForWebSocket(wsContext.WebSocket, new ServerProceduresImpl(connectedClient), Callbacks).ContinueWith(x =>
                 {
-                    Console.WriteLine(x.Exception?.ToString());
-                }, TaskContinuationOptions.OnlyOnFaulted);;
+                    if(x.Exception != null)
+                        Logging.LogException(x.Exception);
+
+                    ConnectedClients.Remove(connectedClient);
+                });;
             }
             else
             {

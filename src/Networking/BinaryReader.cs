@@ -19,7 +19,6 @@ public ref struct BinaryReader
         }
 
         var s = Data.Slice(CurrentOffset, 16);
-        Console.WriteLine($"Reading bytes {string.Join(", ", s.ToArray())}");
         var guid = MemoryMarshal.Read<Guid>(s);
         CurrentOffset += 16;
         return guid;

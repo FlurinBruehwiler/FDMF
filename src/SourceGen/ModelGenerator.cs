@@ -15,7 +15,7 @@ public static class ModelGenerator
             var sourceBuilder = new SourceBuilder();
 
             sourceBuilder.AppendLine("using System.Text;");
-            sourceBuilder.AppendLine("using Model;");
+            sourceBuilder.AppendLine("using Shared;");
 
             sourceBuilder.AppendLine("namespace Server.Generated;");
             sourceBuilder.AppendLine();

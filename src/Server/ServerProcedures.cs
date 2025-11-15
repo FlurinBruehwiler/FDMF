@@ -1,4 +1,5 @@
-﻿using Networking;
+﻿using Model;
+using Networking;
 
 namespace Server;
 
@@ -6,9 +7,12 @@ public class ServerProceduresImpl(ConnectedClient connectedClient) : IServerProc
 {
     public Task<ServerStatus> GetStatus(int a, int b)
     {
-        Console.WriteLine("Getting Status");
+        Logging.Log(LogFlags.Business, "Getting Status");
 
-        connectedClient.ClientProcedures.Ping();
+        for (int i = 0; i < 10; i++)
+        {
+            connectedClient.ClientProcedures.Ping();
+        }
 
         return Task.FromResult(default(ServerStatus));
     }

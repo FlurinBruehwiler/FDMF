@@ -365,7 +365,7 @@ public sealed class Transaction : IDisposable
 
     public void DebugPrintAllValues()
     {
-        Console.WriteLine("DB Content:");
+        Logging.Log(LogFlags.Info, "DB Content:");
 
         var result = Cursor.SetRange([0]);
         if (result == MDBResultCode.Success)
@@ -376,14 +376,15 @@ public sealed class Transaction : IDisposable
                 var currentKey = current.key.AsSpan();
                 var currentValue = current.value.AsSpan();
 
-                for (int i = 0; i < currentKey.Length / 16; i++)
-                {
-                    Console.Write(MemoryMarshal.Read<Guid>(currentKey.Slice(i * 16, 16)) + ", ");
-                }
-
-                Console.Write(":");
-
-                Console.WriteLine((ValueTyp)currentValue[0]);
+                throw new NotImplementedException();
+                // for (int i = 0; i < currentKey.Length / 16; i++)
+                // {
+                //     Logging.Log(LogFlags.Info, MemoryMarshal.Read<Guid>(currentKey.Slice(i * 16, 16)) + ", ");
+                // }
+                //
+                // Logging.Log(LogFlags.Info, ":");
+                //
+                // Logging.Log(LogFlags.Info, (ValueTyp)currentValue[0]);
             }
             // Move to the next duplicate value
             while (Cursor.Next().resultCode == MDBResultCode.Success);
@@ -503,6 +504,14 @@ public static class Helper
         ReadOnlySpan<byte> otherValue = MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref other, 1));
 
         return value.SequenceEqual(otherValue);
+    }
+
+    public static void FireAndForget(Task t)
+    {
+        t.ContinueWith(x =>
+        {
+            Logging.LogException(x.Exception);
+        }, TaskContinuationOptions.OnlyOnFaulted);
     }
 }
 

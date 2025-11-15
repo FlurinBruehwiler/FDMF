@@ -11,7 +11,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Networking", "Networking\Ne
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Client", "Client\Client.csproj", "{DB2A710C-1271-4EDA-A72E-70FD490B3DFD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Model", "Model\Model.csproj", "{9ECB5FF3-B80E-4788-858F-CCC8E7F41821}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared", "Shared\Shared.csproj", "{9ECB5FF3-B80E-4788-858F-CCC8E7F41821}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

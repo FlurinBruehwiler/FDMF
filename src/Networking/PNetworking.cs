@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Model;
 
 namespace Networking;
 
@@ -52,7 +53,7 @@ public class PNetworking
         WebSocketReceiveResult result;
         do
         {
-            Console.WriteLine("Waiting for a message");
+            Logging.Log(LogFlags.Info, "Waiting for a message");
 
             try
             {
@@ -60,16 +61,15 @@ public class PNetworking
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Connection Closed: {e.Message}");
+                Logging.Log(LogFlags.Info, $"Connection Closed: {e.Message}");
                 return ReadOnlyMemory<byte>.Empty;
             }
-
 
             messageBuffer.AddRange(buffer.AsSpan(0, result.Count));
         }
         while (!result.EndOfMessage);
 
-        // Memory<byte> arr = UnsafeAccessors<byte>.GetBackingArray(messageBuffer).AsMemory(0, messageBuffer.Count);
+        Logging.LogMetric("Processed Messages");
 
         return messageBuffer.ToArray().AsMemory();
     }

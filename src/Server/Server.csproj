@@ -12,7 +12,7 @@
 
 
   <ItemGroup>
-    <ProjectReference Include="..\Model\Model.csproj" />
+    <ProjectReference Include="..\Shared\Shared.csproj" />
     <ProjectReference Include="..\Networking\Networking.csproj" />
   </ItemGroup>
 
