@@ -30,32 +30,8 @@ public static class UnsafeAccessors<T>
     public static extern ref T[] GetBackingArray(List<T> list);
 }
 
-public class Networking
+public class PNetworking
 {
-    public async Task ListenForConnections()
-    {
-        var listener = new HttpListener();
-        listener.Prefixes.Add("http://localhost:8080/connect");
-        listener.Start();
-
-        while (true)
-        {
-            var context = await listener.GetContextAsync();
-            if (context.Request.IsWebSocketRequest)
-            {
-                var wsContext = await context.AcceptWebSocketAsync(subProtocol: null);
-
-                //client connected
-
-            }
-            else
-            {
-                context.Response.StatusCode = 400;
-                context.Response.Close();
-            }
-        }
-    }
-
     public static void SendMessage(WebSocket webSocket, Memory<byte> input)
     {
          webSocket.SendAsync(input, WebSocketMessageType.Binary, true, CancellationToken.None);

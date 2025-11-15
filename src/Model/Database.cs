@@ -84,7 +84,7 @@ public sealed class Transaction : IDisposable
     public LightningDatabase ObjectDb;
     public LightningDatabase HistoryDb;
 
-    public Transaction(PEnvironment environment)
+    public Transaction(Environment environment)
     {
         LightningTransaction = environment.LightningEnvironment.BeginTransaction();
         Cursor = LightningTransaction.CreateCursor(environment.ObjectDb);

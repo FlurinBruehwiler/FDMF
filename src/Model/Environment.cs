@@ -2,13 +2,13 @@
 
 namespace Model;
 
-public class PEnvironment
+public class Environment
 {
     public required LightningEnvironment LightningEnvironment;
     public required LightningDatabase ObjectDb;
     public required LightningDatabase HistoryDb;
 
-    public static PEnvironment Create()
+    public static Environment Create()
     {
         var env = new LightningEnvironment("path.db");
         env.Open();
@@ -25,7 +25,7 @@ public class PEnvironment
             Flags = DatabaseOpenFlags.Create
         });
 
-        return new PEnvironment
+        return new Environment
         {
             LightningEnvironment = env,
             ObjectDb = objDb,

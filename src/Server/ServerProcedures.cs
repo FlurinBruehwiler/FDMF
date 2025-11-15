@@ -1,9 +1,13 @@
-﻿namespace Server;
+﻿using Networking;
 
-public class ServerProcedures
+namespace Server;
+
+public class ServerProceduresImpl(ConnectedClient connectedClient) : IServerProcedures
 {
-    public void Test()
+    public Task<ServerStatus> GetStatus(int a, int b)
     {
+        connectedClient.ClientProcedures.Ping();
 
+        return Task.FromResult(default(ServerStatus));
     }
 }

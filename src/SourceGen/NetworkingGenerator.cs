@@ -39,7 +39,7 @@ public static class NetworkingGenerator
 
         var className = interfaceName.Substring(1);
 
-        sb.AppendLine($"public class {className}(WebSocket webSocket, Dictionary<Guid, PendingRequest> callbacks) : {interfaceName}");
+        sb.AppendLine($"public class {className}(Action<Stream> sendMessage, Dictionary<Guid, PendingRequest> callbacks) : {interfaceName}");
         sb.AppendLine("{");
         sb.AddIndent();
 
@@ -54,7 +54,7 @@ public static class NetworkingGenerator
 
             var isVoid = interfaceMember.ReturnType is PredefinedTypeSyntax pts && pts.Keyword.IsKind(SyntaxKind.VoidKeyword);
 
-            sb.AppendLine($"var guid = NetworkingClient.SendRequest(webSocket, nameof({methodName}), [ {p} ], {isVoid.ToString().ToLower()});");
+            sb.AppendLine($"var guid = NetworkingClient.SendRequest(sendMessage, nameof({methodName}), [ {p} ], {isVoid.ToString().ToLower()});");
 
             if (!isVoid)
             {

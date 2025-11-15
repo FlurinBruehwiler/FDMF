@@ -30,12 +30,14 @@ public static class NetworkingClient
         return tsc.Task;
     }
 
-    public static Guid SendRequest(WebSocket webSocket, string methodName, object[] parameters, bool isNotification)
+    public static Guid SendRequest(Action<Stream> sendMessage, string methodName, object[] parameters, bool isNotification)
     {
         var requestGuid = Guid.NewGuid();
 
-        using var stream = WebSocketStream.CreateWritableMessageStream(webSocket, WebSocketMessageType.Binary);
-        using var writer = new BinaryWriter(stream, Encoding.Unicode, true);
+        //todo avoid this memory alloc
+
+        using var memStream = new MemoryStream();
+        using var writer = new BinaryWriter(memStream, Encoding.Unicode, true);
         writer.Write((byte)(isNotification ? MessageType.Notification : MessageType.Request));
         writer.Write(MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref requestGuid, 1)));
         writer.Write(methodName);
@@ -48,6 +50,8 @@ public static class NetworkingClient
             writer.Write(data);
         }
 
+        sendMessage(memStream);
+
         return requestGuid;
     }
 
@@ -55,7 +59,7 @@ public static class NetworkingClient
     {
         while (webSocket.State == WebSocketState.Open)
         {
-            var messageContent = (await Networking.GetNextMessage(webSocket)).Span;
+            var messageContent = (await PNetworking.GetNextMessage(webSocket)).Span;
 
             var binaryReader = new BinaryReader
             {
@@ -102,7 +106,7 @@ public static class NetworkingClient
                             MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref requestId, 1)).CopyTo(response.AsSpan(1));
                             res.AsSpan().CopyTo(response.AsSpan(5));
 
-                            Networking.SendMessage(webSocket, response);
+                            PNetworking.SendMessage(webSocket, response);
                         }
                     }
                 }
