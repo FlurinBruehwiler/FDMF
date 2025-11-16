@@ -27,7 +27,7 @@ public static class NetworkingGenerator
     {
         var sb = new SourceBuilder();
 
-        sb.AppendLine("using System.Net.WebSockets;");
+        sb.AppendLine("using System.Threading.Channels;");
         sb.AppendLine();
 
         sb.AppendLine("namespace Networking;");
@@ -39,7 +39,7 @@ public static class NetworkingGenerator
 
         var className = interfaceName.Substring(1);
 
-        sb.AppendLine($"public class {className}(Action<Stream> sendMessage, Dictionary<Guid, PendingRequest> callbacks) : {interfaceName}");
+        sb.AppendLine($"public class {className}(Channel<Stream> sendMessage, Dictionary<Guid, PendingRequest> callbacks) : {interfaceName}");
         sb.AppendLine("{");
         sb.AddIndent();
 

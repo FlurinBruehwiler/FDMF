@@ -2,6 +2,7 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading.Channels;
 using MemoryPack;
 using Model;
 
@@ -28,7 +29,7 @@ public static class NetworkingClient
         return tsc.Task;
     }
 
-    public static Guid SendRequest(Action<Stream> sendMessage, string methodName, object[] parameters, bool isNotification)
+    public static Guid SendRequest(Channel<Stream> sendMessage, string methodName, object[] parameters, bool isNotification)
     {
         var requestGuid = Guid.NewGuid();
 
@@ -36,7 +37,7 @@ public static class NetworkingClient
 
         //todo avoid this memory alloc
 
-        using var memStream = new MemoryStream();
+        var memStream = new MemoryStream();
         using var writer = new BinaryWriter(memStream, Encoding.Unicode, true);
         writer.Write((byte)(isNotification ? MessageType.Notification : MessageType.Request));
 
@@ -56,12 +57,12 @@ public static class NetworkingClient
             writer.Write(data);
         }
 
-        sendMessage(memStream);
+        sendMessage.Writer.WriteAsync(memStream).AsTask().Wait();
 
         return requestGuid;
     }
 
-    public static async Task ProcessMessagesForWebSocket(WebSocket webSocket, SemaphoreSlim sendSemaphore, object messageHandler, Dictionary<Guid, PendingRequest> callbacks)
+    public static async Task ProcessMessagesForWebSocket(WebSocket webSocket, Channel<Stream> messagesToSend, object messageHandler, Dictionary<Guid, PendingRequest> callbacks)
     {
         while (webSocket.State == WebSocketState.Open)
         {
@@ -135,9 +136,7 @@ public static class NetworkingClient
                                                 res.AsSpan().CopyTo(response.AsSpan(17));
 
                                                 //wow, this is code is so bad, please rewrite everything
-                                                await sendSemaphore.WaitAsync();
-                                                await PNetworking.SendMessage(webSocket, response);
-                                                sendSemaphore.Release();
+                                                await messagesToSend.Writer.WriteAsync(new MemoryStream(response));
                                             }
                                             else
                                             {

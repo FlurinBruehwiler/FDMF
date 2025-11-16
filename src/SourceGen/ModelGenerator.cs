@@ -15,9 +15,8 @@ public static class ModelGenerator
             var sourceBuilder = new SourceBuilder();
 
             sourceBuilder.AppendLine("using System.Text;");
-            sourceBuilder.AppendLine("using Shared;");
 
-            sourceBuilder.AppendLine("namespace Server.Generated;");
+            sourceBuilder.AppendLine("namespace Model.Generated;");
             sourceBuilder.AppendLine();
 
             sourceBuilder.AppendLine($"public struct {entity.Key} : ITransactionObject");

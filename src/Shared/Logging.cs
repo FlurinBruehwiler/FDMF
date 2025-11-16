@@ -18,7 +18,7 @@ public static class Logging
 {
     public static LogFlags LogFlags = LogFlags.All;
 
-    public static void Log(LogFlags logFlags, string message)
+    public static void Log(LogFlags logFlags, string? message)
     {
         if ((LogFlags & logFlags) != 0)
         {

@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Net;
 using System.Net.WebSockets;
+using System.Threading.Channels;
 using Model;
 using Networking;
 
@@ -9,7 +10,6 @@ namespace Server;
 public class ConnectedClient
 {
     public required IClientProcedures ClientProcedures;
-    public required SemaphoreSlim WebsocketSendSemaphore;
 }
 
 public class ServerManager
@@ -56,44 +56,46 @@ public class ServerManager
 
                 Logging.Log(LogFlags.Info, "Client connected!");
 
-                var semaphore = new SemaphoreSlim(1, 1);
+                var messagesToSend = Channel.CreateBounded<Stream>(100);
+
                 var connectedClient = new ConnectedClient
                 {
-                    WebsocketSendSemaphore = semaphore,
-                    ClientProcedures = new ClientProcedures(x =>
-                    {
-                        semaphore.Wait();
-                        try
-                        {
-                            x.Seek(0, SeekOrigin.Begin);
-                            using var stream = WebSocketStream.CreateWritableMessageStream(wsContext.WebSocket, WebSocketMessageType.Binary);
-                            x.CopyTo(stream);
-                        }
-                        catch (Exception e)
-                        {
-                            Logging.LogException(e);
-                        }
-                        finally
-                        {
-                            semaphore.Release();
-                        }
-                    }, Callbacks)
+                    ClientProcedures = new ClientProcedures(messagesToSend, Callbacks)
                 };
 
                 ConnectedClients.Add(connectedClient);
 
-                _ = NetworkingClient.ProcessMessagesForWebSocket(wsContext.WebSocket, semaphore, new ServerProceduresImpl(connectedClient), Callbacks).ContinueWith(x =>
+                _ = NetworkingClient.ProcessMessagesForWebSocket(wsContext.WebSocket, messagesToSend, new ServerProceduresImpl(connectedClient), Callbacks).ContinueWith(x =>
                 {
                     if(x.Exception != null)
                         Logging.LogException(x.Exception);
 
                     ConnectedClients.Remove(connectedClient);
-                });;
+                });
+
+                Helper.FireAndForget(SendMessages(messagesToSend, wsContext.WebSocket));
             }
             else
             {
                 context.Response.StatusCode = 400;
                 context.Response.Close();
+            }
+        }
+    }
+
+    public static async Task SendMessages (Channel<Stream> messagesToSend, WebSocket ws)
+    {
+        await foreach (var message in messagesToSend.Reader.ReadAllAsync())
+        {
+            try
+            {
+                message.Seek(0, SeekOrigin.Begin);
+                await using var stream = WebSocketStream.CreateWritableMessageStream(ws, WebSocketMessageType.Binary);
+                await message.CopyToAsync(stream);
+            }
+            catch (Exception e)
+            {
+                Logging.Log(LogFlags.Info, $"Connection closed {e.Message}");
             }
         }
     }
