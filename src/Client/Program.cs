@@ -15,26 +15,30 @@ Logging.Log(LogFlags.Info, "Trying to connect...");
 await ws.ConnectAsync(new Uri("ws://localhost:8080/connect/"), CancellationToken.None);
 Logging.Log(LogFlags.Info, "Connected!");
 
+var semaphore = new SemaphoreSlim(1, 1);
+
 Dictionary<Guid, PendingRequest> pendingRequests = [];
-_ = NetworkingClient.ProcessMessagesForWebSocket(ws, new ClientProceduresImpl(), pendingRequests).ContinueWith(x =>
+_ = NetworkingClient.ProcessMessagesForWebSocket(ws, semaphore, new ClientProceduresImpl(), pendingRequests).ContinueWith(x =>
 {
     Logging.LogException(x.Exception);
 }, TaskContinuationOptions.OnlyOnFaulted);
 
 IServerProcedures serverProcedures = new ServerProcedures(x =>
 {
+    semaphore.Wait();
     try
     {
-        lock (ws)
-        {
-            x.Seek(0, SeekOrigin.Begin);
-            using var stream = WebSocketStream.CreateWritableMessageStream(ws, WebSocketMessageType.Binary);
-            x.CopyTo(stream);
-        }
+        x.Seek(0, SeekOrigin.Begin);
+        using var stream = WebSocketStream.CreateWritableMessageStream(ws, WebSocketMessageType.Binary);
+        x.CopyTo(stream);
     }
     catch (Exception e)
     {
         Logging.Log(LogFlags.Info, $"Connection closed {e.Message}");
+    }
+    finally
+    {
+        semaphore.Release();
     }
 }, pendingRequests);
 

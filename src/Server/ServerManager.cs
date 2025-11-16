@@ -9,6 +9,7 @@ namespace Server;
 public class ConnectedClient
 {
     public required IClientProcedures ClientProcedures;
+    public required SemaphoreSlim WebsocketSendSemaphore;
 }
 
 public class ServerManager
@@ -55,30 +56,33 @@ public class ServerManager
 
                 Logging.Log(LogFlags.Info, "Client connected!");
 
+                var semaphore = new SemaphoreSlim(1, 1);
                 var connectedClient = new ConnectedClient
                 {
+                    WebsocketSendSemaphore = semaphore,
                     ClientProcedures = new ClientProcedures(x =>
                     {
+                        semaphore.Wait();
                         try
                         {
-                            lock (wsContext.WebSocket)
-                            {
-                                //todo, make this an async op on a different thread maybe
-                                x.Seek(0, SeekOrigin.Begin);
-                                using var stream = WebSocketStream.CreateWritableMessageStream(wsContext.WebSocket, WebSocketMessageType.Binary);
-                                x.CopyTo(stream);
-                            }
+                            x.Seek(0, SeekOrigin.Begin);
+                            using var stream = WebSocketStream.CreateWritableMessageStream(wsContext.WebSocket, WebSocketMessageType.Binary);
+                            x.CopyTo(stream);
                         }
                         catch (Exception e)
                         {
                             Logging.LogException(e);
+                        }
+                        finally
+                        {
+                            semaphore.Release();
                         }
                     }, Callbacks)
                 };
 
                 ConnectedClients.Add(connectedClient);
 
-                _ = NetworkingClient.ProcessMessagesForWebSocket(wsContext.WebSocket, new ServerProceduresImpl(connectedClient), Callbacks).ContinueWith(x =>
+                _ = NetworkingClient.ProcessMessagesForWebSocket(wsContext.WebSocket, semaphore, new ServerProceduresImpl(connectedClient), Callbacks).ContinueWith(x =>
                 {
                     if(x.Exception != null)
                         Logging.LogException(x.Exception);

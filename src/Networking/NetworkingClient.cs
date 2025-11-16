@@ -61,10 +61,8 @@ public static class NetworkingClient
         return requestGuid;
     }
 
-    public static async Task ProcessMessagesForWebSocket(WebSocket webSocket, object messageHandler, Dictionary<Guid, PendingRequest> callbacks)
+    public static async Task ProcessMessagesForWebSocket(WebSocket webSocket, SemaphoreSlim sendSemaphore, object messageHandler, Dictionary<Guid, PendingRequest> callbacks)
     {
-        SemaphoreSlim mutext = new SemaphoreSlim(1, 1);
-
         while (webSocket.State == WebSocketState.Open)
         {
             var messageContent = (await PNetworking.GetNextMessage(webSocket)).Span;
@@ -137,9 +135,9 @@ public static class NetworkingClient
                                                 res.AsSpan().CopyTo(response.AsSpan(17));
 
                                                 //wow, this is code is so bad, please rewrite everything
-                                                await mutext.WaitAsync();
+                                                await sendSemaphore.WaitAsync();
                                                 await PNetworking.SendMessage(webSocket, response);
-                                                mutext.Release();
+                                                sendSemaphore.Release();
                                             }
                                             else
                                             {
