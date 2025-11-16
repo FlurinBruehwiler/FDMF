@@ -57,7 +57,7 @@ public static class NetworkingClient
             writer.Write(data);
         }
 
-        sendMessage.Writer.WriteAsync(memStream).AsTask().Wait();
+        _ = sendMessage.Writer.WriteAsync(memStream); //not awaited, not sure if this is correct...
 
         return requestGuid;
     }
