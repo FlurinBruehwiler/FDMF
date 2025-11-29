@@ -11,33 +11,36 @@ public static class NetworkingGenerator
     public static void Generate(string interfaceFilePath)
     {
         var interfaceFile = File.ReadAllText(interfaceFilePath);
+
         SyntaxTree tree = CSharpSyntaxTree.ParseText(interfaceFile);
+
         var interfaces = new List<InterfaceDeclarationSyntax>();
+
         new InterfaceMemberFinder(interfaces).Visit(tree.GetRoot());
 
         foreach (var i in interfaces)
         {
-            var genText = GenerateInterfaceImplementation(i);
-            var genFilePath = Path.Combine(Path.GetDirectoryName(interfaceFilePath)!, Path.GetFileName(interfaceFilePath).Substring(1));
+            var (genText, className) = GenerateInterfaceImplementation(i);
+            var genFilePath = Path.Combine(Path.GetDirectoryName(interfaceFilePath)!, "Generated" , className + ".cs");
             File.WriteAllText(genFilePath, genText);
         }
     }
 
-    private static string GenerateInterfaceImplementation(InterfaceDeclarationSyntax interfaceDeclarationSyntax)
+    private static (string sourceText, string className) GenerateInterfaceImplementation(InterfaceDeclarationSyntax interfaceDeclarationSyntax)
     {
         var sb = new SourceBuilder();
 
         sb.AppendLine("using System.Threading.Channels;");
         sb.AppendLine();
 
-        sb.AppendLine("namespace Networking;");
+        sb.AppendLine("namespace Shared;");
         sb.AppendLine();
 
         var interfaceName = interfaceDeclarationSyntax.Identifier.Text;
 
         Debug.Assert(interfaceName.StartsWith("I"));
 
-        var className = interfaceName.Substring(1);
+        var className = "Generated" + interfaceName.Substring(1);
 
         sb.AppendLine($"public class {className}(Channel<Stream> sendMessage, Dictionary<Guid, PendingRequest> callbacks) : {interfaceName}");
         sb.AppendLine("{");
@@ -76,7 +79,7 @@ public static class NetworkingGenerator
         sb.RemoveIndent();
         sb.AppendLine("}");
 
-        return sb.ToString();
+        return (sb.ToString(), className);
     }
 
     private static bool TryGetTaskTypeArgumentSyntax(
@@ -103,6 +106,8 @@ public static class NetworkingGenerator
         if (generic.TypeArgumentList.Arguments.Count != 1)
             return false;
 
+
+
         typeArg = generic.TypeArgumentList.Arguments[0];
         return true;
     }
@@ -113,5 +118,10 @@ public class InterfaceMemberFinder(List<InterfaceDeclarationSyntax> interfaces) 
     public override void VisitInterfaceDeclaration(InterfaceDeclarationSyntax node)
     {
         interfaces.Add(node);
+    }
+
+    public override void VisitVariableDeclaration(VariableDeclarationSyntax node)
+    {
+        Console.WriteLine("");
     }
 }

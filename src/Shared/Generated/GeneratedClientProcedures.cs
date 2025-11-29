@@ -1,8 +1,8 @@
 using System.Threading.Channels;
 
-namespace Model;
+namespace Shared;
 
-public class ClientProcedures(Channel<Stream> sendMessage, Dictionary<Guid, PendingRequest> callbacks) : IClientProcedures
+public class GeneratedClientProcedures(Channel<Stream> sendMessage, Dictionary<Guid, PendingRequest> callbacks) : IClientProcedures
 {
     public void Ping()
     {

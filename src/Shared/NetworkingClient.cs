@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Channels;
 using MemoryPack;
 
-namespace Model;
+namespace Shared;
 
 public struct PendingRequest
 {

@@ -1,7 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 
-namespace Model;
+namespace Shared;
 
 [Flags]
 public enum LogFlags

@@ -1,6 +1,6 @@
 ﻿using System.Net.WebSockets;
 
-namespace Model;
+namespace Shared;
 
 /*
  * Goals of this networking implementation:

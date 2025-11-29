@@ -1,8 +1,8 @@
-﻿using Model;
+﻿using Shared;
 
 namespace Client;
 
-class ClientProceduresImpl : IClientProcedures
+class ClientProcedures : IClientProcedures
 {
     public void Ping()
     {

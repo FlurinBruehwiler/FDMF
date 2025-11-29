@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using LightningDB;
 
-namespace Model;
+namespace Shared;
 
 public unsafe struct Slice<T> where T : unmanaged
 {
@@ -79,10 +79,10 @@ public struct Change
 //do we want/need locks in here to ensure that there aren't multiple threads at the same time interacting with the transaction
 public sealed class Transaction : IDisposable
 {
-    public LightningTransaction LightningTransaction;
-    public LightningCursor Cursor;
-    public LightningDatabase ObjectDb;
-    public LightningDatabase HistoryDb;
+    public readonly LightningTransaction LightningTransaction;
+    public readonly LightningCursor Cursor;
+    public readonly LightningDatabase ObjectDb;
+    public readonly LightningDatabase HistoryDb;
 
     public Transaction(Environment environment)
     {

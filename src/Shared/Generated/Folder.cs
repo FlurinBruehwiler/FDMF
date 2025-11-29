@@ -1,5 +1,5 @@
 using System.Text;
-namespace Model.Generated;
+namespace Shared.Generated;
 
 public struct Folder : ITransactionObject
 {

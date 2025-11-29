@@ -1,6 +1,6 @@
 ﻿using MemoryPack;
 
-namespace Model;
+namespace Shared;
 
 [MemoryPackable]
 public partial struct ServerStatus

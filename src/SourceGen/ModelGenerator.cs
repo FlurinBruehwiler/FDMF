@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 using System.Text;
-using Model;
+using Shared;
 
 namespace SourceGen;
 
@@ -16,7 +16,7 @@ public static class ModelGenerator
 
             sourceBuilder.AppendLine("using System.Text;");
 
-            sourceBuilder.AppendLine("namespace Model.Generated;");
+            sourceBuilder.AppendLine("namespace Shared.Generated;");
             sourceBuilder.AppendLine();
 
             sourceBuilder.AppendLine($"public struct {entity.Key} : ITransactionObject");

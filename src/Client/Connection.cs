@@ -1,8 +1,6 @@
-﻿using System.Collections;
-using System.Collections.Concurrent;
-using System.Net.WebSockets;
+﻿using System.Net.WebSockets;
 using System.Threading.Channels;
-using Model;
+using Shared;
 
 namespace Client;
 
@@ -10,7 +8,7 @@ public class ClientState
 {
     public required Channel<Stream> MessagesToSend;
     public required Dictionary<Guid, PendingRequest> PendingRequests;
-    public required ServerProcedures ServerProcedures;
+    public required IServerProcedures ServerProcedures;
 }
 
 public static class Connection
@@ -24,7 +22,7 @@ public static class Connection
         {
             MessagesToSend = messages,
             PendingRequests = pendingRequests,
-            ServerProcedures = new ServerProcedures(messages, pendingRequests)
+            ServerProcedures = new GeneratedServerProcedures(messages, pendingRequests)
         };
     }
 

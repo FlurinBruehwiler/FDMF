@@ -1,8 +1,8 @@
 using System.Threading.Channels;
 
-namespace Model;
+namespace Shared;
 
-public class ServerProcedures(Channel<Stream> sendMessage, Dictionary<Guid, PendingRequest> callbacks) : IServerProcedures
+public class GeneratedServerProcedures(Channel<Stream> sendMessage, Dictionary<Guid, PendingRequest> callbacks) : IServerProcedures
 {
     public Task<ServerStatus> GetStatus(int a, int b)
     {

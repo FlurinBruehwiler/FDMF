@@ -1,6 +1,6 @@
 ﻿using LightningDB;
 
-namespace Model;
+namespace Shared;
 
 public class Environment
 {

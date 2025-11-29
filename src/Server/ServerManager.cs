@@ -2,7 +2,7 @@
 using System.Net;
 using System.Net.WebSockets;
 using System.Threading.Channels;
-using Model;
+using Shared;
 
 namespace Server;
 
@@ -59,7 +59,7 @@ public class ServerManager
 
                 var connectedClient = new ConnectedClient
                 {
-                    ClientProcedures = new ClientProcedures(messagesToSend, Callbacks)
+                    ClientProcedures = new GeneratedClientProcedures(messagesToSend, Callbacks)
                 };
 
                 ConnectedClients.Add(connectedClient);

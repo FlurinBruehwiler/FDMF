@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <RootNamespace>Model</RootNamespace>
+    <RootNamespace>Shared</RootNamespace>
   </PropertyGroup>
 
 

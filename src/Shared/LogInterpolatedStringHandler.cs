@@ -1,7 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace Model;
+namespace Shared;
 
 [InterpolatedStringHandler]
 public struct LogInterpolatedStringHandler
