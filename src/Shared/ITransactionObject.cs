@@ -1,4 +1,6 @@
-﻿namespace Shared;
+﻿using Shared.Database;
+
+namespace Shared;
 
 public interface ITransactionObject
 {

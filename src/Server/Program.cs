@@ -1,5 +1,5 @@
-﻿using Server;
-using Shared;
+﻿using Shared;
+using Shared.Database;
 using Shared.Generated;
 
 //we can store all fields objId+fieldIds that where changed in a dictionary within the transaction,
@@ -9,25 +9,30 @@ using Shared.Generated;
 
 var env = Shared.Environment.Create();
 
+var tsx = new Transaction(env);
 {
-    var tsx = new Transaction(env);
     var folder = new Folder(tsx);
-    folder.Name = "Anita";
-    Console.WriteLine(folder.Name);
-
-    var folder2 = new Folder(tsx);
-    folder2.Name = "Max";
-    Console.WriteLine(folder2.Name);
-
-    var folder3 = new Folder(tsx);
-    folder3.Name = "Wynn";
-    Console.WriteLine(folder3.Name);
-
-    var result = Searcher.Search<Folder>(tsx, new FieldCriterion { FieldId = Folder.Fields.Name, Value = "Max" }).ToArray();
-
-    Console.WriteLine(result.Length == 1);
-    Console.WriteLine(result.First() == folder2);
+    folder.Name = "foo";
 }
+tsx.Commit();
+
+var tsx2 = new Transaction(env);
+{
+    var folder = new Folder(tsx2);
+    folder.Name = "foo2";
+}
+tsx2.Commit();
+
+{
+    var t = new Transaction(env);
+    var folders = Searcher.Search<Folder>(t);
+    foreach (var folder in folders)
+    {
+        Console.WriteLine(folder.Name);
+    }
+}
+
+// var tsx2 = new Transaction(env);
 
 
 // Logging.LogFlags = LogFlags.Error | LogFlags.Performance;

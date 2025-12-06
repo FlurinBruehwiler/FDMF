@@ -1,11 +1,10 @@
 ﻿using System.Collections;
-using System.ComponentModel.Design;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using LightningDB;
 
-namespace Shared;
+namespace Shared.Database;
 
 public unsafe struct Slice<T> where T : unmanaged
 {
@@ -95,6 +94,7 @@ public sealed class Transaction : IDisposable
     public readonly LightningDatabase ObjectDb;
     public readonly LightningDatabase HistoryDb;
 
+
     public Transaction(Environment environment)
     {
         LightningTransaction = environment.LightningEnvironment.BeginTransaction();
@@ -176,7 +176,6 @@ public sealed class Transaction : IDisposable
     public Guid CreateObj(Guid typId)
     {
         //The idea here is to have the objects ordered by creation time in the db, in an attempt to have frequently used objects closer together,
-        //but I'm not sure if this will actually work
         var id = Guid.CreateVersion7();
 
         var val = new ObjValue

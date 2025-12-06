@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.WebSockets;
 using System.Threading.Channels;
 using Shared;
+using Shared.Database;
 
 namespace Server;
 

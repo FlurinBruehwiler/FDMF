@@ -1,5 +1,7 @@
 using System.Text;
 using MemoryPack;
+using Shared.Database;
+
 namespace Shared.Generated;
 
 [MemoryPackable]
