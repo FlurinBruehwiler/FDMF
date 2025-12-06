@@ -13,9 +13,9 @@ public class BPlusTreeTests
         var key = B(1,2,3);
         var value = B(9,9,9);
 
-        tree.Insert(key, value);
+        tree.Put(key, value);
 
-        var result = tree.Search(key);
+        var result = tree.Get(key);
         Assert.NotNull(result);
         Assert.Equal(value, result);
     }
@@ -24,9 +24,9 @@ public class BPlusTreeTests
     public void Search_Missing_Key_Returns_Null()
     {
         var tree = new BPlusTree();
-        tree.Insert(B(1), B(10));
+        tree.Put(B(1), B(10));
 
-        Assert.Null(tree.Search(B(2)));
+        Assert.Null(tree.Get(B(2)));
     }
 
     [Fact]
@@ -35,10 +35,10 @@ public class BPlusTreeTests
         var tree = new BPlusTree(branchingFactor: 4);
 
         for (int i = 0; i < 50; i++)
-            tree.Insert(new[]{(byte)i}, new[]{(byte)(i+1)});
+            tree.Put(new[]{(byte)i}, new[]{(byte)(i+1)});
 
         for (int i = 0; i < 50; i++)
-            Assert.Equal(new[]{(byte)(i+1)}, tree.Search(new[]{(byte)i}));
+            Assert.Equal(new[]{(byte)(i+1)}, tree.Get(new[]{(byte)i}));
     }
 
     [Fact]
@@ -47,10 +47,10 @@ public class BPlusTreeTests
         var tree = new BPlusTree(branchingFactor: 4);
 
         for (int i = 50; i >= 0; i--)
-            tree.Insert(new[]{(byte)i}, new[]{(byte)(i+1)});
+            tree.Put(new[]{(byte)i}, new[]{(byte)(i+1)});
 
         for (int i = 50; i >= 0; i--)
-            Assert.Equal(new[]{(byte)(i+1)}, tree.Search(new[]{(byte)i}));
+            Assert.Equal(new[]{(byte)(i+1)}, tree.Get(new[]{(byte)i}));
     }
 
     [Fact]
@@ -60,10 +60,10 @@ public class BPlusTreeTests
 
         // Force several splits
         for (int i = 0; i < 200; i++)
-            tree.Insert(new[]{(byte)i}, new[]{(byte)(i*2)});
+            tree.Put(new[]{(byte)i}, new[]{(byte)(i*2)});
 
         for (int i = 0; i < 200; i++)
-            Assert.Equal(new[]{(byte)(i*2)}, tree.Search(new[]{(byte)i}));
+            Assert.Equal(new[]{(byte)(i*2)}, tree.Get(new[]{(byte)i}));
     }
 
     [Fact]
@@ -71,13 +71,13 @@ public class BPlusTreeTests
     {
         var tree = new BPlusTree(branchingFactor: 4);
 
-        tree.Insert(B(1,2,3), B(5));
-        tree.Insert(B(1,2), B(6));
-        tree.Insert(B(1,2,3,4), B(7));
+        tree.Put(B(1,2,3), B(5));
+        tree.Put(B(1,2), B(6));
+        tree.Put(B(1,2,3,4), B(7));
 
-        Assert.Equal(B(5), tree.Search(B(1,2,3)));
-        Assert.Equal(B(6), tree.Search(B(1,2)));
-        Assert.Equal(B(7), tree.Search(B(1,2,3,4)));
+        Assert.Equal(B(5), tree.Get(B(1,2,3)));
+        Assert.Equal(B(6), tree.Get(B(1,2)));
+        Assert.Equal(B(7), tree.Get(B(1,2,3,4)));
     }
 
     [Fact]
@@ -86,10 +86,10 @@ public class BPlusTreeTests
         var tree = new BPlusTree();
 
         var key = B(5);
-        tree.Insert(key, B(10));
-        tree.Insert(key, B(20));
+        tree.Put(key, B(10));
+        tree.Put(key, B(20));
 
-        Assert.Equal(B(20), tree.Search(key));
+        Assert.Equal(B(20), tree.Get(key));
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public class BPlusTreeTests
         var tree = new BPlusTree();
 
         for (byte i = 0; i < 20; i++)
-            tree.Insert(B(i), B((byte)(i * 2)));
+            tree.Put(B(i), B((byte)(i * 2)));
 
         var cursor = tree.CreateCursor();
         cursor.SetRange(B(10));
@@ -124,10 +124,10 @@ public class BPlusTreeTests
         var tree = new BPlusTree();
 
         for (byte i = 0; i < 10; i++)
-            tree.Insert(B(i), B((byte)(i * 2)));
+            tree.Put(B(i), B((byte)(i * 2)));
 
         for (byte i = 20; i < 30; i++)
-            tree.Insert(B(i), B((byte)(i * 2)));
+            tree.Put(B(i), B((byte)(i * 2)));
 
         var cursor = tree.CreateCursor();
         cursor.SetRange(B(15));

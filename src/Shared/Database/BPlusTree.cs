@@ -2,6 +2,8 @@
 
 // A simple B+Tree implementation that stores key-value pairs as byte[]
 // Keys are compared lexicographically.
+// TODO, this is a very bad and unoptimized implementation of a B+ Tree, this should be refactored to allocate way less memory.
+
 public class BPlusTree
 {
     private abstract class Node
@@ -34,7 +36,7 @@ public class BPlusTree
     }
 
     // Lexicographic compare of byte[] keys
-    private static int Compare(byte[] a, byte[] b)
+    public static int CompareSpan(ReadOnlySpan<byte> a, ReadOnlySpan<byte> b)
     {
         int len = Math.Min(a.Length, b.Length);
         for (int i = 0; i < len; i++)
@@ -45,8 +47,10 @@ public class BPlusTree
         return a.Length.CompareTo(b.Length);
     }
 
+    public static int Compare(byte[] a, byte[] b) => CompareSpan(a, b);
+
     // Public Insert API
-    public void Insert(byte[] key, byte[] value)
+    public ResultCode Put(byte[] key, byte[] value)
     {
         var split = InsertInternal(_root, key, value);
         if (split != null)
@@ -57,6 +61,13 @@ public class BPlusTree
             newRoot.Children.Add(split.Right);
             _root = newRoot;
         }
+
+        return ResultCode.Success;
+    }
+
+    public ResultCode Delete(byte[] key)
+    {
+
     }
 
     private class SplitResult
@@ -151,9 +162,15 @@ public class BPlusTree
     }
 
     // Lookup
-    public byte[] Search(byte[] key)
+    public (ResultCode resultCode, byte[] key, byte[] value) Get(byte[] key)
     {
-        return SearchExactInternal(_root, key);
+        var value = SearchExactInternal(_root, key);
+        if (value == null)
+        {
+            return (ResultCode.NotFound, key, null);
+        }
+
+        return (ResultCode.Success, key, value);
     }
 
     private byte[] SearchExactInternal(Node node, byte[] key)
@@ -254,6 +271,11 @@ public class BPlusTree
         {
             (key, value, success) = tree.SearchGreaterOrEqualsThan(tree._root, key, true);
             return (!success, key, value);
+        }
+
+        public bool Delete()
+        {
+
         }
     }
 }

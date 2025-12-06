@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Diagnostics;
+using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using LightningDB;
@@ -34,6 +35,11 @@ public unsafe struct Slice<T> where T : unmanaged
     public Slice<byte> AsByteSlice()
     {
         return new Slice<byte>((byte*)Items, Length * sizeof(T));
+    }
+
+    public static Slice<T> Empty()
+    {
+        return new Slice<T>();
     }
 }
 
@@ -85,6 +91,184 @@ public struct Change
 // HistDb_UserKey
 // UserId = histId
 
+public enum ResultCode
+{
+    Success,
+    NotFound
+}
+
+public enum ValueFlag : byte{
+    AddModify,
+    Delete
+}
+
+//This represents a "long lived" transaction, there can multiple of these write transactions at the same time.
+//Specifically, it reads from the LMDB DB with a changeset layered ontop.
+//Once Commit is called, a LMDB write transaction is created (behind a lock) and the changeset is written to LMDB.
+//This replicates the LMDB API, we could put it behind an interface so that the three KV stores (LMDB, ChangeSet, LMDB + Changeset) have the same api.
+public sealed class TransactionalKvStore
+{
+    public LightningTransaction ReadTransaction;
+    public LightningDatabase Database;
+
+    //todo we should combine these changesets, the problem is, we need a flag to indicate if a value was deleted or not,
+    //if we have the flag in the value, we have to copy the value around (to insert the flag at the beginning),
+    //so we could also just append it to the key, which is usually smaller....
+    public BPlusTree ChangeSet;
+
+    public ResultCode Put(ReadOnlySpan<byte> key, ReadOnlySpan<byte> value)
+    {
+        //remove from deleteChangeSet if exists
+        // DeleteChangeSet.Delete(key.ToArray());
+
+        //todo, don't call ToArray
+        return ChangeSet.Put(key.ToArray(), value.ToArray());
+    }
+
+    private static byte[] WrapValue(ReadOnlySpan<byte> data, ValueFlag flag)
+    {
+        var arr = new byte[data.Length + 1];
+        arr[0] = (byte)flag;
+        data.CopyTo(arr.AsSpan(1));
+        return arr;
+    }
+
+    public (ResultCode resultCode, Slice<byte> key, byte[] value) Get(ReadOnlySpan<byte> key)
+    {
+        //check the deleted changeset
+        //check the additive changeset
+        //check the lmdb transaction
+
+        //todo don't call ToArray
+        var (additiveResult, _, newValue) = ChangeSet.Get(key.ToArray());
+        if (additiveResult == ResultCode.Success)
+        {
+            if(newValue[0] == (byte)ValueFlag.Delete)
+                return (ResultCode.NotFound, Slice<byte>.Empty(), []);
+
+            return (ResultCode.Success, new Slice<byte>(key), newValue.AsSpan(1).ToArray());
+        }
+
+        var (lmdbResult, _, value) = ReadTransaction.Get(Database, key);
+        if (lmdbResult == MDBResultCode.Success)
+            return (ResultCode.Success, new Slice<byte>(key), value.CopyToNewArray()); //todo don't create array
+
+        return (ResultCode.NotFound, Slice<byte>.Empty(), []);
+    }
+
+    public ResultCode Delete(ReadOnlySpan<byte> key)
+    {
+        if (ReadTransaction.Get(Database, key).resultCode == MDBResultCode.Success)
+        {
+            ChangeSet.Put(key.ToArray(), [ (byte)ValueFlag.Delete ]);
+        }
+        else
+        {
+            ChangeSet.Delete(key.ToArray());
+        }
+
+        return ResultCode.Success; //todo should we check if it existed
+    }
+
+    public Cursor CreateCursor()
+    {
+        return new Cursor
+        {
+            LightningCursor = ReadTransaction.CreateCursor(Database),
+            ChangeSetCursor = ChangeSet.CreateCursor(),
+            ChangeSet = ChangeSet
+        };
+    }
+
+    public struct Cursor
+    {
+        public required LightningCursor LightningCursor;
+        public required BPlusTree.Cursor ChangeSetCursor;
+
+        public required BPlusTree ChangeSet;
+
+        public ResultCode SetRange(ReadOnlySpan<byte> key)
+        {
+            LightningCursor.SetRange(key);
+            ChangeSetCursor.SetRange(key.ToArray());
+            //DeleteCursor.SetRange(key.ToArray());
+
+            return ResultCode.Success;
+        }
+
+        public ResultCode Delete()
+        {
+            var baseSet = LightningCursor.GetCurrent();
+            var changeSet = ChangeSetCursor.GetCurrent();
+
+            var comp = BPlusTree.CompareSpan(baseSet.key.AsSpan(), changeSet.key.AsSpan());
+            if (comp <= 0)
+            {
+                ChangeSet.Put(baseSet.key.CopyToNewArray(), []);
+            }
+            else
+            {
+                //change is smaller than base
+                ChangeSetCursor.Delete();
+            }
+
+            return ResultCode.Success;
+        }
+
+        public (ResultCode resultCode, byte[] key, byte[] value) GetCurrent()
+        {
+            var baseSet = LightningCursor.GetCurrent();
+            var changeSet = ChangeSetCursor.GetCurrent();
+
+            //return the lower, if both are the same, return changeSet
+
+            var comp = BPlusTree.CompareSpan(baseSet.key.AsSpan(), changeSet.key.AsSpan());
+            if (comp < 0)
+            {
+                // baseSet is smaller than changeSet
+                return (ResultCode.Success, baseSet.key.CopyToNewArray(), baseSet.value.CopyToNewArray());
+            }
+
+            Debug.Assert(changeSet.value[0] == (byte)ValueFlag.AddModify);
+
+            return (ResultCode.Success, changeSet.key, changeSet.value);
+        }
+
+        public (ResultCode resultCode, byte[] key, byte[] value) Next()
+        {
+            //we are currently on a value, it is either from the read or the change dataset
+            //both read and change have a current value
+            //we take the lower of the two and call next
+
+            //if both are the same, we advance both. GetCurrent returns the lower value!
+
+            next:
+            var a = LightningCursor.GetCurrent();
+            var b = ChangeSetCursor.GetCurrent();
+
+            var comp = BPlusTree.CompareSpan(a.key.AsSpan(), b.key.AsSpan());
+            if (comp <= 0)
+            {
+                LightningCursor.Next();
+            }
+
+            if (comp >= 0)
+            {
+                var (result, _, value) = ChangeSetCursor.Next();
+
+                if (result)
+                {
+                    if (value[0] == (byte)ValueFlag.Delete)
+                    {
+                        goto next;
+                    }
+                }
+            }
+
+            return GetCurrent();
+        }
+    }
+}
 
 //do we want/need locks in here to ensure that there aren't multiple threads at the same time interacting with the transaction
 public sealed class Transaction : IDisposable
@@ -94,10 +278,9 @@ public sealed class Transaction : IDisposable
     public readonly LightningDatabase ObjectDb;
     public readonly LightningDatabase HistoryDb;
 
-
     public Transaction(Environment environment)
     {
-        LightningTransaction = environment.LightningEnvironment.BeginTransaction();
+        LightningTransaction = environment.LightningEnvironment.BeginTransaction(TransactionBeginFlags.ReadOnly);
 
         Cursor = LightningTransaction.CreateCursor(environment.ObjectDb);
         ObjectDb = environment.ObjectDb;
