@@ -1,5 +1,7 @@
 ﻿using Shared.Database;
 
+namespace Tests;
+
 public class BPlusTreeTests
 {
     private static byte[] B(params byte[] x) => x;
@@ -14,8 +16,7 @@ public class BPlusTreeTests
         tree.Put(key, value);
 
         var result = tree.Get(key);
-        Assert.NotNull(result);
-        Assert.Equal(value, result.value);
+        Assert.Equal(value, result.Value);
     }
 
     [Fact]
@@ -24,7 +25,7 @@ public class BPlusTreeTests
         var tree = new BPlusTree();
         tree.Put(B(1), B(10));
 
-        Assert.True(tree.Get(B(2)).resultCode == ResultCode.NotFound);
+        Assert.True(tree.Get(B(2)).ResultCode == ResultCode.NotFound);
     }
 
     [Fact]
@@ -33,10 +34,10 @@ public class BPlusTreeTests
         var tree = new BPlusTree(branchingFactor: 4);
 
         for (int i = 0; i < 50; i++)
-            tree.Put(new[]{(byte)i}, new[]{(byte)(i+1)});
+            tree.Put([(byte)i], [(byte)(i+1)]);
 
         for (int i = 0; i < 50; i++)
-            Assert.Equal(new[]{(byte)(i+1)}, tree.Get(new[]{(byte)i}).value);
+            Assert.Equal(new[]{(byte)(i+1)}, tree.Get([(byte)i]).Value);
     }
 
     [Fact]
@@ -45,10 +46,10 @@ public class BPlusTreeTests
         var tree = new BPlusTree(branchingFactor: 4);
 
         for (int i = 50; i >= 0; i--)
-            tree.Put(new[]{(byte)i}, new[]{(byte)(i+1)});
+            tree.Put([(byte)i], [(byte)(i+1)]);
 
         for (int i = 50; i >= 0; i--)
-            Assert.Equal(new[]{(byte)(i+1)}, tree.Get(new[]{(byte)i}).value);
+            Assert.Equal(new[]{(byte)(i+1)}, tree.Get([(byte)i]).Value);
     }
 
     [Fact]
@@ -58,10 +59,10 @@ public class BPlusTreeTests
 
         // Force several splits
         for (int i = 0; i < 200; i++)
-            tree.Put(new[]{(byte)i}, new[]{(byte)(i*2)});
+            tree.Put([(byte)i], [(byte)(i*2)]);
 
         for (int i = 0; i < 200; i++)
-            Assert.Equal(new[]{(byte)(i*2)}, tree.Get(new[]{(byte)i}).value);
+            Assert.Equal(new[]{(byte)(i*2)}, tree.Get([(byte)i]).Value);
     }
 
     [Fact]
@@ -73,9 +74,9 @@ public class BPlusTreeTests
         tree.Put(B(1,2), B(6));
         tree.Put(B(1,2,3,4), B(7));
 
-        Assert.Equal(B(5), tree.Get(B(1,2,3)).value);
-        Assert.Equal(B(6), tree.Get(B(1,2)).value);
-        Assert.Equal(B(7), tree.Get(B(1,2,3,4)).value);
+        Assert.Equal(B(5), tree.Get(B(1,2,3)).Value);
+        Assert.Equal(B(6), tree.Get(B(1,2)).Value);
+        Assert.Equal(B(7), tree.Get(B(1,2,3,4)).Value);
     }
 
     [Fact]
@@ -87,7 +88,7 @@ public class BPlusTreeTests
         tree.Put(key, B(10));
         tree.Put(key, B(20));
 
-        Assert.Equal(B(20), tree.Get(key).value);
+        Assert.Equal(B(20), tree.Get(key).Value);
     }
 
     [Fact]
@@ -143,5 +144,18 @@ public class BPlusTreeTests
         }
 
         Assert.False(cursor.Next().success);
+    }
+
+    [Fact]
+    public void Delete()
+    {
+        var tree = new BPlusTree();
+
+        var key = B(1);
+
+        tree.Put(key, B(2));
+
+        Assert.True(tree.Delete(key) == ResultCode.Success);
+        Assert.True(tree.Get(key).ResultCode == ResultCode.NotFound);
     }
 }

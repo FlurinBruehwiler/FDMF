@@ -146,7 +146,7 @@ public sealed class TransactionalKvStore
             if(newValue[0] == (byte)ValueFlag.Delete)
                 return (ResultCode.NotFound, Slice<byte>.Empty(), []);
 
-            return (ResultCode.Success, new Slice<byte>(key), newValue.AsSpan(1).ToArray());
+            return (ResultCode.Success, new Slice<byte>(key), newValue.Slice(1).ToArray());
         }
 
         var (lmdbResult, _, value) = ReadTransaction.Get(Database, key);

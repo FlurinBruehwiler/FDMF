@@ -6,6 +6,27 @@
 
 public class BPlusTree
 {
+    public ref struct Result
+    {
+        public ResultCode ResultCode;
+        public ReadOnlySpan<byte> Key;
+        public ReadOnlySpan<byte> Value;
+
+        public Result(ResultCode resultCode, ReadOnlySpan<byte> key, ReadOnlySpan<byte> value)
+        {
+            ResultCode = resultCode;
+            Key = key;
+            Value = value;
+        }
+
+        public void Deconstruct(out ResultCode resultCode, out ReadOnlySpan<byte> key, out ReadOnlySpan<byte> value)
+        {
+            resultCode = ResultCode;
+            key = Key;
+            value = Value;
+        }
+    }
+
     private abstract class Node
     {
         public List<byte[]> Keys = new List<byte[]>();
@@ -46,8 +67,6 @@ public class BPlusTree
         }
         return a.Length.CompareTo(b.Length);
     }
-
-    public static int Compare(byte[] a, byte[] b) => CompareSpan(a, b);
 
     // Public Insert API
     public ResultCode Put(byte[] key, byte[] value)
@@ -154,7 +173,7 @@ public class BPlusTree
         if (node.IsLeaf)
         {
             var leaf = (LeafNode)node;
-            int pos = leaf.Keys.BinarySearch(key, Comparer<byte[]>.Create(Compare));
+            int pos = BinarySearch(leaf.Keys, key);
 
             //if the key already exists, we replace the value
             if (pos >= 0)
@@ -174,7 +193,7 @@ public class BPlusTree
         else
         {
             var internalNode = (InternalNode)node;
-            int childIndex = internalNode.Keys.BinarySearch(key, Comparer<byte[]>.Create(Compare));
+            int childIndex = BinarySearch(internalNode.Keys, key);
             if (childIndex >= 0) childIndex++;
             else childIndex = ~childIndex;
 
@@ -234,33 +253,52 @@ public class BPlusTree
     }
 
     // Lookup
-    public (ResultCode resultCode, byte[] key, byte[] value) Get(byte[] key)
+    public Result Get(ReadOnlySpan<byte> key)
     {
-        var value = SearchExactInternal(_root, key);
-        if (value == null)
-        {
-            return (ResultCode.NotFound, key, null);
-        }
-
-        return (ResultCode.Success, key, value);
+        return SearchExactInternal(_root, key);
     }
 
-    private byte[] SearchExactInternal(Node node, byte[] key)
+    private Result SearchExactInternal(Node node, ReadOnlySpan<byte> key)
     {
-        if (node.IsLeaf)
-        {
+        if (node.IsLeaf) {
             var leaf = (LeafNode)node;
-            int pos = leaf.Keys.BinarySearch(key, Comparer<byte[]>.Create(Compare));
-            return pos >= 0 ? leaf.Values[pos] : null;
+            int pos = BinarySearch(leaf.Keys, key);
+            if (pos >= 0)
+                return new Result(ResultCode.Success, key, leaf.Values[pos]);
+            else
+                return new Result(ResultCode.NotFound, default, default);
         }
         else
         {
             var internalNode = (InternalNode)node;
-            int childIndex = internalNode.Keys.BinarySearch(key, Comparer<byte[]>.Create(Compare));
+            int childIndex = BinarySearch(internalNode.Keys, key);
             if (childIndex >= 0) childIndex++;
             else childIndex = ~childIndex;
             return SearchExactInternal(internalNode.Children[childIndex], key);
         }
+    }
+
+    private int BinarySearch(List<byte[]> array, ReadOnlySpan<byte> value)
+    {
+        int lo = 0;
+        int hi = array.Count - 1;
+        while (lo <= hi)
+        {
+            int i = lo + ((hi - lo) >> 1);
+            int order = CompareSpan(array[i], value);
+
+            if (order == 0) return i;
+            if (order < 0)
+            {
+                lo = i + 1;
+            }
+            else
+            {
+                hi = i - 1;
+            }
+        }
+
+        return ~lo;
     }
 
     private (byte[] key, byte[] value, bool didNotFindGreater) SearchGreaterOrEqualsThan(Node node, byte[] key, bool onlyGreater)
@@ -268,7 +306,7 @@ public class BPlusTree
         if (node.IsLeaf)
         {
             var leaf = (LeafNode)node;
-            int pos = leaf.Keys.BinarySearch(key, Comparer<byte[]>.Create(Compare));
+            int pos = BinarySearch(leaf.Keys, key);
 
             if (pos >= 0)
             {
@@ -297,7 +335,7 @@ public class BPlusTree
         else
         {
             var internalNode = (InternalNode)node;
-            int childIndex = internalNode.Keys.BinarySearch(key, Comparer<byte[]>.Create(Compare));
+            int childIndex = BinarySearch(internalNode.Keys, key);
             if (childIndex >= 0) childIndex++;
             else childIndex = ~childIndex;
             var res = SearchGreaterOrEqualsThan(internalNode.Children[childIndex], key, onlyGreater);
