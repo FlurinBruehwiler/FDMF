@@ -67,7 +67,79 @@ public class BPlusTree
 
     public ResultCode Delete(byte[] key)
     {
+        bool removed = DeleteInternal(_root, key, out _);
 
+        // root collapsed?
+        if (_root is InternalNode internalRoot &&
+            internalRoot.Children.Count == 1)
+        {
+            _root = internalRoot.Children[0];
+        }
+
+        return removed ? ResultCode.Success : ResultCode.NotFound;
+    }
+
+    private bool DeleteInternal(Node node, byte[] key, out bool shouldDeleteNode)
+    {
+        shouldDeleteNode = false;
+
+        if (node.IsLeaf)
+        {
+            var leaf = (LeafNode)node;
+            int index = leaf.Keys.BinarySearch(key);
+
+            if (index < 0)
+                return false; // not found
+
+            // Remove key/value
+            leaf.Keys.RemoveAt(index);
+            leaf.Values.RemoveAt(index);
+
+            // Check underflow
+            shouldDeleteNode = leaf.Keys.Count == 0;
+            return true;
+        }
+
+        var internalNode = (InternalNode)node;
+
+        // Find child
+        int childIndex = internalNode.Keys.BinarySearch(key);
+        if (childIndex >= 0)
+            childIndex++;
+        else
+            childIndex = ~childIndex;
+
+        bool removed = DeleteInternal(internalNode.Children[childIndex], key, out bool deleteChild);
+
+        if (!removed) return false;
+
+        // If child node became empty, remove it
+        if (deleteChild)
+        {
+            internalNode.Children.RemoveAt(childIndex);
+
+            // Remove the separator (unless child was last)
+            if (childIndex < internalNode.Keys.Count)
+                internalNode.Keys.RemoveAt(childIndex);
+            else if (childIndex > 0)
+                internalNode.Keys.RemoveAt(childIndex - 1);
+        }
+        else
+        {
+            // Fix separator keys after leaf delete
+            if (childIndex > 0 && internalNode.Keys.Count > 0)
+            {
+                var child = internalNode.Children[childIndex];
+                if (child.IsLeaf)
+                {
+                    internalNode.Keys[childIndex - 1] =
+                        ((LeafNode)child).Keys[0];
+                }
+            }
+        }
+
+        shouldDeleteNode = internalNode.Children.Count == 0;
+        return true;
     }
 
     private class SplitResult
@@ -269,13 +341,15 @@ public class BPlusTree
 
         public (bool success, byte[] key, byte[] value) Next()
         {
+            //don't search again from the top...
             (key, value, success) = tree.SearchGreaterOrEqualsThan(tree._root, key, true);
             return (!success, key, value);
         }
 
-        public bool Delete()
+        public ResultCode Delete()
         {
-
+            //todo don't search again
+            return tree.Delete(key);
         }
     }
 }
