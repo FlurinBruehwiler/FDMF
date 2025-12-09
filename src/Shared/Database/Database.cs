@@ -180,7 +180,7 @@ public sealed class TransactionalKvStore
         };
     }
 
-    public struct Cursor
+    public class Cursor
     {
         public required LightningCursor LightningCursor;
         public required BPlusTree.Cursor ChangeSetCursor;
@@ -226,7 +226,7 @@ public sealed class TransactionalKvStore
             //return the lower, if both are the same, return changeSet
 
             var comp = BPlusTree.CompareSpan(baseSet.key.AsSpan(), changeSet.key.AsSpan());
-            if (comp < 0 && !BaseIsFinished)
+            if (ChangeIsFinished || (comp < 0 && !BaseIsFinished))
             {
                  // baseSet is smaller than changeSet
                 return (ResultCode.Success, baseSet.key.CopyToNewArray(), baseSet.value.CopyToNewArray());
@@ -234,7 +234,7 @@ public sealed class TransactionalKvStore
 
             Debug.Assert(changeSet.value[0] == (byte)ValueFlag.AddModify);
 
-            return (ResultCode.Success, changeSet.key, changeSet.value);
+            return (ResultCode.Success, changeSet.key, changeSet.value.AsSpan(1).ToArray());
         }
 
         public (ResultCode resultCode, byte[] key, byte[] value) Next()
@@ -250,12 +250,28 @@ public sealed class TransactionalKvStore
             var b = ChangeSetCursor.GetCurrent();
 
             var comp = BPlusTree.CompareSpan(a.key.AsSpan(), b.key.AsSpan());
-            if (comp <= 0)
+            if (!BaseIsFinished && comp <= 0)
             {
                 BaseIsFinished = LightningCursor.Next().resultCode == MDBResultCode.NotFound;
             }
+            else if (comp >= 0)
+            {
+                var (result, _, value) = ChangeSetCursor.Next();
 
-            if (BaseIsFinished || comp >= 0)
+                ChangeIsFinished = result == ResultCode.NotFound;
+
+                if (result == ResultCode.Success)
+                {
+                    if (value[0] == (byte)ValueFlag.Delete)
+                    {
+                        goto next;
+                    }
+                }
+
+                goto end;
+            }
+
+            if (BaseIsFinished)
             {
                 var (result, _, value) = ChangeSetCursor.Next();
 
@@ -270,6 +286,7 @@ public sealed class TransactionalKvStore
                 }
             }
 
+            end:
             if (ChangeIsFinished && BaseIsFinished)
                 return (ResultCode.NotFound, [], []);
 

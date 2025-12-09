@@ -188,9 +188,9 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
     }
 
     [Fact]
-    public void Cursor()
+    public void Cursor_Simple()
     {
-        var env = new LightningEnvironment($"{Fixture.TestDirectory}/{nameof(Cursor)}");
+        var env = new LightningEnvironment($"{Fixture.TestDirectory}/{nameof(Cursor_Simple)}");
         env.Open();
 
         LightningDatabase db;
@@ -216,6 +216,91 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
 
         Assert.Equal([(byte)2], cursor.GetCurrent().value);
         Assert.Equal([(byte)3], cursor.Next().value);
+        Assert.Equal(ResultCode.NotFound, cursor.Next().resultCode);
+    }
+
+    [Fact]
+    public void Cursor_Complex()
+    {
+        var env = new LightningEnvironment($"{Fixture.TestDirectory}/{nameof(Cursor_Complex)}");
+        env.Open();
+
+        LightningDatabase db;
+        using (var tx = env.BeginTransaction())
+        {
+            db = tx.OpenDatabase();
+
+            tx.Put(db, [1], [1]);
+            tx.Put(db, [2], [2]);
+            tx.Put(db, [3], [3]);
+            tx.Put(db, [4], [4]);
+
+            tx.Commit();
+        }
+
+        using var rtx = env.BeginTransaction(TransactionBeginFlags.ReadOnly);
+        var store = new TransactionalKvStore
+        {
+            Database = db,
+            ReadTransaction = rtx,
+        };
+
+        store.Put([4], [8]);
+        store.Put([5], [10]);
+        store.Put([6], [12]);
+
+        var cursor = store.CreateCursor();
+        cursor.SetRange([0]);
+
+        Assert.Equal([(byte)1], cursor.GetCurrent().value);
+        Assert.Equal([(byte)2], cursor.Next().value);
+        Assert.Equal([(byte)3], cursor.Next().value);
+        Assert.Equal([(byte)8], cursor.Next().value);
+        Assert.Equal([(byte)10], cursor.Next().value);
+        Assert.Equal([(byte)12], cursor.Next().value);
+        Assert.Equal(ResultCode.NotFound, cursor.Next().resultCode);
+    }
+
+    [Fact]
+    public void Cursor_Complex_2()
+    {
+        var env = new LightningEnvironment($"{Fixture.TestDirectory}/{nameof(Cursor_Complex_2)}");
+        env.Open();
+
+        LightningDatabase db;
+        using (var tx = env.BeginTransaction())
+        {
+            db = tx.OpenDatabase();
+
+            tx.Put(db, [4], [8]);
+            tx.Put(db, [5], [10]);
+            tx.Put(db, [6], [12]);
+
+            tx.Commit();
+        }
+
+        using var rtx = env.BeginTransaction(TransactionBeginFlags.ReadOnly);
+        var store = new TransactionalKvStore
+        {
+            Database = db,
+            ReadTransaction = rtx,
+        };
+
+
+        store.Put([1], [1]);
+        store.Put([2], [2]);
+        store.Put([3], [3]);
+        store.Put([4], [4]);
+
+        var cursor = store.CreateCursor();
+        cursor.SetRange([0]);
+
+        Assert.Equal([(byte)1], cursor.GetCurrent().value);
+        Assert.Equal([(byte)2], cursor.Next().value);
+        Assert.Equal([(byte)3], cursor.Next().value);
+        Assert.Equal([(byte)4], cursor.Next().value);
+        Assert.Equal([(byte)10], cursor.Next().value);
+        Assert.Equal([(byte)12], cursor.Next().value);
         Assert.Equal(ResultCode.NotFound, cursor.Next().resultCode);
     }
 }
