@@ -9,14 +9,14 @@ using Shared.Generated;
 
 var env = Shared.Environment.Create();
 
-var tsx = new Transaction(env);
+var tsx = new DbSession(env);
 {
     var folder = new Folder(tsx);
     folder.Name = "foo";
 }
 tsx.Commit();
 
-var tsx2 = new Transaction(env);
+var tsx2 = new DbSession(env);
 {
     var folder = new Folder(tsx2);
     folder.Name = "foo2";
@@ -24,7 +24,7 @@ var tsx2 = new Transaction(env);
 tsx2.Commit();
 
 {
-    var t = new Transaction(env);
+    var t = new DbSession(env);
     var folders = Searcher.Search<Folder>(t);
     foreach (var folder in folders)
     {

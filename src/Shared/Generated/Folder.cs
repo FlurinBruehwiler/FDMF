@@ -10,29 +10,29 @@ public partial struct Folder : ITransactionObject
     [Obsolete]
     [MemoryPackConstructor]
     public Folder() { }
-    public Folder(Transaction transaction)
+    public Folder(DbSession dbSession)
     {
-        _transaction = transaction;
-        _objId = _transaction.CreateObj(TypId);
+        DbSession = dbSession;
+        _objId = DbSession.CreateObj(TypId);
     }
 
     [MemoryPackIgnore]
-    public Transaction _transaction { get; set; }
+    public DbSession DbSession { get; set; }
     public Guid _objId { get; set; }
 
     [MemoryPackIgnore]
     public string Name
     {
-        get => Encoding.Unicode.GetString(_transaction.GetFldValue(_objId, Fields.Name).AsSpan());
-        set => _transaction.SetFldValue(_objId, Fields.Name, Encoding.Unicode.GetBytes(value).AsSpan().AsSlice());
+        get => Encoding.Unicode.GetString(DbSession.GetFldValue(_objId, Fields.Name).AsSpan());
+        set => DbSession.SetFldValue(_objId, Fields.Name, Encoding.Unicode.GetBytes(value).AsSpan().AsSlice());
     }
     [MemoryPackIgnore]
-    public AssocCollection<Folder> Subfolders => new(_transaction, _objId, Fields.Subfolders, Folder.Fields.Parent);
+    public AssocCollection<Folder> Subfolders => new(DbSession, _objId, Fields.Subfolders, Folder.Fields.Parent);
     [MemoryPackIgnore]
     public Folder? Parent
     {
-        get => GeneratedCodeHelper.GetNullableAssoc<Folder>(_transaction, _objId, Fields.Parent);
-        set => GeneratedCodeHelper.SetAssoc(_transaction, _objId, Fields.Parent, value?._objId ?? Guid.Empty, Folder.Fields.Subfolders);
+        get => GeneratedCodeHelper.GetNullableAssoc<Folder>(DbSession, _objId, Fields.Parent);
+        set => GeneratedCodeHelper.SetAssoc(DbSession, _objId, Fields.Parent, value?._objId ?? Guid.Empty, Folder.Fields.Subfolders);
     }
 
     public static bool operator ==(Folder a, Folder b) => a._objId == b._objId;

@@ -35,15 +35,11 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
             tx.Commit();
         }
 
-        using var rtx = env.BeginTransaction(TransactionBeginFlags.ReadOnly);
-        var store = new TransactionalKvStore
-        {
-            Database = db,
-            ReadTransaction = rtx,
-        };
+        var store = new TransactionalKvStore(env, db);
 
         Assert.Equal([(byte)2], store.Get([1]).value.AsSpan());
     }
+
 
     [Fact]
     public void Data_From_The_Change_Set_Is_Visible()
@@ -59,12 +55,7 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
             tx.Commit();
         }
 
-        using var rtx = env.BeginTransaction(TransactionBeginFlags.ReadOnly);
-        var store = new TransactionalKvStore
-        {
-            Database = db,
-            ReadTransaction = rtx,
-        };
+        var store = new TransactionalKvStore(env, db);
 
         store.Put([3], [6]);
 
@@ -86,12 +77,7 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
             tx.Commit();
         }
 
-        using var rtx = env.BeginTransaction(TransactionBeginFlags.ReadOnly);
-        var store = new TransactionalKvStore
-        {
-            Database = db,
-            ReadTransaction = rtx,
-        };
+        var store = new TransactionalKvStore(env, db);
 
         store.Put([1], [3]);
 
@@ -113,12 +99,7 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
             tx.Commit();
         }
 
-        using var rtx = env.BeginTransaction(TransactionBeginFlags.ReadOnly);
-        var store = new TransactionalKvStore
-        {
-            Database = db,
-            ReadTransaction = rtx,
-        };
+        var store = new TransactionalKvStore(env, db);
 
         store.Delete([1]);
 
@@ -140,12 +121,7 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
             tx.Commit();
         }
 
-        using var rtx = env.BeginTransaction(TransactionBeginFlags.ReadOnly);
-        var store = new TransactionalKvStore
-        {
-            Database = db,
-            ReadTransaction = rtx,
-        };
+        var store = new TransactionalKvStore(env, db);
 
         store.Delete([1]);
 
@@ -171,12 +147,7 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
             tx.Commit();
         }
 
-        using var rtx = env.BeginTransaction(TransactionBeginFlags.ReadOnly);
-        var store = new TransactionalKvStore
-        {
-            Database = db,
-            ReadTransaction = rtx,
-        };
+        var store = new TransactionalKvStore(env, db);
 
         store.Put([1], [3]);
 
@@ -202,16 +173,11 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
             tx.Commit();
         }
 
-        using var rtx = env.BeginTransaction(TransactionBeginFlags.ReadOnly);
-        var store = new TransactionalKvStore
-        {
-            Database = db,
-            ReadTransaction = rtx,
-        };
+        var store = new TransactionalKvStore(env, db);
 
         store.Put([2], [3]);
 
-        var cursor = store.CreateCursor();
+        using var cursor = store.CreateCursor();
         cursor.SetRange([1]);
 
         Assert.Equal([(byte)2], cursor.GetCurrent().value);
@@ -234,16 +200,11 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
             tx.Commit();
         }
 
-        using var rtx = env.BeginTransaction(TransactionBeginFlags.ReadOnly);
-        var store = new TransactionalKvStore
-        {
-            Database = db,
-            ReadTransaction = rtx,
-        };
+        var store = new TransactionalKvStore(env, db);
 
         store.Put([1], [2]);
 
-        var cursor = store.CreateCursor();
+        using var cursor = store.CreateCursor();
         cursor.SetRange([1]);
 
         Assert.Equal([(byte)2], cursor.GetCurrent().value);
@@ -266,16 +227,11 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
             tx.Commit();
         }
 
-        using var rtx = env.BeginTransaction(TransactionBeginFlags.ReadOnly);
-        var store = new TransactionalKvStore
-        {
-            Database = db,
-            ReadTransaction = rtx,
-        };
+        var store = new TransactionalKvStore(env, db);
 
         store.Put([1], [3]);
 
-        var cursor = store.CreateCursor();
+        using var cursor = store.CreateCursor();
         cursor.SetRange([1]);
 
         Assert.Equal([(byte)3], cursor.GetCurrent().value);
@@ -301,18 +257,13 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
             tx.Commit();
         }
 
-        using var rtx = env.BeginTransaction(TransactionBeginFlags.ReadOnly);
-        var store = new TransactionalKvStore
-        {
-            Database = db,
-            ReadTransaction = rtx,
-        };
+        var store = new TransactionalKvStore(env, db);
 
         store.Put([4], [8]);
         store.Put([5], [10]);
         store.Put([6], [12]);
 
-        var cursor = store.CreateCursor();
+        using var cursor = store.CreateCursor();
         cursor.SetRange([0]);
 
         Assert.Equal([(byte)1], cursor.GetCurrent().value);
@@ -342,20 +293,14 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
             tx.Commit();
         }
 
-        using var rtx = env.BeginTransaction(TransactionBeginFlags.ReadOnly);
-        var store = new TransactionalKvStore
-        {
-            Database = db,
-            ReadTransaction = rtx,
-        };
-
+        var store = new TransactionalKvStore(env, db);
 
         store.Put([1], [1]);
         store.Put([2], [2]);
         store.Put([3], [3]);
         store.Put([4], [4]);
 
-        var cursor = store.CreateCursor();
+        using var cursor = store.CreateCursor();
         cursor.SetRange([0]);
 
         Assert.Equal([(byte)1], cursor.GetCurrent().value);
@@ -385,17 +330,11 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
             tx.Commit();
         }
 
-        using var rtx = env.BeginTransaction(TransactionBeginFlags.ReadOnly);
-        var store = new TransactionalKvStore
-        {
-            Database = db,
-            ReadTransaction = rtx,
-        };
-
+        var store = new TransactionalKvStore(env, db);
 
         store.Delete([5]);
 
-        var cursor = store.CreateCursor();
+        using var cursor = store.CreateCursor();
         cursor.SetRange([0]);
 
         Assert.Equal([(byte)8], cursor.GetCurrent().value);
@@ -422,17 +361,11 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
             tx.Commit();
         }
 
-        using var rtx = env.BeginTransaction(TransactionBeginFlags.ReadOnly);
-        var store = new TransactionalKvStore
-        {
-            Database = db,
-            ReadTransaction = rtx,
-        };
-
+        var store = new TransactionalKvStore(env, db);
 
         store.Delete([6]);
 
-        var cursor = store.CreateCursor();
+        using var cursor = store.CreateCursor();
         cursor.SetRange([0]);
 
         Assert.Equal([(byte)8], cursor.GetCurrent().value);
@@ -459,17 +392,11 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
             tx.Commit();
         }
 
-        using var rtx = env.BeginTransaction(TransactionBeginFlags.ReadOnly);
-        var store = new TransactionalKvStore
-        {
-            Database = db,
-            ReadTransaction = rtx,
-        };
-
+        var store = new TransactionalKvStore(env, db);
 
         store.Delete([4]);
 
-        var cursor = store.CreateCursor();
+        using var cursor = store.CreateCursor();
         cursor.SetRange([0]);
 
         Assert.Equal([(byte)10], cursor.GetCurrent().value);
@@ -496,19 +423,13 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
             tx.Commit();
         }
 
-        using var rtx = env.BeginTransaction(TransactionBeginFlags.ReadOnly);
-        var store = new TransactionalKvStore
-        {
-            Database = db,
-            ReadTransaction = rtx,
-        };
-
+        var store = new TransactionalKvStore(env, db);
 
         store.Delete([4]);
         store.Delete([5]);
         store.Delete([6]);
 
-        var cursor = store.CreateCursor();
+        using var cursor = store.CreateCursor();
         cursor.SetRange([0]);
 
         Assert.Equal(ResultCode.NotFound, cursor.Next().resultCode);

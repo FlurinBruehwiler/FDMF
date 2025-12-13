@@ -22,7 +22,18 @@ We have a flag on each field that defines if an index should be created for it.
 Indexes are just separate LMDB Databases. Maybe we can even combine them into a single db, 
 for example the key could consist of [fldId + value] and the value is then the list of objGuids whose field has this value.
 This way we only use a single database for all indexes. We also need to have a session system ontop of this index system, 
-as we want to be able to search within the changes of a session. This means our session system should be general enough to work for 
-the obj and idx databases.
+so when the user does queries something within a _write_ session, we also search through the changes, 
+but we don't need an index for them, as the change set it is generally quite small.
 
 TODO: fulltext search
+
+## Saving
+
+
+1. Acquire lock
+2. Open an LMDB write transaction
+3. Apply the changes from the changset
+4. Execute all SaveActions
+5. Execute all Validators
+6. If no validator reported an error, we commit to LMDB.
+7. Release lock

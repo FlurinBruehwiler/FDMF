@@ -1,0 +1,501 @@
+﻿using System.Collections;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+
+namespace Shared.Database;
+
+
+//todo do we want/need locks in here to ensure that there aren't multiple threads at the same time interacting with the transaction
+
+/// <summary>
+/// This represents a "long lived" transaction, there can multiple of these write transactions at the same time.
+/// Specifically, it reads from the LMDB DB with a changeset layered ontop.
+/// Once Commit is called, a LMDB write transaction is created (behind a lock) and the changeset is written to LMDB.
+/// This replicates the LMDB API, we could put it behind an interface so that the three KV stores (LMDB, ChangeSet, LMDB + Changeset) have the same api.
+/// </summary>
+public sealed class DbSession : IDisposable
+{
+    /*
+     * The objs are stored as follows:
+     *
+     * Keys:                                   Values: TODO, document how the values are stored
+     * OBJ: ObjId, TypId
+     * ASO: ObjIdA, FldIdA, ObjIdB, FldIdB
+     * ASO: ObjIdB, FldIdB, ObjIdA, FldIdA
+     * VAL: ObjId, FldId
+     *
+     */
+
+    public readonly TransactionalKvStore.Cursor Cursor;
+    public TransactionalKvStore Store;
+    public Environment Environment;
+
+    public DbSession(Environment environment)
+    {
+        Store = new TransactionalKvStore(environment.LightningEnvironment, environment.ObjectDb);
+        Cursor = Store.CreateCursor();
+        Environment = environment;
+    }
+
+    public void Commit()
+    {
+        //todo do we want to make this async?
+        lock (Environment)
+        {
+            Store.Commit();
+        }
+    }
+
+    /// <summary>
+    /// Gets the TypId for a given Obj. If there isn't an OBJ with this objId, an empty guid is returned
+    /// </summary>
+    public Guid GetTypId(Guid objId)
+    {
+        var keyBuf = MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref objId, 1));
+
+        var (resultCode, key, value) = Store.Get(keyBuf);
+
+        if (resultCode == ResultCode.Success)
+        {
+            return MemoryMarshal.Read<ObjValue>(value.AsSpan()).TypId;
+        }
+
+        return Guid.Empty;
+    }
+
+    /// <summary>
+    /// Deletes the Obj with the given ID and all associated fields and assoc fields.
+    /// If there isn't an Obj with the given ID, this is a NoOP.
+    /// </summary>
+    public void DeleteObj(Guid id)
+    {
+        var prefix = MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref id, 1));
+
+        Span<byte> tempBuf = stackalloc byte[4 * 16];
+
+        //delete everything that starts with the ObjId
+        if (Cursor.SetRange(prefix) == ResultCode.Success)
+        {
+            do
+            {
+                var (_, k, v) = Cursor.GetCurrent();
+
+                if(!k.AsSpan().Slice(0, 16).SequenceEqual(prefix))
+                    break;
+
+                if (v.AsSpan()[0] == (byte)ValueTyp.Aso)
+                {
+                    //flip to get other assoc
+                    k.AsSpan().Slice(0, 2 * 16).CopyTo(tempBuf.Slice(2 * 16, 2 * 16));
+                    k.AsSpan().Slice(16 * 2, 2 * 16).CopyTo(tempBuf.Slice(0, 2 * 16));
+                    Store.Delete(tempBuf);
+                }
+
+                Cursor.Delete();
+            } while (Cursor.Next().resultCode == ResultCode.Success);
+        }
+    }
+
+    /// <summary>
+    /// Creates an Obj with a given TypId and returns the ObjId of the newly created obj
+    /// </summary>
+    public Guid CreateObj(Guid typId)
+    {
+        //The idea here is to have the objects ordered by creation time in the db, in an attempt to have frequently used objects closer together,
+        var id = Guid.CreateVersion7();
+
+        var val = new ObjValue
+        {
+            TypId = typId,
+            ValueTyp = ValueTyp.Obj
+        };
+
+        var keyBuf = MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref id, 1));
+        var valueBuf = MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref val, 1));
+
+        var result = Store.Put(keyBuf, valueBuf);
+
+        if (result != ResultCode.Success)
+        {
+            Console.WriteLine(result);
+            Debug.Assert(false);
+        }
+
+        return id;
+    }
+
+    /// <summary>
+    /// Creates and Association between two Objs/Flds.
+    /// </summary>
+    public bool CreateAso(Guid objIdA, Guid fldIdA, Guid objIdB, Guid fldIdB)
+    {
+        Span<byte> keyBuf = stackalloc byte[4 * 16];
+        MemoryMarshal.Write(keyBuf.Slice(0*16, 16), objIdA);
+        MemoryMarshal.Write(keyBuf.Slice(1*16, 16), fldIdA);
+        MemoryMarshal.Write(keyBuf.Slice(2*16, 16), objIdB);
+        MemoryMarshal.Write(keyBuf.Slice(3*16, 16), fldIdB);
+        var res1 = Store.Put(keyBuf, [(byte)ValueTyp.Aso]);
+
+        Span<byte> otherKeyBuf = stackalloc byte[4 * 16];
+        MemoryMarshal.Write(otherKeyBuf.Slice(0*16, 16), objIdB);
+        MemoryMarshal.Write(otherKeyBuf.Slice(1*16, 16), fldIdB);
+        MemoryMarshal.Write(otherKeyBuf.Slice(2*16, 16), objIdA);
+        MemoryMarshal.Write(otherKeyBuf.Slice(3*16, 16), fldIdA);
+        var res2 = Store.Put(otherKeyBuf, [(byte)ValueTyp.Aso]);
+
+        Debug.Assert(res1 == res2);
+
+        if (res1 == ResultCode.Success && res2 == ResultCode.Success)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Remove all assoc entries of a FLD on an OBJ
+    /// </summary>
+    public void RemoveAllAso(Guid objId, Guid fldId)
+    {
+        Span<byte> prefix = stackalloc byte[2 * 16];
+        MemoryMarshal.Write(prefix.Slice(0*16, 16), objId);
+        MemoryMarshal.Write(prefix.Slice(1*16, 16), fldId);
+
+        Span<byte> tempBuf = stackalloc byte[4 * 16];
+
+        //delete everything that starts with the ObjId and Aso
+        if (Cursor.SetRange(prefix) == ResultCode.Success)
+        {
+            do
+            {
+                var (_, k, v) = Cursor.GetCurrent();
+
+                if(!k.AsSpan().Slice(0, 2*16).SequenceEqual(prefix))
+                    break;
+
+                if (v.AsSpan()[0] == (byte)ValueTyp.Aso)
+                {
+                    //flip to get other assoc
+                    k.AsSpan().Slice(0, 2 * 16).CopyTo(tempBuf.Slice(2 * 16, 2 * 16));
+                    k.AsSpan().Slice(16 * 2, 2 * 16).CopyTo(tempBuf.Slice(0, 2 * 16));
+                    Store.Delete(tempBuf);
+                }
+
+                //todo, why is this unused
+                var otherObjId = MemoryMarshal.Read<Guid>(k.AsSpan().Slice(16 * 2, 16 * 1));
+                var otherFldId = MemoryMarshal.Read<Guid>(k.AsSpan().Slice(16 * 3, 16 * 1));
+
+                Cursor.Delete();
+            } while (Cursor.Next().resultCode == ResultCode.Success);
+        }
+    }
+
+    /// <summary>
+    /// Removes a specific Aso connection.
+    /// <returns>True if the Aso existed; otherwise false</returns>
+    /// </summary>
+    public bool RemoveAso(Guid objIdA, Guid fldIdA, Guid objIdB, Guid fldIdB)
+    {
+        Span<byte> keyBuf = stackalloc byte[4 * 16];
+        MemoryMarshal.Write(keyBuf.Slice(0*16, 16), objIdA);
+        MemoryMarshal.Write(keyBuf.Slice(1*16, 16), fldIdA);
+        MemoryMarshal.Write(keyBuf.Slice(2*16, 16), objIdB);
+        MemoryMarshal.Write(keyBuf.Slice(3*16, 16), fldIdB);
+        var res1 = Store.Delete(keyBuf);
+
+        Span<byte> otherKeyBuf = stackalloc byte[4 * 16];
+        MemoryMarshal.Write(otherKeyBuf.Slice(0*16, 16), objIdB);
+        MemoryMarshal.Write(otherKeyBuf.Slice(1*16, 16), fldIdB);
+        MemoryMarshal.Write(otherKeyBuf.Slice(2*16, 16), objIdA);
+        MemoryMarshal.Write(otherKeyBuf.Slice(3*16, 16), fldIdA);
+        var res2 = Store.Delete(otherKeyBuf);
+
+        Debug.Assert(res1 == res2);
+
+        if (res1 == ResultCode.Success && res2 == ResultCode.Success)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Sets the value of a field
+    /// </summary>
+    public void SetFldValue(Guid objId, Guid fldId, Slice<byte> span)
+    {
+        //todo, in debug mode we could check if the obj exists!
+
+        Span<byte> keyBuf = stackalloc byte[2 * 16];
+        MemoryMarshal.Write(keyBuf.Slice(0*16, 16), objId);
+        MemoryMarshal.Write(keyBuf.Slice(1*16, 16), fldId);
+
+        if (span.Length == 0)
+        {
+            Store.Delete(keyBuf);
+        }
+        else
+        {
+            Span<byte> valueBuf = stackalloc byte[1 + span.Length]; //todo ensure span.length is not too large, should use arena here....
+            valueBuf[0] = (byte)ValueTyp.Val;
+            span.AsSpan().CopyTo(valueBuf.Slice(1));
+
+            Store.Put(keyBuf, valueBuf);
+        }
+    }
+
+    /// <summary>
+    /// Gets a field value as a Slice, the slice points to valid memory as long as the transaction persists.
+    /// </summary>
+    public unsafe Slice<byte> GetFldValue(Guid objId, Guid fldId)
+    {
+        Span<byte> keyBuf = stackalloc byte[2 * 16];
+        MemoryMarshal.Write(keyBuf.Slice(0*16, 16), objId);
+        MemoryMarshal.Write(keyBuf.Slice(1*16, 16), fldId);
+
+        var (s, k, v) = Store.Get(keyBuf);
+
+        if (s != ResultCode.Success) //todo logging
+            return default;
+
+        //todo this code is not correct, we can't just have a pointer to a byte[] without pinning the byte array!!!!!!!
+        //we need to have some kind of data type that can have either a ptr or a byte array as the backing storage, and exposes this as a Span
+        return new Slice<byte>(v.AsSpan().Slice(1)); //todo check if the first byte is correct!
+    }
+
+    /// <summary>
+    /// Gets the Obj of an Aso. Returns null if the Aso is empty
+    /// </summary>
+    public Guid? GetSingleAsoValue(Guid objId, Guid fldId)
+    {
+        //todo avoid overhead of enumerating aso, just manually do a get call!!!
+
+        using var enumerator = EnumerateAso(objId, fldId).GetEnumerator();
+
+        var hasValue = enumerator.MoveNext();
+        if (!hasValue)
+            return null;
+
+        return enumerator.Current.ObjId;
+    }
+
+    /// <summary>
+    /// Enumerates the
+    /// </summary>
+    public AsoFldEnumerable EnumerateAso(Guid objId, Guid fldId)
+    {
+        //todo we can reuse the cursor, the problem is once the user starts to enumerate multiple asos at the same time,
+        //so we would need to detect that and at that point create a new cursor, or even better we have a cursor pool,
+        //where for each enumeration we look if if have a non used cursor, once the enumeration finishes,
+        //the cursor gets returned to the pool
+        var cursor = Store.CreateCursor();
+
+        //todo, should we allow the modification of the Aso (add/remove) of entries while we are enumerating?
+        //if yes: we need to clearly specify the behaviour
+        //if no: throw an exception if it happens
+        return new AsoFldEnumerable(cursor, objId, fldId);
+    }
+
+    /// <summary>
+    /// Gets the number of connections in an AsoFld
+    /// </summary>
+    public int GetAsoCount(Guid objId, Guid fldId)
+    {
+        //todo, improve performance by storing the count in the db
+        int count = 0;
+        foreach (var _ in EnumerateAso(objId, fldId))
+        {
+            count++;
+        }
+
+        return count;
+    }
+
+    /// <summary>
+    /// Disposes the underlying KvStore and cached cursor
+    /// </summary>
+    public void Dispose()
+    {
+        Cursor.Dispose();
+        Store.Dispose();
+    }
+
+    //Todo this method should be replaced by the searching system...
+    public IEnumerable<(Guid objId, Guid typId)> EnumerateObjs()
+    {
+        //todo write manual enumerator that doesn't allocate!!!
+        var result = Cursor.SetRange([0]);
+        if (result == ResultCode.Success)
+        {
+            do
+            {
+                var current = Cursor.GetCurrent();
+                var currentKey = current.key.AsSpan();
+                var currentValue = current.value.AsSpan();
+
+                if (currentValue[0] == (byte)ValueTyp.Obj)
+                {
+                    yield return (MemoryMarshal.Read<Guid>(currentKey), MemoryMarshal.Read<ObjValue>(currentValue).TypId);
+                }
+            }
+            while (Cursor.Next().resultCode == ResultCode.Success);
+        }
+    }
+}
+
+public struct AsoEnumeratorObj
+{
+    public Guid ObjId;
+    public Guid FldId;
+}
+
+public struct AsoFldEnumerable : IEnumerable<AsoEnumeratorObj>
+{
+    private readonly TransactionalKvStore.Cursor _cursor;
+    private readonly Guid _objId;
+    private readonly Guid _fldId;
+
+    public AsoFldEnumerable(TransactionalKvStore.Cursor cursor, Guid objId, Guid fldId)
+    {
+        _cursor = cursor;
+        _objId = objId;
+        _fldId = fldId;
+    }
+
+    public AsoFldEnumerator GetEnumerator()
+    {
+        return new AsoFldEnumerator(_cursor, _objId, _fldId);
+    }
+
+    IEnumerator<AsoEnumeratorObj> IEnumerable<AsoEnumeratorObj>.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
+
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
+}
+
+public struct AsoFldEnumerator : IEnumerator<AsoEnumeratorObj>
+{
+    private AsoEnumeratorObj _current1;
+    private TransactionalKvStore.Cursor cursor;
+    private bool isFirst;
+    private Guid objId;
+    private Guid fldId;
+
+    public AsoFldEnumerator(TransactionalKvStore.Cursor cursor, Guid objId, Guid fldId)
+    {
+        isFirst = true;
+        this.cursor = cursor;
+        this.objId = objId;
+        this.fldId = fldId;
+    }
+
+    public void Dispose()
+    {
+        cursor.Dispose();
+    }
+
+    public bool MoveNext()
+    {
+        ResultCode code;
+        byte[] key;
+
+        Span<byte> prefixKeyBuf = stackalloc byte[2 * 16];
+        MemoryMarshal.Write(prefixKeyBuf.Slice(0*16, 16), objId);
+        MemoryMarshal.Write(prefixKeyBuf.Slice(1*16, 16), fldId);
+
+        if (isFirst)
+        {
+            code = cursor.SetRange(prefixKeyBuf);
+            if (code != ResultCode.Success)
+                return false;
+
+            (_, key, _) = cursor.GetCurrent();
+            isFirst = false;
+        }
+        else
+        {
+            (code, key, _) = cursor.Next();
+        }
+
+        if (code != ResultCode.Success)
+            return false;
+
+        if (!key.AsSpan().Slice(0, 2 * 16).SequenceEqual(prefixKeyBuf))
+            return false;
+
+        _current1.ObjId = MemoryMarshal.Read<Guid>(key.AsSpan().Slice(2 * 16, 16));
+        _current1.FldId = MemoryMarshal.Read<Guid>(key.AsSpan().Slice(3 * 16, 16));
+
+        return true;
+    }
+
+    public void Reset()
+    {
+        throw new NotImplementedException();
+    }
+
+    public AsoEnumeratorObj Current => _current1;
+
+    AsoEnumeratorObj IEnumerator<AsoEnumeratorObj>.Current => _current1;
+
+    object IEnumerator.Current => throw new NotImplementedException();
+}
+
+
+
+public enum ValueTyp : byte
+{
+    Obj = 0,
+    Aso = 1,
+    Val = 2,
+}
+
+public enum ChangeType : byte
+{
+    ObjCreated = 0,
+    ObjDeleted,
+    AsoAdded,
+    AsoRemoved,
+    FldChanged
+}
+
+[StructLayout(LayoutKind.Explicit)]
+public struct ObjValue
+{
+    [FieldOffset(0)]
+    public ValueTyp ValueTyp;
+
+    [FieldOffset(1)]
+    public Guid TypId;
+}
+
+//todo readd the history feature
+public struct Change
+{
+    public ChangeType ChangeType;
+    public DateTime DateTime;
+    public Guid UserId;
+
+    public Guid ObjAId;
+    public Guid FldAId;
+    public Guid ObjBId;
+    public Guid FldBId;
+}
+
+public enum ResultCode
+{
+    Success,
+    NotFound
+}
+
+public enum ValueFlag : byte{
+    AddModify,
+    Delete
+}

@@ -12,9 +12,9 @@ public struct FieldCriterion
 
 public static class Searcher
 {
-    public static IEnumerable<T> Search<T>(Transaction transaction, params FieldCriterion[] criteria) where T : ITransactionObject, new()
+    public static IEnumerable<T> Search<T>(DbSession dbSession, params FieldCriterion[] criteria) where T : ITransactionObject, new()
     {
-        foreach (var (obj, typId) in transaction.EnumerateObjs())
+        foreach (var (obj, typId) in dbSession.EnumerateObjs())
         {
             if(T.TypId != typId)
                 continue;
@@ -22,7 +22,7 @@ public static class Searcher
             bool matches = true;
             foreach (var queryCriterion in criteria)
             {
-                var result = transaction.GetFldValue(obj, queryCriterion.FieldId);
+                var result = dbSession.GetFldValue(obj, queryCriterion.FieldId);
                 if (!result.AsSpan().SequenceEqual(MemoryMarshal.AsBytes(queryCriterion.Value.AsSpan())))
                 {
                     matches = false;
@@ -34,7 +34,7 @@ public static class Searcher
                 yield return new T
                 {
                     _objId = obj,
-                    _transaction = transaction
+                    DbSession = dbSession
                 };
         }
     }

@@ -7,46 +7,46 @@ namespace Shared;
 
 public static class GeneratedCodeHelper
 {
-    public static T? GetNullableAssoc<T>(Transaction transaction, Guid objId, Guid fldId) where T : struct, ITransactionObject
+    public static T? GetNullableAssoc<T>(DbSession dbSession, Guid objId, Guid fldId) where T : struct, ITransactionObject
     {
-        var asoValue = transaction.GetSingleAsoValue(objId, fldId);
+        var asoValue = dbSession.GetSingleAsoValue(objId, fldId);
         if (!asoValue.HasValue)
             return null;
 
-        return new T { _transaction = transaction, _objId = asoValue.Value };
+        return new T { DbSession = dbSession, _objId = asoValue.Value };
     }
 
-    public static T GetAssoc<T>(Transaction transaction, Guid objId, Guid fldId) where T : struct, ITransactionObject
+    public static T GetAssoc<T>(DbSession dbSession, Guid objId, Guid fldId) where T : struct, ITransactionObject
     {
-        var asoValue = transaction.GetSingleAsoValue(objId, fldId);
+        var asoValue = dbSession.GetSingleAsoValue(objId, fldId);
         if (!asoValue.HasValue)
             throw new Exception("what should happen here?");
 
-        return new T { _transaction = transaction, _objId = asoValue.Value };
+        return new T { DbSession = dbSession, _objId = asoValue.Value };
     }
 
-    public static void SetAssoc(Transaction transaction, Guid objIdA, Guid fldIdA, Guid objIdB, Guid fldIdB)
+    public static void SetAssoc(DbSession dbSession, Guid objIdA, Guid fldIdA, Guid objIdB, Guid fldIdB)
     {
         if (objIdB == Guid.Empty)
         {
-            transaction.RemoveAllAso(objIdA, fldIdA);
+            dbSession.RemoveAllAso(objIdA, fldIdA);
         }
         else
         {
-            transaction.CreateAso(objIdA, fldIdA, objIdB, fldIdB);
+            dbSession.CreateAso(objIdA, fldIdA, objIdB, fldIdB);
         }
     }
 }
 
 public struct AssoCollectionEnumerator<T> : IEnumerator<T> where T : struct, ITransactionObject
 {
-    private readonly Transaction _transaction;
+    private readonly DbSession _dbSession;
     private AsoFldEnumerator _asoFldEnumerator;
     private T _current;
 
-    public AssoCollectionEnumerator(Transaction transaction, AsoFldEnumerator asoFldEnumerator)
+    public AssoCollectionEnumerator(DbSession dbSession, AsoFldEnumerator asoFldEnumerator)
     {
-        _transaction = transaction;
+        _dbSession = dbSession;
         _asoFldEnumerator = asoFldEnumerator;
     }
 
@@ -62,7 +62,7 @@ public struct AssoCollectionEnumerator<T> : IEnumerator<T> where T : struct, ITr
         if (result)
         {
             _current = default;
-            _current._transaction = _transaction;
+            _current.DbSession = _dbSession;
             _current._objId = _asoFldEnumerator.Current.ObjId;
         }
 
@@ -86,11 +86,11 @@ public struct AssocCollection<T> : ICollection<T> where T : struct, ITransaction
     public Guid _objId;
     public Guid _fldId;
     public Guid _otherFld;
-    public Transaction _transaction;
+    public DbSession DbSession;
 
-    public AssocCollection(Transaction transaction, Guid objId, Guid fldId, Guid otherFld)
+    public AssocCollection(DbSession dbSession, Guid objId, Guid fldId, Guid otherFld)
     {
-        _transaction = transaction;
+        DbSession = dbSession;
         _objId = objId;
         _fldId = fldId;
         _otherFld = otherFld;
@@ -98,7 +98,7 @@ public struct AssocCollection<T> : ICollection<T> where T : struct, ITransaction
 
     public AssoCollectionEnumerator<T> GetEnumerator()
     {
-        return new AssoCollectionEnumerator<T>(_transaction, _transaction.EnumerateAso(_objId, _fldId).GetEnumerator());
+        return new AssoCollectionEnumerator<T>(DbSession, DbSession.EnumerateAso(_objId, _fldId).GetEnumerator());
     }
 
     IEnumerator<T> IEnumerable<T>.GetEnumerator()
@@ -113,17 +113,17 @@ public struct AssocCollection<T> : ICollection<T> where T : struct, ITransaction
 
     public void Add(T item)
     {
-        _transaction.CreateAso(_objId, _fldId, item._objId, _otherFld);
+        DbSession.CreateAso(_objId, _fldId, item._objId, _otherFld);
     }
 
     public void Clear()
     {
-        _transaction.RemoveAllAso(_objId, _fldId);
+        DbSession.RemoveAllAso(_objId, _fldId);
     }
 
     public bool Contains(T item)
     {
-        foreach (var otherObj in _transaction.EnumerateAso(_objId, _fldId))
+        foreach (var otherObj in DbSession.EnumerateAso(_objId, _fldId))
         {
             if (otherObj.ObjId == item._objId)
                 return true;
@@ -139,10 +139,10 @@ public struct AssocCollection<T> : ICollection<T> where T : struct, ITransaction
 
     public bool Remove(T item)
     {
-        return _transaction.RemoveAso(_objId, _fldId, item._objId, _otherFld);
+        return DbSession.RemoveAso(_objId, _fldId, item._objId, _otherFld);
     }
 
-    public int Count => _transaction.GetAsoCount(_objId, _fldId);
+    public int Count => DbSession.GetAsoCount(_objId, _fldId);
     public bool IsReadOnly => false;
 
 }
