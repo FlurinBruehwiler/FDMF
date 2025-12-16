@@ -25,12 +25,17 @@ try
 
         new Folder(tsx)
         {
-            Name = "Flu Flu"
+            Name = "Flurin Flu"
         };
 
         new Folder(tsx)
         {
             Name = "Anna max Wynn"
+        };
+
+        new Folder(tsx)
+        {
+            Name = "Flurin"
         };
 
         tsx.Commit();
@@ -39,13 +44,21 @@ try
     {
         using var t = new DbSession(env);
 
-        foreach (var folder in Searcher.Search<Folder>(t, new FieldCriterion
-                 {
-                     FieldId = Folder.Fields.Name,
-                     Value = "Flurin"
-                 }))
+        foreach (var matchType in Enum.GetValues<StringCriterion.MatchType>())
         {
-            Console.WriteLine(folder.Name);
+            Console.WriteLine(matchType + ":");
+
+            foreach (var folder in Searcher.Search<Folder>(t, new StringCriterion
+                     {
+                         FieldId = Folder.Fields.Name,
+                         Value = "FLurIN",
+                         Type = matchType
+                     }))
+            {
+                Console.WriteLine(folder.Name);
+            }
+
+            Console.WriteLine();
         }
     }
 }

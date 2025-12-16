@@ -1,20 +1,27 @@
-﻿using System.Diagnostics;
-using System.Runtime.InteropServices;
-using System.Text;
+﻿using System.Runtime.InteropServices;
 using LightningDB;
 using Shared.Database;
 
 namespace Shared;
 
-public struct FieldCriterion
+public struct StringCriterion
 {
     public Guid FieldId;
     public string Value;
+    public MatchType Type;
+
+    public enum MatchType
+    {
+        Substring = 0,
+        Exact,
+        Prefix,
+        Postfix,
+    }
 }
 
 public static class Searcher
 {
-    public static IEnumerable<T> Search<T>(DbSession dbSession, params FieldCriterion[] criteria) where T : ITransactionObject, new()
+    public static IEnumerable<T> Search<T>(DbSession dbSession, params StringCriterion[] criteria) where T : ITransactionObject, new()
     {
         Guid[]? results = null;
 
@@ -22,7 +29,7 @@ public static class Searcher
         {
             //todo assert that the criterion is valid (that the fieldId is part of T)
 
-            var r = ExecuteStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, criterion.FieldId, criterion.Value);
+            var r = ExecuteStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, criterion);
             if (results is null)
             {
                 results = r;
@@ -46,65 +53,76 @@ public static class Searcher
         }
     }
 
-    public static Guid[] ExecuteStringSearch(Environment environment, LightningTransaction transaction, Guid fldId, ReadOnlySpan<char> searchString)
+    public static Guid[] ExecuteStringSearch(Environment environment, LightningTransaction transaction, StringCriterion criterion)
     {
         using var cursor = transaction.CreateCursor(environment.SearchIndex);
 
-        var stringAsBytes = MemoryMarshal.Cast<char, byte>(searchString);
+        var strValue = Normalize(criterion.Value);
 
         var set = new HashSet<Guid>();
 
-        var prefixForwardKey = ConstructIndexKey(IndexFlag.Normal, fldId, stringAsBytes);
-        Collect(prefixForwardKey);
-
-        var prefixBackwardKey = ConstructIndexKey(IndexFlag.Reverse, fldId, stringAsBytes);
-        Collect(prefixBackwardKey);
-
-        //ngram search
-        if (searchString.Length >= 3)
+        if (criterion.Type == StringCriterion.MatchType.Exact)
         {
-            HashSet<Guid> lastRound = [];
-            HashSet<Guid> thisRound = [];
-
-            for (int i = 0; i < searchString.Length - 2; i++)
+            var exactKey = ConstructIndexKey(IndexFlag.Normal, criterion.FieldId, strValue);
+            Collect(exactKey, exact: true);
+        }
+        else if (criterion.Type == StringCriterion.MatchType.Prefix)
+        {
+            var prefixForwardKey = ConstructIndexKey(IndexFlag.Normal, criterion.FieldId, strValue);
+            Collect(prefixForwardKey, exact: false);
+        }
+        else if (criterion.Type == StringCriterion.MatchType.Postfix)
+        {
+            var prefixBackwardKey = ConstructIndexKey(IndexFlag.Reverse, criterion.FieldId, strValue);
+            Collect(prefixBackwardKey, exact: false);
+        }
+        else if (criterion.Type == StringCriterion.MatchType.Substring)
+        {
+            //ngram search
+            if (strValue.Length >= 3)
             {
-                var ngramKey = ConstructIndexKey(IndexFlag.NGram, fldId, MemoryMarshal.Cast<char, byte>(searchString.Slice(i, 3)));
+                HashSet<Guid> lastRound = [];
+                HashSet<Guid> thisRound = [];
 
-                if (cursor.SetRange(ngramKey) == MDBResultCode.Success)
+                for (int i = 0; i < strValue.Length - 2; i++)
                 {
-                    do
+                    var ngramKey = ConstructIndexKey(IndexFlag.NGram, criterion.FieldId, strValue.AsSpan().Slice(i, 3));
+
+                    if (cursor.SetRange(ngramKey) == MDBResultCode.Success)
                     {
-                        var (_, key, value) = cursor.GetCurrent();
-
-                        if (!key.AsSpan().StartsWith(ngramKey))
-                            break;
-
-                        var guid = MemoryMarshal.Read<Guid>(value.AsSpan());
-
-                        if (i == 0 || lastRound.Contains(guid))
+                        do
                         {
-                            thisRound.Add(guid);
-                        }
+                            var (_, key, value) = cursor.GetCurrent();
 
-                    } while (cursor.Next().resultCode == MDBResultCode.Success);
+                            if (!key.AsSpan().StartsWith(ngramKey))
+                                break;
+
+                            var guid = MemoryMarshal.Read<Guid>(value.AsSpan());
+
+                            if (i == 0 || lastRound.Contains(guid))
+                            {
+                                thisRound.Add(guid);
+                            }
+                        } while (cursor.Next().resultCode == MDBResultCode.Success);
+                    }
+
+                    if (thisRound.Count == 0)
+                        break;
+
+                    (thisRound, lastRound) = (lastRound, thisRound);
+                    thisRound.Clear();
                 }
 
-                if(thisRound.Count == 0)
-                    break;
-
-                (thisRound, lastRound) = (lastRound, thisRound);
-                thisRound.Clear();
-            }
-
-            foreach (var guid in lastRound)
-            {
-                set.Add(guid);
+                foreach (var guid in lastRound)
+                {
+                    set.Add(guid);
+                }
             }
         }
 
         return set.ToArray();
 
-        void Collect(byte[] prefixKey)
+        void Collect(byte[] prefixKey, bool exact)
         {
             if (cursor.SetRange(prefixKey) == MDBResultCode.Success)
             {
@@ -112,11 +130,13 @@ public static class Searcher
                 {
                     var (_, key, value) = cursor.GetCurrent();
 
+                    if(exact && !key.AsSpan().SequenceEqual(prefixKey))
+                        break;
+
                     if (!key.AsSpan().StartsWith(prefixKey))
                         break;
 
                     set.Add(MemoryMarshal.Read<Guid>(value.AsSpan()));
-
                 } while (cursor.Next().resultCode == MDBResultCode.Success);
             }
         }
@@ -148,28 +168,29 @@ public static class Searcher
                         //index for different data types
                     }
                 }
-
             } while (cursor.Next().resultCode == MDBResultCode.Success);
         }
 
         transaction.Commit();
     }
 
-    private static byte[] ConstructIndexKey(IndexFlag indexFlag, Guid fieldId, ReadOnlySpan<byte> value)
+    private static byte[] ConstructIndexKey(IndexFlag indexFlag, Guid fieldId, ReadOnlySpan<char> stringValue)
     {
+        var value = MemoryMarshal.Cast<char, byte>(stringValue);
+
         var fldIdSpan = fieldId.AsSpan();
 
         var forwardIndexKey = new byte[1 + fldIdSpan.Length + value.Length];
         forwardIndexKey[0] = (byte)indexFlag;
-        fldIdSpan.CopyTo(forwardIndexKey);
+        fldIdSpan.CopyTo(forwardIndexKey.AsSpan(1));
 
         if (indexFlag == IndexFlag.Reverse)
         {
-            MemoryMarshal.Cast<byte, char>(value).CopyToReverse(MemoryMarshal.Cast<byte, char>(forwardIndexKey.AsSpan(16)));
+            MemoryMarshal.Cast<byte, char>(value).CopyToReverse(MemoryMarshal.Cast<byte, char>(forwardIndexKey.AsSpan(1 + 16)));
         }
         else
         {
-            value.CopyTo(forwardIndexKey.AsSpan(16));
+            value.CopyTo(forwardIndexKey.AsSpan(1 + 16));
         }
 
         return forwardIndexKey;
@@ -189,7 +210,7 @@ public static class Searcher
             {
                 var (_, key, value) = changeCursor.GetCurrent();
 
-                if(key.AsSpan().Length != 32)
+                if (key.AsSpan().Length != 32)
                     continue;
 
                 var objId = MemoryMarshal.Read<Guid>(key.AsSpan());
@@ -201,7 +222,7 @@ public static class Searcher
 
                     if (r == MDBResultCode.Success) //the value already existed, we remove it
                     {
-                        var oldValueSpan = oldValue.AsSpan().Slice(1);
+                        var oldValueSpan = Normalize(MemoryMarshal.Cast<byte, char>(oldValue.AsSpan().Slice(1))).AsSpan();
                         var indexKey = ConstructIndexKey(IndexFlag.Normal, fldId, oldValueSpan); //ignore tag
 
                         if (indexCursor.GetBoth(indexKey, objId.AsSpan()) == MDBResultCode.Success)
@@ -212,12 +233,11 @@ public static class Searcher
                             indexCursor.GetBoth(indexKey2, objId.AsSpan());
                             indexCursor.Delete();
 
-                            var oldString = MemoryMarshal.Cast<byte, char>(oldValueSpan);
-                            if (oldString.Length >= 3)
+                            if (oldValueSpan.Length >= 3)
                             {
-                                for (int i = 0; i < oldString.Length - 2; i++)
+                                for (int i = 0; i < oldValueSpan.Length - 2; i++)
                                 {
-                                    var ngramIndexKey = ConstructIndexKey(IndexFlag.NGram, fldId, MemoryMarshal.Cast<char, byte>(oldString.Slice(i, 3)));
+                                    var ngramIndexKey = ConstructIndexKey(IndexFlag.NGram, fldId, oldValueSpan.Slice(i, 3));
                                     indexCursor.GetBoth(ngramIndexKey, objId.AsSpan());
                                     indexCursor.Delete();
                                 }
@@ -230,7 +250,6 @@ public static class Searcher
                         Insert(objId, fldId, MemoryMarshal.Cast<byte, char>(value.AsSpan(2)), txn, environment.SearchIndex);
                     }
                 }
-
             } while (changeCursor.Next().resultCode == ResultCode.Success);
         }
     }
@@ -239,24 +258,31 @@ public static class Searcher
 
     private static void Insert(Guid objId, Guid fldId, ReadOnlySpan<char> str, LightningTransaction transaction, LightningDatabase indexDb)
     {
-        var forwardIndexKey = ConstructIndexKey(IndexFlag.Normal, fldId, MemoryMarshal.Cast<char, byte>(str));
+        str = Normalize(str);
+
+        var forwardIndexKey = ConstructIndexKey(IndexFlag.Normal, fldId, str);
         transaction.Put(indexDb, forwardIndexKey.AsSpan(), objId.AsSpan()); //forward
 
-        var backwardIndexKey = ConstructIndexKey(IndexFlag.Reverse, fldId, MemoryMarshal.Cast<char, byte>(str));
+        var backwardIndexKey = ConstructIndexKey(IndexFlag.Reverse, fldId, str);
         transaction.Put(indexDb, backwardIndexKey.AsSpan(), objId.AsSpan()); //forward
 
         if (str.Length >= 3)
         {
             for (int i = 0; i < str.Length - 2; i++)
             {
-                var ngramIndexKey = ConstructIndexKey(IndexFlag.NGram, fldId, MemoryMarshal.Cast<char, byte>(str.Slice(i, 3)));
+                var ngramIndexKey = ConstructIndexKey(IndexFlag.NGram, fldId, str.Slice(i, 3));
                 transaction.Put(indexDb, ngramIndexKey.AsSpan(), objId.AsSpan()); //forward
             }
         }
     }
+
+    private static string Normalize(ReadOnlySpan<char> input)
+    {
+        return input.ToString().ToLower();//todo don't allocate two strings!!!
+    }
 }
 
-public enum IndexFlag: byte
+public enum IndexFlag : byte
 {
     Normal,
     Reverse,
