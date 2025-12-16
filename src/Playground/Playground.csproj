@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="LightningDB" Version="0.19.1" />
+    <PackageReference Include="LightningDB" Version="0.20.0" />
   </ItemGroup>
 
 </Project>

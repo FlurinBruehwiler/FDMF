@@ -1,4 +1,6 @@
-﻿using LightningDB;
+﻿using System.Data.Common;
+using System.Runtime.InteropServices;
+using LightningDB;
 
 namespace Shared;
 
@@ -7,7 +9,9 @@ public class Environment
     public required LightningEnvironment LightningEnvironment;
     public required LightningDatabase ObjectDb;
     public required LightningDatabase HistoryDb;
-    public required LightningDatabase SearchIndex;
+    public required LightningDatabase StringSearchIndex;
+    public required LightningDatabase NonStringSearchIndex;
+
     public required HashSet<Guid> FldsToIndex;
 
     public static Environment Create(HashSet<Guid> fldsToIndex)
@@ -33,10 +37,20 @@ public class Environment
             Flags = DatabaseOpenFlags.Create
         });
 
-        var indexDb = lightningTransaction.OpenDatabase(name: "IndexDb", new DatabaseConfiguration
+        var stringSearchIndex = lightningTransaction.OpenDatabase(name: "StringIndexDb", new DatabaseConfiguration
         {
             Flags = DatabaseOpenFlags.Create | DatabaseOpenFlags.DuplicatesSort
         });
+
+        //we could combine string and nonstring index dbs, the reason why they are separated for now,
+        //is that I'm not sure about the performance of custom comparers, they have to be slower because they involve dynamic dispatch,
+        //but I'm not sure if this actually makes a difference
+        var customComparer = new DatabaseConfiguration
+        {
+            Flags = DatabaseOpenFlags.Create | DatabaseOpenFlags.DuplicatesSort,
+        };
+        customComparer.CompareWith(new CustomIndexComparer());
+        var nonStringSearchIndex = lightningTransaction.OpenDatabase(name: "NonStringIndexDb", customComparer);
 
         lightningTransaction.Commit();
 
@@ -45,8 +59,50 @@ public class Environment
             LightningEnvironment = env,
             ObjectDb = objDb,
             HistoryDb = histDb,
-            SearchIndex = indexDb,
+            StringSearchIndex = stringSearchIndex,
+            NonStringSearchIndex = nonStringSearchIndex,
             FldsToIndex = fldsToIndex
         };
+    }
+}
+
+public class CustomIndexComparer : IComparer<MDBValue>
+{
+    public enum Comparison : byte
+    {
+        SignedLong,
+        DateTime,
+        Decimal
+    }
+
+    public static int CompareStatic(ReadOnlySpan<byte> a, ReadOnlySpan<byte> b)
+    {
+        if (a[0] != b[0])
+        {
+            return a[0].CompareTo(b[0]);
+        }
+
+        var aData = a.Slice(1 + 16);
+        var bData = b.Slice(1 + 16);
+
+        var comparison = (Comparison)a[0];
+
+        return comparison switch
+        {
+            Comparison.SignedLong => CompareT<long>(aData, bData),
+            Comparison.DateTime => CompareT<DateTime>(aData, bData),
+            Comparison.Decimal => CompareT<decimal>(aData, bData),
+            _ => throw new ArgumentOutOfRangeException()
+        };
+
+        int CompareT<T>(ReadOnlySpan<byte> x, ReadOnlySpan<byte> y) where T : unmanaged, IComparable<T>
+        {
+            return MemoryMarshal.Read<T>(x).CompareTo(MemoryMarshal.Read<T>(y));
+        }
+    }
+
+    public int Compare(MDBValue a, MDBValue b)
+    {
+        return CompareStatic(a.AsSpan(), b.AsSpan());
     }
 }

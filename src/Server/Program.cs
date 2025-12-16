@@ -44,15 +44,19 @@ try
     {
         using var t = new DbSession(env);
 
-        foreach (var matchType in Enum.GetValues<StringCriterion.MatchType>())
+        foreach (var matchType in Enum.GetValues<SearchCriterion.StringCriterion.MatchType>())
         {
             Console.WriteLine(matchType + ":");
 
-            foreach (var folder in Searcher.Search<Folder>(t, new StringCriterion
+            foreach (var folder in Searcher.Search<Folder>(t, new SearchCriterion
                      {
-                         FieldId = Folder.Fields.Name,
-                         Value = "FLurIN",
-                         Type = matchType
+                         Type = SearchCriterion.CriterionType.String,
+                         String = new SearchCriterion.StringCriterion
+                         {
+                             FieldId = Folder.Fields.Name,
+                             Value = "FLurIN",
+                             Type = matchType
+                         }
                      }))
             {
                 Console.WriteLine(folder.Name);

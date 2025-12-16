@@ -1,27 +1,68 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Diagnostics;
+using System.Runtime.InteropServices;
 using LightningDB;
 using Shared.Database;
 
 namespace Shared;
 
-public struct StringCriterion
+public struct SearchCriterion
 {
-    public Guid FieldId;
-    public string Value;
-    public MatchType Type;
+    public CriterionType Type;
+    public StringCriterion String;
 
-    public enum MatchType
+    //todo overlap the following three fields so that the struct is smaller
+    public LongCriterion Long;
+    public DecimalCriterion Decimal;
+    public DateTimeCriterion DateTime;
+
+    public enum CriterionType
     {
-        Substring = 0,
-        Exact,
-        Prefix,
-        Postfix,
+        String,
+        Long,
+        Decimal,
+        DateTime
+    }
+
+    public struct LongCriterion
+    {
+        public Guid FieldId;
+        public long From;
+        public long To;
+    }
+
+    public struct DecimalCriterion
+    {
+        public Guid FieldId;
+        public decimal From;
+        public decimal To;
+    }
+
+    public struct DateTimeCriterion
+    {
+        public Guid FieldId;
+        public DateTime From;
+        public DateTime To;
+    }
+
+    public struct StringCriterion
+    {
+        public Guid FieldId;
+        public string Value;
+        public MatchType Type;
+
+        public enum MatchType
+        {
+            Substring = 0, //default
+            Exact,
+            Prefix,
+            Postfix,
+        }
     }
 }
 
 public static class Searcher
 {
-    public static IEnumerable<T> Search<T>(DbSession dbSession, params StringCriterion[] criteria) where T : ITransactionObject, new()
+    public static IEnumerable<T> Search<T>(DbSession dbSession, params SearchCriterion[] criteria) where T : ITransactionObject, new()
     {
         Guid[]? results = null;
 
@@ -29,7 +70,15 @@ public static class Searcher
         {
             //todo assert that the criterion is valid (that the fieldId is part of T)
 
-            var r = ExecuteStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, criterion);
+            var r = criterion.Type switch
+            {
+                SearchCriterion.CriterionType.String => ExecuteStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, criterion.String),
+                SearchCriterion.CriterionType.Long => ExecuteNonStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, criterion.Long.FieldId, criterion.Long.From, criterion.Long.To),
+                SearchCriterion.CriterionType.Decimal => ExecuteNonStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, criterion.Decimal.FieldId, criterion.Decimal.From, criterion.Decimal.To),
+                SearchCriterion.CriterionType.DateTime => ExecuteNonStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, criterion.DateTime.FieldId, criterion.DateTime.From, criterion.DateTime.To),
+                _ => throw new ArgumentOutOfRangeException()
+            };
+
             if (results is null)
             {
                 results = r;
@@ -53,30 +102,58 @@ public static class Searcher
         }
     }
 
-    public static Guid[] ExecuteStringSearch(Environment environment, LightningTransaction transaction, StringCriterion criterion)
+    public static Guid[] ExecuteNonStringSearch<T>(Environment environment, LightningTransaction transaction, Guid fieldId, T from, T to) where T : unmanaged
     {
-        using var cursor = transaction.CreateCursor(environment.SearchIndex);
+        using var cursor = transaction.CreateCursor(environment.NonStringSearchIndex);
+
+        Span<byte> minKey = stackalloc byte[GetNonStringKeySize<DateTime>()];
+        ConstructNonStringIndexKey(CustomIndexComparer.Comparison.DateTime, fieldId, from, minKey);
+
+        Span<byte> maxKey = stackalloc byte[GetNonStringKeySize<DateTime>()];
+        ConstructNonStringIndexKey(CustomIndexComparer.Comparison.DateTime, fieldId, to, minKey);
+
+        var set = new HashSet<Guid>();
+
+        if (cursor.SetRange(minKey) == MDBResultCode.Success)
+        {
+            do
+            {
+                var (_, key, value) = cursor.GetCurrent();
+
+                if (CustomIndexComparer.CompareStatic(maxKey, key.AsSpan()) < 0)
+                    break;
+
+                set.Add(MemoryMarshal.Read<Guid>(value.AsSpan()));
+            } while (cursor.Next().resultCode == MDBResultCode.Success);
+        }
+
+        return set.ToArray();
+    }
+
+    public static Guid[] ExecuteStringSearch(Environment environment, LightningTransaction transaction, SearchCriterion.StringCriterion criterion)
+    {
+        using var cursor = transaction.CreateCursor(environment.StringSearchIndex);
 
         var strValue = Normalize(criterion.Value);
 
         var set = new HashSet<Guid>();
 
-        if (criterion.Type == StringCriterion.MatchType.Exact)
+        if (criterion.Type == SearchCriterion.StringCriterion.MatchType.Exact)
         {
-            var exactKey = ConstructIndexKey(IndexFlag.Normal, criterion.FieldId, strValue);
+            var exactKey = ConstructStringIndexKey(IndexFlag.Normal, criterion.FieldId, strValue);
             Collect(exactKey, exact: true);
         }
-        else if (criterion.Type == StringCriterion.MatchType.Prefix)
+        else if (criterion.Type == SearchCriterion.StringCriterion.MatchType.Prefix)
         {
-            var prefixForwardKey = ConstructIndexKey(IndexFlag.Normal, criterion.FieldId, strValue);
+            var prefixForwardKey = ConstructStringIndexKey(IndexFlag.Normal, criterion.FieldId, strValue);
             Collect(prefixForwardKey, exact: false);
         }
-        else if (criterion.Type == StringCriterion.MatchType.Postfix)
+        else if (criterion.Type == SearchCriterion.StringCriterion.MatchType.Postfix)
         {
-            var prefixBackwardKey = ConstructIndexKey(IndexFlag.Reverse, criterion.FieldId, strValue);
+            var prefixBackwardKey = ConstructStringIndexKey(IndexFlag.Reverse, criterion.FieldId, strValue);
             Collect(prefixBackwardKey, exact: false);
         }
-        else if (criterion.Type == StringCriterion.MatchType.Substring)
+        else if (criterion.Type == SearchCriterion.StringCriterion.MatchType.Substring)
         {
             //ngram search
             if (strValue.Length >= 3)
@@ -86,7 +163,7 @@ public static class Searcher
 
                 for (int i = 0; i < strValue.Length - 2; i++)
                 {
-                    var ngramKey = ConstructIndexKey(IndexFlag.NGram, criterion.FieldId, strValue.AsSpan().Slice(i, 3));
+                    var ngramKey = ConstructStringIndexKey(IndexFlag.NGram, criterion.FieldId, strValue.AsSpan().Slice(i, 3));
 
                     if (cursor.SetRange(ngramKey) == MDBResultCode.Success)
                     {
@@ -144,7 +221,7 @@ public static class Searcher
 
     public static void BuildSearchIndex(Environment environment)
     {
-        var indexDb = environment.SearchIndex;
+        var indexDb = environment.StringSearchIndex;
 
         using var transaction = environment.LightningEnvironment.BeginTransaction();
 
@@ -165,7 +242,7 @@ public static class Searcher
                     {
                         Insert(objId, fldId, MemoryMarshal.Cast<byte, char>(dataValue), transaction, indexDb);
 
-                        //index for different data types
+                        //todo index for different data types
                     }
                 }
             } while (cursor.Next().resultCode == MDBResultCode.Success);
@@ -174,7 +251,22 @@ public static class Searcher
         transaction.Commit();
     }
 
-    private static byte[] ConstructIndexKey(IndexFlag indexFlag, Guid fieldId, ReadOnlySpan<char> stringValue)
+    private static unsafe int GetNonStringKeySize<T>() where T : unmanaged
+    {
+        return 1 + 16 + sizeof(T);
+    }
+
+    private static void ConstructNonStringIndexKey<T>(CustomIndexComparer.Comparison comparison, Guid fieldId, T data, Span<byte> destination) where T : unmanaged
+    {
+        Debug.Assert(GetNonStringKeySize<T>() == destination.Length);
+
+        destination[0] = (byte)comparison;
+        fieldId.AsSpan().CopyTo(destination.Slice(1));
+
+        MemoryMarshal.Write<T>(destination.Slice(1 + 16), data);
+    }
+
+    private static byte[] ConstructStringIndexKey(IndexFlag indexFlag, Guid fieldId, ReadOnlySpan<char> stringValue)
     {
         var value = MemoryMarshal.Cast<char, byte>(stringValue);
 
@@ -201,7 +293,7 @@ public static class Searcher
     /// </summary>
     public static void UpdateSearchIndex(Environment environment, LightningTransaction txn, BPlusTree changeSet)
     {
-        using var indexCursor = txn.CreateCursor(environment.SearchIndex);
+        using var indexCursor = txn.CreateCursor(environment.StringSearchIndex);
 
         var changeCursor = changeSet.CreateCursor();
         if (changeCursor.SetRange([0]) == ResultCode.Success)
@@ -223,13 +315,13 @@ public static class Searcher
                     if (r == MDBResultCode.Success) //the value already existed, we remove it
                     {
                         var oldValueSpan = Normalize(MemoryMarshal.Cast<byte, char>(oldValue.AsSpan().Slice(1))).AsSpan();
-                        var indexKey = ConstructIndexKey(IndexFlag.Normal, fldId, oldValueSpan); //ignore tag
+                        var indexKey = ConstructStringIndexKey(IndexFlag.Normal, fldId, oldValueSpan); //ignore tag
 
                         if (indexCursor.GetBoth(indexKey, objId.AsSpan()) == MDBResultCode.Success)
                         {
                             indexCursor.Delete();
 
-                            var indexKey2 = ConstructIndexKey(IndexFlag.Reverse, fldId, oldValueSpan); //ignore tag
+                            var indexKey2 = ConstructStringIndexKey(IndexFlag.Reverse, fldId, oldValueSpan); //ignore tag
                             indexCursor.GetBoth(indexKey2, objId.AsSpan());
                             indexCursor.Delete();
 
@@ -237,7 +329,7 @@ public static class Searcher
                             {
                                 for (int i = 0; i < oldValueSpan.Length - 2; i++)
                                 {
-                                    var ngramIndexKey = ConstructIndexKey(IndexFlag.NGram, fldId, oldValueSpan.Slice(i, 3));
+                                    var ngramIndexKey = ConstructStringIndexKey(IndexFlag.NGram, fldId, oldValueSpan.Slice(i, 3));
                                     indexCursor.GetBoth(ngramIndexKey, objId.AsSpan());
                                     indexCursor.Delete();
                                 }
@@ -247,7 +339,7 @@ public static class Searcher
 
                     if (value[0] == (byte)ValueFlag.AddModify)
                     {
-                        Insert(objId, fldId, MemoryMarshal.Cast<byte, char>(value.AsSpan(2)), txn, environment.SearchIndex);
+                        Insert(objId, fldId, MemoryMarshal.Cast<byte, char>(value.AsSpan(2)), txn, environment.StringSearchIndex);
                     }
                 }
             } while (changeCursor.Next().resultCode == ResultCode.Success);
@@ -260,17 +352,17 @@ public static class Searcher
     {
         str = Normalize(str);
 
-        var forwardIndexKey = ConstructIndexKey(IndexFlag.Normal, fldId, str);
+        var forwardIndexKey = ConstructStringIndexKey(IndexFlag.Normal, fldId, str);
         transaction.Put(indexDb, forwardIndexKey.AsSpan(), objId.AsSpan()); //forward
 
-        var backwardIndexKey = ConstructIndexKey(IndexFlag.Reverse, fldId, str);
+        var backwardIndexKey = ConstructStringIndexKey(IndexFlag.Reverse, fldId, str);
         transaction.Put(indexDb, backwardIndexKey.AsSpan(), objId.AsSpan()); //forward
 
         if (str.Length >= 3)
         {
             for (int i = 0; i < str.Length - 2; i++)
             {
-                var ngramIndexKey = ConstructIndexKey(IndexFlag.NGram, fldId, str.Slice(i, 3));
+                var ngramIndexKey = ConstructStringIndexKey(IndexFlag.NGram, fldId, str.Slice(i, 3));
                 transaction.Put(indexDb, ngramIndexKey.AsSpan(), objId.AsSpan()); //forward
             }
         }
