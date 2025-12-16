@@ -7,39 +7,76 @@ using Shared.Generated;
 //we could directly add the entries to hist db in a new transaction.
 //what we want is to group often used objects together for better cache efficiency, and so that these pages can be unloaded from memory
 
-var env = Shared.Environment.Create();
-
-var tsx = new DbSession(env);
+try
 {
-    var folder = new Folder(tsx);
-    folder.Name = "foo";
-}
-tsx.Commit();
+    var env = Shared.Environment.Create([Folder.Fields.Name]);
 
-var tsx2 = new DbSession(env);
-{
-    var folder = new Folder(tsx2);
-    folder.Name = "foo2";
-}
-tsx2.Commit();
+    Guid flurinFolder;
 
-{
-    var t = new DbSession(env);
-    var folders = Searcher.Search<Folder>(t);
-    foreach (var folder in folders)
+    using (var tsx = new DbSession(env))
     {
-        Console.WriteLine(folder.Name);
+        new Folder(tsx)
+        {
+            Name = "Flurin"
+        };
+
+        flurinFolder = new Folder(tsx)
+        {
+            Name = "Flurin Brühwiler"
+        }.ObjId;
+
+        new Folder(tsx)
+        {
+            Name = "Firefox"
+        };
+
+        new Folder(tsx)
+        {
+            Name = "Anna"
+        };
+
+        tsx.Commit();
+    }
+
+    Searcher.BuildSearchIndex(env);
+
+    using (var tsx = new DbSession(env))
+    {
+        new Folder(tsx)
+        {
+            Name = "Flurin 2"
+        };
+
+        var f = tsx.GetObjFromGuid<Folder>(flurinFolder);
+        f.Name = "Johnny";
+
+        tsx.Commit();
+    }
+
+    {
+        using var t = new DbSession(env);
+
+        foreach (var folder in Searcher.Search<Folder>(t, new FieldCriterion
+                 {
+                     FieldId = Folder.Fields.Name,
+                     Value = "Flu"
+                 }))
+        {
+            Console.WriteLine(folder.Name);
+        }
+
+        foreach (var folder in Searcher.Search<Folder>(t, new FieldCriterion
+                 {
+                     FieldId = Folder.Fields.Name,
+                     Value = "Jo"
+                 }))
+        {
+            Console.WriteLine(folder.Name);
+        }
     }
 }
-
-// var tsx2 = new Transaction(env);
-
-
-// Logging.LogFlags = LogFlags.Error | LogFlags.Performance;
-//
-// var sm = new ServerManager();
-//
-// Helper.FireAndForget(sm.LogMetrics());
-//
-// await sm.ListenForConnections();
-
+catch (Exception e)
+{
+    Console.WriteLine(e);
+    Console.WriteLine(e.StackTrace);
+}

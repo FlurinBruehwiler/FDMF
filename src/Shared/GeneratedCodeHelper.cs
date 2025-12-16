@@ -13,7 +13,7 @@ public static class GeneratedCodeHelper
         if (!asoValue.HasValue)
             return null;
 
-        return new T { DbSession = dbSession, _objId = asoValue.Value };
+        return new T { DbSession = dbSession, ObjId = asoValue.Value };
     }
 
     public static T GetAssoc<T>(DbSession dbSession, Guid objId, Guid fldId) where T : struct, ITransactionObject
@@ -22,7 +22,7 @@ public static class GeneratedCodeHelper
         if (!asoValue.HasValue)
             throw new Exception("what should happen here?");
 
-        return new T { DbSession = dbSession, _objId = asoValue.Value };
+        return new T { DbSession = dbSession, ObjId = asoValue.Value };
     }
 
     public static void SetAssoc(DbSession dbSession, Guid objIdA, Guid fldIdA, Guid objIdB, Guid fldIdB)
@@ -63,7 +63,7 @@ public struct AssoCollectionEnumerator<T> : IEnumerator<T> where T : struct, ITr
         {
             _current = default;
             _current.DbSession = _dbSession;
-            _current._objId = _asoFldEnumerator.Current.ObjId;
+            _current.ObjId = _asoFldEnumerator.Current.ObjId;
         }
 
         return result;
@@ -113,7 +113,7 @@ public struct AssocCollection<T> : ICollection<T> where T : struct, ITransaction
 
     public void Add(T item)
     {
-        DbSession.CreateAso(_objId, _fldId, item._objId, _otherFld);
+        DbSession.CreateAso(_objId, _fldId, item.ObjId, _otherFld);
     }
 
     public void Clear()
@@ -125,7 +125,7 @@ public struct AssocCollection<T> : ICollection<T> where T : struct, ITransaction
     {
         foreach (var otherObj in DbSession.EnumerateAso(_objId, _fldId))
         {
-            if (otherObj.ObjId == item._objId)
+            if (otherObj.ObjId == item.ObjId)
                 return true;
         }
 
@@ -139,7 +139,7 @@ public struct AssocCollection<T> : ICollection<T> where T : struct, ITransaction
 
     public bool Remove(T item)
     {
-        return DbSession.RemoveAso(_objId, _fldId, item._objId, _otherFld);
+        return DbSession.RemoveAso(_objId, _fldId, item.ObjId, _otherFld);
     }
 
     public int Count => DbSession.GetAsoCount(_objId, _fldId);

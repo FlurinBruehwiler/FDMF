@@ -13,30 +13,30 @@ public partial struct Folder : ITransactionObject
     public Folder(DbSession dbSession)
     {
         DbSession = dbSession;
-        _objId = DbSession.CreateObj(TypId);
+        ObjId = DbSession.CreateObj(TypId);
     }
 
     [MemoryPackIgnore]
     public DbSession DbSession { get; set; }
-    public Guid _objId { get; set; }
+    public Guid ObjId { get; set; }
 
     [MemoryPackIgnore]
     public string Name
     {
-        get => Encoding.Unicode.GetString(DbSession.GetFldValue(_objId, Fields.Name).AsSpan());
-        set => DbSession.SetFldValue(_objId, Fields.Name, Encoding.Unicode.GetBytes(value).AsSpan().AsSlice());
+        get => Encoding.Unicode.GetString(DbSession.GetFldValue(ObjId, Fields.Name).AsSpan());
+        set => DbSession.SetFldValue(ObjId, Fields.Name, Encoding.Unicode.GetBytes(value).AsSpan().AsSlice());
     }
     [MemoryPackIgnore]
-    public AssocCollection<Folder> Subfolders => new(DbSession, _objId, Fields.Subfolders, Folder.Fields.Parent);
+    public AssocCollection<Folder> Subfolders => new(DbSession, ObjId, Fields.Subfolders, Folder.Fields.Parent);
     [MemoryPackIgnore]
     public Folder? Parent
     {
-        get => GeneratedCodeHelper.GetNullableAssoc<Folder>(DbSession, _objId, Fields.Parent);
-        set => GeneratedCodeHelper.SetAssoc(DbSession, _objId, Fields.Parent, value?._objId ?? Guid.Empty, Folder.Fields.Subfolders);
+        get => GeneratedCodeHelper.GetNullableAssoc<Folder>(DbSession, ObjId, Fields.Parent);
+        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Parent, value?.ObjId ?? Guid.Empty, Folder.Fields.Subfolders);
     }
 
-    public static bool operator ==(Folder a, Folder b) => a._objId == b._objId;
-    public static bool operator !=(Folder a, Folder b) => a._objId != b._objId;
+    public static bool operator ==(Folder a, Folder b) => a.ObjId == b.ObjId;
+    public static bool operator !=(Folder a, Folder b) => a.ObjId != b.ObjId;
 
     public static Guid TypId { get; } = new Guid([139, 189, 204, 163, 86, 34, 75, 65, 164, 2, 26, 9, 28, 180, 7, 165]);
 

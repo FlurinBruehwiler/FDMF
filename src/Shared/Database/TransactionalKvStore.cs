@@ -21,10 +21,8 @@ public sealed class TransactionalKvStore : IDisposable
         Environment = env;
     }
 
-    public void Commit()
+    public void Commit(LightningTransaction writeTransaction)
     {
-        using var writeTransaction = Environment.BeginTransaction();
-
         //loop over changeset and apply changes
         var cursor = ChangeSet.CreateCursor();
         if (cursor.SetRange([0]) == ResultCode.Success)
@@ -48,8 +46,6 @@ public sealed class TransactionalKvStore : IDisposable
 
             } while (cursor.Next().resultCode == ResultCode.Success);
         }
-
-        writeTransaction.Commit();
     }
 
     public ResultCode Put(ReadOnlySpan<byte> key, ReadOnlySpan<byte> value)

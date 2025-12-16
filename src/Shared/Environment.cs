@@ -7,9 +7,14 @@ public class Environment
     public required LightningEnvironment LightningEnvironment;
     public required LightningDatabase ObjectDb;
     public required LightningDatabase HistoryDb;
+    public required LightningDatabase SearchIndex;
+    public required HashSet<Guid> FldsToIndex;
 
-    public static Environment Create()
+    public static Environment Create(HashSet<Guid> fldsToIndex)
     {
+        //during testing we delete the old db
+        Directory.Delete("database", recursive: true);
+
         var env = new LightningEnvironment("database", new EnvironmentConfiguration
         {
             MaxDatabases = 128
@@ -28,11 +33,20 @@ public class Environment
             Flags = DatabaseOpenFlags.Create
         });
 
+        var indexDb = lightningTransaction.OpenDatabase(name: "IndexDb", new DatabaseConfiguration
+        {
+            Flags = DatabaseOpenFlags.Create | DatabaseOpenFlags.DuplicatesSort
+        });
+
+        lightningTransaction.Commit();
+
         return new Environment
         {
             LightningEnvironment = env,
             ObjectDb = objDb,
-            HistoryDb = histDb
+            HistoryDb = histDb,
+            SearchIndex = indexDb,
+            FldsToIndex = fldsToIndex
         };
     }
 }

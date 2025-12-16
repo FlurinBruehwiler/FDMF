@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
+
 namespace Shared.Database;
 
 
@@ -43,7 +44,14 @@ public sealed class DbSession : IDisposable
         //but we want to have our SaveAction on Validation logic before that.
         //so the alternative design, which may be better is to first update the readonly transaction of the TKV to the current version,
         //then execute all saveaction/validations, and only then commit
-        Store.Commit();
+
+        using var writeTransaction = Environment.LightningEnvironment.BeginTransaction();
+
+        Searcher.UpdateSearchIndex(Environment, writeTransaction, Store.ChangeSet);
+
+        Store.Commit(writeTransaction);
+
+        writeTransaction.Commit();
     }
 
     /// <summary>
@@ -342,6 +350,16 @@ public sealed class DbSession : IDisposable
             }
             while (Cursor.Next().resultCode == ResultCode.Success);
         }
+    }
+
+    public T GetObjFromGuid<T>(Guid objId) where T : ITransactionObject, new()
+    {
+        //i'm not sure if this function is at the right place....
+        return new T
+        {
+            ObjId = objId,
+            DbSession = this
+        };
     }
 }
 
