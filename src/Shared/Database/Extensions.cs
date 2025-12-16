@@ -14,7 +14,7 @@ public static class Extensions
         return MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref value, 1));
     }
 
-    public static void CopyReverse<T>(this ReadOnlySpan<T> source, Span<T> destination)
+    public static void CopyToReverse<T>(this ReadOnlySpan<T> source, Span<T> destination)
     {
         if (destination.Length < source.Length)
             throw new ArgumentException("Destination too small");

@@ -68,7 +68,7 @@ try
         foreach (var folder in Searcher.Search<Folder>(t, new FieldCriterion
                  {
                      FieldId = Folder.Fields.Name,
-                     Value = "Jo"
+                     Value = "nna"
                  }))
         {
             Console.WriteLine(folder.Name);
