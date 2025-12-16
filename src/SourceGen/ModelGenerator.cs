@@ -16,6 +16,7 @@ public static class ModelGenerator
 
             sourceBuilder.AppendLine("using System.Text;");
             sourceBuilder.AppendLine("using MemoryPack;");
+            sourceBuilder.AppendLine("using Shared.Database;");
 
             sourceBuilder.AppendLine("namespace Shared.Generated;");
             sourceBuilder.AppendLine();
@@ -30,20 +31,20 @@ public static class ModelGenerator
             sourceBuilder.AppendLine("public Folder() { }");
 
 
-            sourceBuilder.AppendLine($"public {entity.Key}(Transaction transaction)");
+            sourceBuilder.AppendLine($"public {entity.Key}(DbSession dbSession)");
             sourceBuilder.AppendLine("{");
             sourceBuilder.AddIndent();
 
-            sourceBuilder.AppendLine("_transaction = transaction;");
-            sourceBuilder.AppendLine("_objId = _transaction.CreateObj(TypId);");
+            sourceBuilder.AppendLine("DbSession = dbSession;");
+            sourceBuilder.AppendLine("ObjId = DbSession.CreateObj(TypId);");
             sourceBuilder.RemoveIndent();
             sourceBuilder.AppendLine("}");
 
             sourceBuilder.AppendLine();
 
             sourceBuilder.AppendLine("[MemoryPackIgnore]");
-            sourceBuilder.AppendLine("public Transaction _transaction { get; set; }");
-            sourceBuilder.AppendLine("public Guid _objId { get; set; }");
+            sourceBuilder.AppendLine("public DbSession DbSession { get; set; }");
+            sourceBuilder.AppendLine("public Guid ObjId { get; set; }");
             sourceBuilder.AppendLine();
 
             foreach (var field in entity.Fields)
@@ -83,8 +84,8 @@ public static class ModelGenerator
                 sourceBuilder.AppendLine($"public {dataType} {field.Key}");
                 sourceBuilder.AppendLine("{");
                 sourceBuilder.AddIndent();
-                sourceBuilder.AppendLine($"get => {string.Format(toFunction, $"_transaction.GetFldValue(_objId, Fields.{field.Key})")};");
-                sourceBuilder.AppendLine($"set => _transaction.SetFldValue(_objId, Fields.{field.Key}, {fromFunction});");
+                sourceBuilder.AppendLine($"get => {string.Format(toFunction, $"DbSession.GetFldValue(ObjId, Fields.{field.Key})")};");
+                sourceBuilder.AppendLine($"set => DbSession.SetFldValue(ObjId, Fields.{field.Key}, {fromFunction});");
                 sourceBuilder.RemoveIndent();
                 sourceBuilder.AppendLine("}");
             }
@@ -101,8 +102,8 @@ public static class ModelGenerator
                     sourceBuilder.AppendLine("{");
                     sourceBuilder.AddIndent();
 
-                    sourceBuilder.AppendLine($"get => GeneratedCodeHelper.{getMethod}<{entity.Key}>(_transaction, _objId, Fields.{refField.Key});");
-                    sourceBuilder.AppendLine($"set => GeneratedCodeHelper.SetAssoc(_transaction, _objId, Fields.{refField.Key}, value?._objId ?? Guid.Empty, {refField.OtherReferenceField.OwningEntity.Key}.Fields.{refField.OtherReferenceField.Key});");
+                    sourceBuilder.AppendLine($"get => GeneratedCodeHelper.{getMethod}<{entity.Key}>(DbSession, ObjId, Fields.{refField.Key});");
+                    sourceBuilder.AppendLine($"set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.{refField.Key}, value?.ObjId ?? Guid.Empty, {refField.OtherReferenceField.OwningEntity.Key}.Fields.{refField.OtherReferenceField.Key});");
 
                     sourceBuilder.RemoveIndent();
                     sourceBuilder.AppendLine("}");
@@ -110,14 +111,14 @@ public static class ModelGenerator
                 else if (refField.RefType == RefType.Multiple)
                 {
                     sourceBuilder.AppendLine("[MemoryPackIgnore]");
-                    sourceBuilder.AppendLine($"public AssocCollection<{refField.OtherReferenceField.OwningEntity.Key}> {refField.Key} => new(_transaction, _objId, Fields.{refField.Key}, {refField.OtherReferenceField.OwningEntity.Key}.Fields.{refField.OtherReferenceField.Key});");
+                    sourceBuilder.AppendLine($"public AssocCollection<{refField.OtherReferenceField.OwningEntity.Key}> {refField.Key} => new(DbSession, ObjId, Fields.{refField.Key}, {refField.OtherReferenceField.OwningEntity.Key}.Fields.{refField.OtherReferenceField.Key});");
                 }
             }
 
             sourceBuilder.AppendLine();
 
-            sourceBuilder.AppendLine($"public static bool operator ==({entity.Key} a, {entity.Key} b) => a._objId == b._objId;");
-            sourceBuilder.AppendLine($"public static bool operator !=({entity.Key} a, {entity.Key} b) => a._objId != b._objId;");
+            sourceBuilder.AppendLine($"public static bool operator ==({entity.Key} a, {entity.Key} b) => a.ObjId == b.ObjId;");
+            sourceBuilder.AppendLine($"public static bool operator !=({entity.Key} a, {entity.Key} b) => a.ObjId != b.ObjId;");
 
             sourceBuilder.AppendLine();
 
