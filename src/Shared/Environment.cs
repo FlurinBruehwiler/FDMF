@@ -1,8 +1,15 @@
-﻿using System.Data.Common;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using LightningDB;
 
 namespace Shared;
+
+public enum IndexType
+{
+    String,
+    DateTime,
+    SignedLong,
+    Decimal
+}
 
 public class Environment
 {
@@ -12,9 +19,9 @@ public class Environment
     public required LightningDatabase StringSearchIndex;
     public required LightningDatabase NonStringSearchIndex;
 
-    public required HashSet<Guid> FldsToIndex;
+    public required Dictionary<Guid, IndexType> FldsToIndex;
 
-    public static Environment Create(HashSet<Guid> fldsToIndex)
+    public static Environment Create(Dictionary<Guid, IndexType> fldsToIndex)
     {
         //during testing we delete the old db
         Directory.Delete("database", recursive: true);

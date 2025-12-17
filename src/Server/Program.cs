@@ -9,7 +9,10 @@ using Shared.Generated;
 
 try
 {
-    var env = Shared.Environment.Create([Folder.Fields.Name]);
+    var env = Shared.Environment.Create(new Dictionary<Guid, IndexType>
+    {
+        { Folder.Fields.Name, IndexType.String }
+    });
 
     using (var tsx = new DbSession(env))
     {

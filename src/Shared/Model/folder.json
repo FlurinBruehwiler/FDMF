@@ -12,6 +12,22 @@
         "en": "Name"
       },
       "datatype": "String"
+    },
+    {
+      "id": "19AFB14D-E6E6-4FFA-947B-B4B861D0118E",
+      "key": "TestDateField",
+      "name": {
+        "en": "A Date field used for testing"
+      },
+      "datatype": "DateTime"
+    },
+    {
+      "id": "25B2926A-E77D-4A1F-BA75-9D3C76AC7DD7",
+      "key": "TestDecimalField",
+      "name": {
+        "en": "A Decimal field used for testing"
+      },
+    "datatype": "Decimal"
     }
   ],
   "referenceFields": [

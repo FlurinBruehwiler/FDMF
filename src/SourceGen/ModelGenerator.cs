@@ -14,6 +14,7 @@ public static class ModelGenerator
         {
             var sourceBuilder = new SourceBuilder();
 
+            sourceBuilder.AppendLine("using System.Runtime.InteropServices;");
             sourceBuilder.AppendLine("using System.Text;");
             sourceBuilder.AppendLine("using MemoryPack;");
             sourceBuilder.AppendLine("using Shared.Database;");
@@ -22,7 +23,7 @@ public static class ModelGenerator
             sourceBuilder.AppendLine();
 
             sourceBuilder.AppendLine("[MemoryPackable]");
-            sourceBuilder.AppendLine($"public partial struct {entity.Key} : ITransactionObject");
+            sourceBuilder.AppendLine($"public partial struct {entity.Key} : ITransactionObject, IEquatable<{entity.Key}>");
             sourceBuilder.AppendLine("{");
             sourceBuilder.AddIndent();
 
@@ -63,7 +64,7 @@ public static class ModelGenerator
                 {
                     FieldDataType.Integer => "MemoryMarshal.Read<int>({0})",
                     FieldDataType.Decimal => "MemoryMarshal.Read<decimal>({0})",
-                    FieldDataType.String => "Encoding.Unicode.GetString({0}.AsSpan())",
+                    FieldDataType.String => "Encoding.Unicode.GetString({0})",
                     FieldDataType.DateTime => "MemoryMarshal.Read<DateTime>({0})",
                     FieldDataType.Boolean => "MemoryMarshal.Read<bool>({0})",
                     _ => throw new ArgumentOutOfRangeException()
@@ -81,10 +82,10 @@ public static class ModelGenerator
 
                 //could be improving performance here....
                 sourceBuilder.AppendLine("[MemoryPackIgnore]");
-                sourceBuilder.AppendLine($"public {dataType} {field.Key}");
+                sourceBuilder.AppendLine($"public unsafe {dataType} {field.Key}");
                 sourceBuilder.AppendLine("{");
                 sourceBuilder.AddIndent();
-                sourceBuilder.AppendLine($"get => {string.Format(toFunction, $"DbSession.GetFldValue(ObjId, Fields.{field.Key})")};");
+                sourceBuilder.AppendLine($"get => {string.Format(toFunction, $"DbSession.GetFldValue(ObjId, Fields.{field.Key}).AsSpan()")};");
                 sourceBuilder.AppendLine($"set => DbSession.SetFldValue(ObjId, Fields.{field.Key}, {fromFunction});");
                 sourceBuilder.RemoveIndent();
                 sourceBuilder.AppendLine("}");
@@ -117,8 +118,12 @@ public static class ModelGenerator
 
             sourceBuilder.AppendLine();
 
-            sourceBuilder.AppendLine($"public static bool operator ==({entity.Key} a, {entity.Key} b) => a.ObjId == b.ObjId;");
-            sourceBuilder.AppendLine($"public static bool operator !=({entity.Key} a, {entity.Key} b) => a.ObjId != b.ObjId;");
+            sourceBuilder.AppendLine($"public static bool operator ==({entity.Key} a, {entity.Key} b) => a.DbSession == b.DbSession && a.ObjId == b.ObjId;");
+            sourceBuilder.AppendLine($"public static bool operator !=({entity.Key} a, {entity.Key} b) => a.DbSession != b.DbSession || a.ObjId != b.ObjId;");
+
+            sourceBuilder.AppendLine($"public bool Equals({entity.Key} other) => this == other;");
+            sourceBuilder.AppendLine("public override bool Equals(object? obj) => obj is Folder other && Equals(other);");
+            sourceBuilder.AppendLine("public override int GetHashCode() => HashCode.Combine(DbSession, ObjId);");
 
             sourceBuilder.AppendLine();
 
