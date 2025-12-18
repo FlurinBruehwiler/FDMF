@@ -5,17 +5,33 @@ public struct SearchCriterion
     public CriterionType Type;
     public StringCriterion String;
 
-    //todo overlap the following three fields so that the struct is smaller
+    //todo overlap the following fields so that the struct is smaller
     public LongCriterion Long;
     public DecimalCriterion Decimal;
     public DateTimeCriterion DateTime;
+    public AssocCriterion Assoc;
 
     public enum CriterionType
     {
         String,
         Long,
         Decimal,
-        DateTime
+        DateTime,
+        Assoc
+    }
+
+    public struct AssocCriterion
+    {
+        public Guid FieldId;
+        public Guid ObjId;
+        public AssocCriterionType Type;
+
+        public enum AssocCriterionType
+        {
+            MatchGuid = 0, //Default
+            Null,
+            NotNull,
+        }
     }
 
     public struct LongCriterion

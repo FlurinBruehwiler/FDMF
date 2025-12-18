@@ -1,5 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 using LightningDB;
+using Shared.Database;
 
 namespace Shared;
 
@@ -8,7 +9,8 @@ public enum IndexType
     String,
     DateTime,
     SignedLong,
-    Decimal
+    Decimal,
+    Assoc
 }
 
 public class Environment
@@ -79,7 +81,8 @@ public class CustomIndexComparer : IComparer<MDBValue>
     {
         SignedLong,
         DateTime,
-        Decimal
+        Decimal,
+        Assoc
     }
 
     public static int CompareStatic(ReadOnlySpan<byte> a, ReadOnlySpan<byte> b)
@@ -99,6 +102,7 @@ public class CustomIndexComparer : IComparer<MDBValue>
             Comparison.SignedLong => CompareT<long>(aData, bData),
             Comparison.DateTime => CompareT<DateTime>(aData, bData),
             Comparison.Decimal => CompareT<decimal>(aData, bData),
+            Comparison.Assoc => BPlusTree.CompareSpan(aData, bData),
             _ => throw new ArgumentOutOfRangeException()
         };
 

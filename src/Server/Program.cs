@@ -13,21 +13,28 @@ try
     {
         { Folder.Fields.Name, IndexType.String },
         { Folder.Fields.TestDateField, IndexType.DateTime },
+        { Folder.Fields.Parent, IndexType.Assoc },
+        { Folder.Fields.Subfolders, IndexType.Assoc }
     });
 
+    Guid parentFolderObjId;
+    Guid childObjId;
     using (var tsx = new DbSession(env))
     {
-        new Folder(tsx)
+        var parentFolder = new Folder(tsx)
         {
-            Name = "Hallo Flurin",
+            Name = "Parent",
             TestDateField = new DateTime(2004, 09, 13),
         };
+        parentFolderObjId = parentFolder.ObjId;
 
-        new Folder(tsx)
+        var childFolder = new Folder(tsx)
         {
-            Name = "Foo der Erste flurin",
+            Name = "Child",
             TestDateField = new DateTime(2004, 09, 13),
+            Parent = parentFolder
         };
+        childObjId = childFolder.ObjId;
 
         new Folder(tsx)
         {
@@ -52,23 +59,34 @@ try
 
         var result = Searcher.Search<Folder>(t, new SearchCriterion
         {
-            Type = SearchCriterion.CriterionType.DateTime,
-            DateTime = new SearchCriterion.DateTimeCriterion
+            Type = SearchCriterion.CriterionType.Assoc,
+            Assoc = new SearchCriterion.AssocCriterion
             {
-                FieldId = Folder.Fields.TestDateField,
-                From = new DateTime(2003, 1, 1),
-                To = new DateTime(2005, 1, 1)
-            }
-        },new SearchCriterion
-        {
-            Type = SearchCriterion.CriterionType.String,
-            String = new SearchCriterion.StringCriterion
-            {
-                FieldId = Folder.Fields.Name,
-                Value = "flurin",
-                Type = SearchCriterion.StringCriterion.MatchType.Substring
+                FieldId = Folder.Fields.Subfolders,
+                ObjId = childObjId,
+                Type = SearchCriterion.AssocCriterion.AssocCriterionType.MatchGuid
             }
         });
+
+        // var result = Searcher.Search<Folder>(t, new SearchCriterion
+        // {
+        //     Type = SearchCriterion.CriterionType.DateTime,
+        //     DateTime = new SearchCriterion.DateTimeCriterion
+        //     {
+        //         FieldId = Folder.Fields.TestDateField,
+        //         From = new DateTime(2003, 1, 1),
+        //         To = new DateTime(2005, 1, 1)
+        //     }
+        // }, new SearchCriterion
+        // {
+        //     Type = SearchCriterion.CriterionType.String,
+        //     String = new SearchCriterion.StringCriterion
+        //     {
+        //         FieldId = Folder.Fields.Name,
+        //         Value = "flurin",
+        //         Type = SearchCriterion.StringCriterion.MatchType.Substring
+        //     }
+        // });
 
         foreach (Folder folder in result)
         {
