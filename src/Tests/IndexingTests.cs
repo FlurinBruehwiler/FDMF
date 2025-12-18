@@ -103,7 +103,7 @@ public class IndexingTests
 
         var folderB = new TestingFolder(tsx)
         {
-            Name = "Firefox"
+            Name = "Firefox :)"
         };
 
         tsx.Commit();
@@ -114,12 +114,78 @@ public class IndexingTests
             String = new SearchCriterion.StringCriterion
             {
                 FieldId = TestingFolder.Fields.Name,
-                Value = "firfox",
+                Value = "firfo",
                 Type = SearchCriterion.StringCriterion.MatchType.Fuzzy,
-                FuzzyCutoff = 0.5f
+                FuzzyCutoff = 0.3f
             }
         });
 
         Assert.Equal([folderB], result);
+    }
+
+    [Fact]
+    public void Assoc_Search()
+    {
+        var testModel = ProjectModel.CreateFromDirectory("TestModel");
+        var env = Environment.Create(testModel, dbName: nameof(Assoc_Search));
+
+        using var tsx = new DbSession(env);
+
+        var folderA = new TestingFolder(tsx);
+
+        var folderB = new TestingFolder(tsx)
+        {
+            Parent = folderA
+        };
+
+        tsx.Commit();
+
+        var result = Searcher.Search<TestingFolder>(tsx, new SearchCriterion
+        {
+            Type = SearchCriterion.CriterionType.Assoc,
+            Assoc = new SearchCriterion.AssocCriterion
+            {
+                FieldId = TestingFolder.Fields.Parent,
+                ObjId = folderA.ObjId,
+                Type = SearchCriterion.AssocCriterion.AssocCriterionType.MatchGuid
+            }
+        });
+
+        Assert.Equal([folderB], result);
+
+        var result2 = Searcher.Search<TestingFolder>(tsx, new SearchCriterion
+        {
+            Type = SearchCriterion.CriterionType.Assoc,
+            Assoc = new SearchCriterion.AssocCriterion
+            {
+                FieldId = TestingFolder.Fields.Subfolders,
+                ObjId = folderB.ObjId,
+                Type = SearchCriterion.AssocCriterion.AssocCriterionType.MatchGuid
+            }
+        });
+
+        Assert.Equal([folderA], result2);
+    }
+
+    [Fact]
+    public void Type_Search()
+    {
+        var testModel = ProjectModel.CreateFromDirectory("TestModel");
+        var env = Environment.Create(testModel, dbName: nameof(Type_Search));
+
+        using var tsx = new DbSession(env);
+
+        var folderA = new TestingFolder(tsx);
+
+        var folderB = new TestingFolder(tsx)
+        {
+            Parent = folderA
+        };
+
+        tsx.Commit();
+
+        var result = Searcher.Search<TestingFolder>(tsx);
+
+        Assert.Equal([folderA, folderB], result);
     }
 }

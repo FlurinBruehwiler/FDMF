@@ -9,6 +9,19 @@ namespace Shared;
 
 //todo at one point we also want the functionality to search the non-commited data (these wouldn't need an index)
 
+//todo the following features need to be implemented
+// [ ] implement search of non indexed values fields
+// [ ] implement ranking
+// [ ] implement partial results
+// [ ] implement result info (for example in a substring search, we want to see the part of the substring that matched
+// [ ] implement profiling (we want to see what searches are slow, so the user can add indexes to these fields
+// [ ] implement more complex operators (not only AND, but also OR)
+// [ ] implement sub queries
+// [ ] implement assoc null/not null search
+// [ ] implement better substring/fuzzy search
+// [ ] improve the performance (reducing allocations)
+// [ ] implement search by type (indexed)
+
 /// <summary>
 /// Method for Searching the Database and maintaining indexes.
 /// </summary>
@@ -18,27 +31,34 @@ public static class Searcher
     {
         Guid[]? results = null;
 
-        foreach (var criterion in criteria)
+        if (criteria.Length == 0)
         {
-            //todo assert that the criterion is valid (that the fieldId is part of T)
+            results = ExecuteTypeSearch(dbSession.Environment, dbSession.Store.ReadTransaction, T.TypId);
+        }
+        else //else just for clarity
+        {
+            foreach (var criterion in criteria)
+            {
+                //todo assert that the criterion is valid (that the fieldId is part of T)
 
-            var r = criterion.Type switch
-            {
-                SearchCriterion.CriterionType.String => ExecuteStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, criterion.String),
-                SearchCriterion.CriterionType.Long => ExecuteNonStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, CustomIndexComparer.Comparison.SignedLong, criterion.Long.FieldId, criterion.Long.From, criterion.Long.To),
-                SearchCriterion.CriterionType.Decimal => ExecuteNonStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, CustomIndexComparer.Comparison.Decimal, criterion.Decimal.FieldId, criterion.Decimal.From, criterion.Decimal.To),
-                SearchCriterion.CriterionType.DateTime => ExecuteNonStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, CustomIndexComparer.Comparison.DateTime, criterion.DateTime.FieldId, criterion.DateTime.From, criterion.DateTime.To),
-                SearchCriterion.CriterionType.Assoc => ExecuteAssocSearch(dbSession.Environment, dbSession.Store.ReadTransaction, criterion.Assoc),
-                _ => throw new ArgumentOutOfRangeException()
-            };
+                var r = criterion.Type switch
+                {
+                    SearchCriterion.CriterionType.String => ExecuteStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, criterion.String),
+                    SearchCriterion.CriterionType.Long => ExecuteNonStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, CustomIndexComparer.Comparison.SignedLong, criterion.Long.FieldId, criterion.Long.From, criterion.Long.To),
+                    SearchCriterion.CriterionType.Decimal => ExecuteNonStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, CustomIndexComparer.Comparison.Decimal, criterion.Decimal.FieldId, criterion.Decimal.From, criterion.Decimal.To),
+                    SearchCriterion.CriterionType.DateTime => ExecuteNonStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, CustomIndexComparer.Comparison.DateTime, criterion.DateTime.FieldId, criterion.DateTime.From, criterion.DateTime.To),
+                    SearchCriterion.CriterionType.Assoc => ExecuteAssocSearch(dbSession.Environment, dbSession.Store.ReadTransaction, criterion.Assoc),
+                    _ => throw new ArgumentOutOfRangeException()
+                };
 
-            if (results is null)
-            {
-                results = r;
-            }
-            else
-            {
-                results = results.Intersect(r).ToArray();
+                if (results is null)
+                {
+                    results = r;
+                }
+                else
+                {
+                    results = results.Intersect(r).ToArray();
+                }
             }
         }
 
@@ -55,7 +75,7 @@ public static class Searcher
         }
     }
 
-    public static void BuildSearchIndex(Environment environment)
+    public static void xcfd(Environment environment)
     {
         using var txn = environment.LightningEnvironment.BeginTransaction();
 
@@ -87,6 +107,13 @@ public static class Searcher
                         InsertNonStringIndex<Guid>(CustomIndexComparer.Comparison.Assoc, fldId, objId, otherObjId, txn, environment.NonStringSearchIndex);
                     }
                 }
+                else if (value.AsSpan()[0] == (byte)ValueTyp.Obj)
+                {
+                    var objId = MemoryMarshal.Read<Guid>(key.AsSpan());
+                    var typId = MemoryMarshal.Read<Guid>(value.AsSpan().Slice(1));
+
+                    InsertTypeIndex(environment, typId, txn, objId);
+                }
             } while (cursor.Next().resultCode == MDBResultCode.Success);
         }
 
@@ -98,9 +125,6 @@ public static class Searcher
     /// </summary>
     public static void UpdateSearchIndex(Environment environment, LightningTransaction txn, BPlusTree changeSet)
     {
-        // using var indexCursor = txn.CreateCursor(environment.StringSearchIndex);
-        // using var nonStringIndexCursor = txn.CreateCursor(environment.NonStringSearchIndex);
-
         var changeCursor = changeSet.CreateCursor();
         if (changeCursor.SetRange([0]) == ResultCode.Success)
         {
@@ -108,66 +132,87 @@ public static class Searcher
             {
                 var (_, key, value) = changeCursor.GetCurrent();
 
-                if (key.AsSpan().Length < 32)
+                if (key.AsSpan().Length < 16)
                     continue;
 
                 var objId = MemoryMarshal.Read<Guid>(key.AsSpan());
-                var fldId = MemoryMarshal.Read<Guid>(key.AsSpan(16));
 
-                if (key.AsSpan().Length == 32 && environment.Model.FieldsById.TryGetValue(fldId, out var fieldDefinition) && fieldDefinition.IsIndexed)
+                if (key.AsSpan().Length == 16)
                 {
-                    var (r, _, v) = txn.Get(environment.ObjectDb, key);
+                    txn.Delete(environment.ObjectDb, objId.AsSpan());
 
-                    if (r == MDBResultCode.Success) //the value already existed, we remove it
+                    var typId = MemoryMarshal.Read<Guid>(value.AsSpan().Slice(2));
+
+                    if (value[0] == (byte)ValueFlag.AddModify)
                     {
-                        var oldValue = v.AsSpan().Slice(1);
-                        switch (fieldDefinition.DataType)
+                        InsertTypeIndex(environment, typId, txn, objId);
+                    }
+                }
+                else if (key.AsSpan().Length == 32)
+                {
+                    var fldId = MemoryMarshal.Read<Guid>(key.AsSpan(16));
+
+                    if (environment.Model.FieldsById.TryGetValue(fldId, out var fieldDefinition) && fieldDefinition.IsIndexed)
+                    {
+                        var (r, _, v) = txn.Get(environment.ObjectDb, key);
+
+                        if (r == MDBResultCode.Success) //the value already existed, we remove it
                         {
-                            case FieldDataType.String:
-                                var oldValueSpan = Normalize(MemoryMarshal.Cast<byte, char>(oldValue)).AsSpan();
+                            var oldValue = v.AsSpan().Slice(1);
+                            switch (fieldDefinition.DataType)
+                            {
+                                case FieldDataType.String:
+                                    var oldValueSpan = Normalize(MemoryMarshal.Cast<byte, char>(oldValue)).AsSpan();
 
-                                var indexKey = ConstructStringIndexKey(IndexFlag.Normal, fldId, oldValueSpan); //ignore tag
-                                txn.Delete(environment.StringSearchIndex, indexKey, objId.AsSpan());
+                                    var indexKey = ConstructStringIndexKey(IndexFlag.Normal, fldId, oldValueSpan); //ignore tag
+                                    txn.Delete(environment.StringSearchIndex, indexKey, objId.AsSpan());
 
-                                var indexKey2 = ConstructStringIndexKey(IndexFlag.Reverse, fldId, oldValueSpan); //ignore tag
-                                txn.Delete(environment.StringSearchIndex, indexKey2, objId.AsSpan());
+                                    var indexKey2 = ConstructStringIndexKey(IndexFlag.Reverse, fldId, oldValueSpan); //ignore tag
+                                    txn.Delete(environment.StringSearchIndex, indexKey2, objId.AsSpan());
 
-                                if (oldValueSpan.Length >= 3)
-                                {
-                                    for (int i = 0; i < oldValueSpan.Length - 2; i++)
+                                    if (oldValueSpan.Length >= 3)
                                     {
-                                        var ngramIndexKey = ConstructStringIndexKey(IndexFlag.NGram, fldId, oldValueSpan.Slice(i, 3));
-                                        txn.Delete(environment.StringSearchIndex, ngramIndexKey, objId.AsSpan());
+                                        for (int i = 0; i < oldValueSpan.Length - 2; i++)
+                                        {
+                                            var ngramIndexKey = ConstructStringIndexKey(IndexFlag.NGram, fldId, oldValueSpan.Slice(i, 3));
+                                            txn.Delete(environment.StringSearchIndex, ngramIndexKey, objId.AsSpan());
+                                        }
                                     }
-                                }
 
-                                break;
-                            case FieldDataType.DateTime:
-                                objId = RemoveNonStringIndexValue<DateTime>(oldValue, CustomIndexComparer.Comparison.DateTime, fldId, objId, txn, environment.NonStringSearchIndex);
-                                break;
-                            case FieldDataType.Integer:
-                                objId = RemoveNonStringIndexValue<long>(oldValue, CustomIndexComparer.Comparison.SignedLong, fldId, objId, txn, environment.NonStringSearchIndex);
-                                break;
-                            case FieldDataType.Decimal:
-                                objId = RemoveNonStringIndexValue<decimal>(oldValue, CustomIndexComparer.Comparison.Decimal, fldId, objId, txn, environment.NonStringSearchIndex);
-                                break;
-                            default:
-                                throw new ArgumentOutOfRangeException();
+                                    break;
+                                case FieldDataType.DateTime:
+                                    objId = RemoveNonStringIndexValue<DateTime>(oldValue, CustomIndexComparer.Comparison.DateTime, fldId, objId, txn, environment.NonStringSearchIndex);
+                                    break;
+                                case FieldDataType.Integer:
+                                    objId = RemoveNonStringIndexValue<long>(oldValue, CustomIndexComparer.Comparison.SignedLong, fldId, objId, txn, environment.NonStringSearchIndex);
+                                    break;
+                                case FieldDataType.Decimal:
+                                    objId = RemoveNonStringIndexValue<decimal>(oldValue, CustomIndexComparer.Comparison.Decimal, fldId, objId, txn, environment.NonStringSearchIndex);
+                                    break;
+                                default:
+                                    throw new ArgumentOutOfRangeException();
+                            }
+                        }
+
+                        if (value[0] == (byte)ValueFlag.AddModify)
+                        {
+                            var val = value.AsSpan(2);
+                            InsertIndex(fieldDefinition.DataType, objId, fldId, val, txn, environment);
                         }
                     }
-
-                    if (value[0] == (byte)ValueFlag.AddModify)
-                    {
-                        var val = value.AsSpan(2);
-                        InsertIndex(fieldDefinition.DataType, objId, fldId, val, txn, environment);
-                    }
-                }else if (key.AsSpan().Length == 64 && environment.Model.AsoFieldsById.TryGetValue(fldId, out var asoFld) && asoFld.IsIndexed)
+                }
+                else if (key.AsSpan().Length == 64)
                 {
-                    txn.Delete(environment.ObjectDb, key);
-                    if (value[0] == (byte)ValueFlag.AddModify)
+                    var fldId = MemoryMarshal.Read<Guid>(key.AsSpan(16));
+
+                    if (environment.Model.AsoFieldsById.TryGetValue(fldId, out var asoFld) && asoFld.IsIndexed)
                     {
-                        var val = key.AsSpan(32, 16);
-                        InsertNonStringIndex<Guid>(CustomIndexComparer.Comparison.Assoc, fldId, objId, val, txn, environment.NonStringSearchIndex);
+                        txn.Delete(environment.ObjectDb, key);
+                        if (value[0] == (byte)ValueFlag.AddModify)
+                        {
+                            var val = key.AsSpan(32, 16);
+                            InsertNonStringIndex<Guid>(CustomIndexComparer.Comparison.Assoc, fldId, objId, val, txn, environment.NonStringSearchIndex);
+                        }
                     }
                 }
             } while (changeCursor.Next().resultCode == ResultCode.Success);
@@ -227,6 +272,31 @@ public static class Searcher
         return set.ToArray();
     }
 
+    private static Guid[] ExecuteTypeSearch(Environment environment, LightningTransaction transaction, Guid typId)
+    {
+        using var cursor = transaction.CreateCursor(environment.NonStringSearchIndex);
+
+        Span<byte> dest = stackalloc byte[1 + 16];
+        dest[0] = (byte)CustomIndexComparer.Comparison.Type;
+        typId.AsSpan().CopyTo(dest.Slice(1));
+
+        List<Guid> objs = [];
+
+        if (cursor.SetKey(dest).resultCode == MDBResultCode.Success)
+        {
+            do
+            {
+                var (_, _, value) = cursor.GetCurrent();
+
+                var guid = MemoryMarshal.Read<Guid>(value.AsSpan());
+
+                objs.Add(guid);
+            } while (cursor.NextDuplicate().resultCode == MDBResultCode.Success);
+        }
+
+        return objs.ToArray();
+    }
+
     private static Guid[] ExecuteStringSearch(Environment environment, LightningTransaction transaction, SearchCriterion.StringCriterion criterion)
     {
         using var cursor = transaction.CreateCursor(environment.StringSearchIndex);
@@ -276,7 +346,6 @@ public static class Searcher
                         {
                             matchingObjs.Add(guid, 1);
                         }
-
                     } while (cursor.NextDuplicate().resultCode == MDBResultCode.Success);
                 }
             }
@@ -326,8 +395,8 @@ public static class Searcher
             Span<byte> keyBuf = stackalloc byte[2 * 16];
             foreach (var guid in lastRound)
             {
-                MemoryMarshal.Write(keyBuf.Slice(0*16, 16), guid);
-                MemoryMarshal.Write(keyBuf.Slice(1*16, 16), criterion.FieldId);
+                MemoryMarshal.Write(keyBuf.Slice(0 * 16, 16), guid);
+                MemoryMarshal.Write(keyBuf.Slice(1 * 16, 16), criterion.FieldId);
 
                 var (r, _, v) = transaction.Get(environment.ObjectDb, keyBuf);
                 if (r == MDBResultCode.Success)
@@ -418,6 +487,15 @@ public static class Searcher
             default:
                 throw new ArgumentOutOfRangeException();
         }
+    }
+
+    private static void InsertTypeIndex(Environment environment, Guid typId, LightningTransaction txn, Guid objId)
+    {
+        Span<byte> dest = stackalloc byte[1 + 16];
+        dest[0] = (byte)CustomIndexComparer.Comparison.Type;
+        typId.AsSpan().CopyTo(dest.Slice(1));
+
+        txn.Put(environment.NonStringSearchIndex, dest, objId.AsSpan());
     }
 
     private static void InsertNonStringIndex<T>(CustomIndexComparer.Comparison comparison, Guid fldId, Guid objId, ReadOnlySpan<byte> val, LightningTransaction transaction, LightningDatabase indexDb) where T : unmanaged

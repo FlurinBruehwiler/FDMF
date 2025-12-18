@@ -75,7 +75,8 @@ public class CustomIndexComparer : IComparer<MDBValue>
         SignedLong,
         DateTime,
         Decimal,
-        Assoc
+        Assoc,
+        Type
     }
 
     public static int CompareStatic(ReadOnlySpan<byte> a, ReadOnlySpan<byte> b)
@@ -96,6 +97,7 @@ public class CustomIndexComparer : IComparer<MDBValue>
             Comparison.DateTime => CompareT<DateTime>(aData, bData),
             Comparison.Decimal => CompareT<decimal>(aData, bData),
             Comparison.Assoc => BPlusTree.CompareSpan(aData, bData),
+            Comparison.Type => BPlusTree.CompareSpan(aData, bData),
             _ => throw new ArgumentOutOfRangeException()
         };
 

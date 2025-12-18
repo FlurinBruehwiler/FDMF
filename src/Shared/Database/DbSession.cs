@@ -20,7 +20,7 @@ public sealed class DbSession : IDisposable
      * The objs are stored as follows:
      *
      * Keys:                                   Values: TODO, document how the values are stored
-     * OBJ: ObjId, TypId
+     * OBJ: ObjId: [F]TypId
      * ASO: ObjIdA, FldIdA, ObjIdB, FldIdB
      * ASO: ObjIdB, FldIdB, ObjIdA, FldIdA
      * VAL: ObjId, FldId
