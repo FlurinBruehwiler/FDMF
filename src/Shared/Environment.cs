@@ -4,14 +4,7 @@ using Shared.Database;
 
 namespace Shared;
 
-public enum IndexType
-{
-    String,
-    DateTime,
-    SignedLong,
-    Decimal,
-    Assoc
-}
+
 
 public class Environment
 {
@@ -20,11 +13,15 @@ public class Environment
     public required LightningDatabase HistoryDb;
     public required LightningDatabase StringSearchIndex;
     public required LightningDatabase NonStringSearchIndex;
+    public required ProjectModel Model;
 
-    public required Dictionary<Guid, IndexType> FldsToIndex;
 
-    public static Environment Create(Dictionary<Guid, IndexType> fldsToIndex)
+    public static Environment Create()
     {
+        var root = Helper.GetRootDir();
+
+        var model = ProjectModel.CreateFromDirectory(Path.Combine(root, "Shared/Model"));
+
         //during testing we delete the old db
         Directory.Delete("database", recursive: true);
 
@@ -70,7 +67,7 @@ public class Environment
             HistoryDb = histDb,
             StringSearchIndex = stringSearchIndex,
             NonStringSearchIndex = nonStringSearchIndex,
-            FldsToIndex = fldsToIndex
+            Model = model
         };
     }
 }

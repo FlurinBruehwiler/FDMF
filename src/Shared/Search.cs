@@ -57,9 +57,9 @@ public static class Searcher
 
     public static void BuildSearchIndex(Environment environment)
     {
-        using var transaction = environment.LightningEnvironment.BeginTransaction();
+        using var txn = environment.LightningEnvironment.BeginTransaction();
 
-        using var cursor = transaction.CreateCursor(environment.ObjectDb);
+        using var cursor = txn.CreateCursor(environment.ObjectDb);
         if (cursor.SetRange([0]) == MDBResultCode.Success)
         {
             do
@@ -72,9 +72,9 @@ public static class Searcher
 
                     var objId = MemoryMarshal.Read<Guid>(key.AsSpan().Slice(0, 16));
                     var fldId = MemoryMarshal.Read<Guid>(key.AsSpan().Slice(16));
-                    if (environment.FldsToIndex.TryGetValue(fldId, out var indextype))
+                    if (environment.Model.FieldsById.TryGetValue(fldId, out var fld) && fld.IsIndexed)
                     {
-                        InsertIndex(indextype, objId, fldId, dataValue, transaction, environment);
+                        InsertIndex(fld.DataType, objId, fldId, dataValue, txn, environment);
                     }
                 }
                 else if (value.AsSpan()[0] == (byte)ValueTyp.Aso)
@@ -82,16 +82,15 @@ public static class Searcher
                     var objId = MemoryMarshal.Read<Guid>(key.AsSpan().Slice(0));
                     var fldId = MemoryMarshal.Read<Guid>(key.AsSpan().Slice(16));
                     var otherObjId = key.AsSpan().Slice(32, 16);
-                    if (environment.FldsToIndex.TryGetValue(fldId, out var indexType))
+                    if (environment.Model.AsoFieldsById.TryGetValue(fldId, out var asoFld) && asoFld.IsIndexed)
                     {
-                        Debug.Assert(indexType == IndexType.Assoc);
-                        InsertIndex(indexType, objId, fldId, otherObjId, transaction, environment);
+                        InsertNonStringIndex<Guid>(CustomIndexComparer.Comparison.Assoc, fldId, objId, otherObjId, txn, environment.NonStringSearchIndex);
                     }
                 }
             } while (cursor.Next().resultCode == MDBResultCode.Success);
         }
 
-        transaction.Commit();
+        txn.Commit();
     }
 
     /// <summary>
@@ -115,65 +114,60 @@ public static class Searcher
                 var objId = MemoryMarshal.Read<Guid>(key.AsSpan());
                 var fldId = MemoryMarshal.Read<Guid>(key.AsSpan(16));
 
-                if (environment.FldsToIndex.TryGetValue(fldId, out var indexType))
+                if (key.AsSpan().Length == 32 && environment.Model.FieldsById.TryGetValue(fldId, out var fieldDefinition) && fieldDefinition.IsIndexed)
                 {
-                    var isAso = key.AsSpan().Length == 64;
-
-                    if (!isAso)
-                        Debug.Assert(key.AsSpan().Length == 32);
-
                     var (r, _, v) = txn.Get(environment.ObjectDb, key);
 
                     if (r == MDBResultCode.Success) //the value already existed, we remove it
                     {
-                        if (isAso)
+                        var oldValue = v.AsSpan().Slice(1);
+                        switch (fieldDefinition.DataType)
                         {
-                            var oldValue = v.AsSpan().Slice(1);
-                            switch (indexType)
-                            {
-                                case IndexType.String:
-                                    var oldValueSpan = Normalize(MemoryMarshal.Cast<byte, char>(oldValue)).AsSpan();
+                            case FieldDataType.String:
+                                var oldValueSpan = Normalize(MemoryMarshal.Cast<byte, char>(oldValue)).AsSpan();
 
-                                    var indexKey = ConstructStringIndexKey(IndexFlag.Normal, fldId, oldValueSpan); //ignore tag
-                                    txn.Delete(environment.StringSearchIndex, indexKey, objId.AsSpan());
+                                var indexKey = ConstructStringIndexKey(IndexFlag.Normal, fldId, oldValueSpan); //ignore tag
+                                txn.Delete(environment.StringSearchIndex, indexKey, objId.AsSpan());
 
-                                    var indexKey2 = ConstructStringIndexKey(IndexFlag.Reverse, fldId, oldValueSpan); //ignore tag
-                                    txn.Delete(environment.StringSearchIndex, indexKey2, objId.AsSpan());
+                                var indexKey2 = ConstructStringIndexKey(IndexFlag.Reverse, fldId, oldValueSpan); //ignore tag
+                                txn.Delete(environment.StringSearchIndex, indexKey2, objId.AsSpan());
 
-                                    if (oldValueSpan.Length >= 3)
+                                if (oldValueSpan.Length >= 3)
+                                {
+                                    for (int i = 0; i < oldValueSpan.Length - 2; i++)
                                     {
-                                        for (int i = 0; i < oldValueSpan.Length - 2; i++)
-                                        {
-                                            var ngramIndexKey = ConstructStringIndexKey(IndexFlag.NGram, fldId, oldValueSpan.Slice(i, 3));
-                                            txn.Delete(environment.StringSearchIndex, ngramIndexKey, objId.AsSpan());
-                                        }
+                                        var ngramIndexKey = ConstructStringIndexKey(IndexFlag.NGram, fldId, oldValueSpan.Slice(i, 3));
+                                        txn.Delete(environment.StringSearchIndex, ngramIndexKey, objId.AsSpan());
                                     }
+                                }
 
-                                    break;
-                                case IndexType.DateTime:
-                                    objId = RemoveNonStringIndexValue<DateTime>(oldValue, CustomIndexComparer.Comparison.DateTime, fldId, objId, txn, environment.NonStringSearchIndex);
-                                    break;
-                                case IndexType.SignedLong:
-                                    objId = RemoveNonStringIndexValue<long>(oldValue, CustomIndexComparer.Comparison.SignedLong, fldId, objId, txn, environment.NonStringSearchIndex);
-                                    break;
-                                case IndexType.Decimal:
-                                    objId = RemoveNonStringIndexValue<decimal>(oldValue, CustomIndexComparer.Comparison.Decimal, fldId, objId, txn, environment.NonStringSearchIndex);
-                                    break;
-                                default:
-                                    throw new ArgumentOutOfRangeException();
-                            }
-                        }
-                        else
-                        {
-                            Debug.Assert(indexType == IndexType.Assoc);
-                            txn.Delete(environment.ObjectDb, key);
+                                break;
+                            case FieldDataType.DateTime:
+                                objId = RemoveNonStringIndexValue<DateTime>(oldValue, CustomIndexComparer.Comparison.DateTime, fldId, objId, txn, environment.NonStringSearchIndex);
+                                break;
+                            case FieldDataType.Integer:
+                                objId = RemoveNonStringIndexValue<long>(oldValue, CustomIndexComparer.Comparison.SignedLong, fldId, objId, txn, environment.NonStringSearchIndex);
+                                break;
+                            case FieldDataType.Decimal:
+                                objId = RemoveNonStringIndexValue<decimal>(oldValue, CustomIndexComparer.Comparison.Decimal, fldId, objId, txn, environment.NonStringSearchIndex);
+                                break;
+                            default:
+                                throw new ArgumentOutOfRangeException();
                         }
                     }
 
                     if (value[0] == (byte)ValueFlag.AddModify)
                     {
-                        var val = isAso ? key.AsSpan(32, 16) : value.AsSpan(2);
-                        InsertIndex(indexType, objId, fldId, val, txn, environment);
+                        var val = value.AsSpan(2);
+                        InsertIndex(fieldDefinition.DataType, objId, fldId, val, txn, environment);
+                    }
+                }else if (key.AsSpan().Length == 64 && environment.Model.AsoFieldsById.TryGetValue(fldId, out var asoFld) && asoFld.IsIndexed)
+                {
+                    txn.Delete(environment.ObjectDb, key);
+                    if (value[0] == (byte)ValueFlag.AddModify)
+                    {
+                        var val = key.AsSpan(32, 16);
+                        InsertNonStringIndex<Guid>(CustomIndexComparer.Comparison.Assoc, fldId, objId, val, txn, environment.NonStringSearchIndex);
                     }
                 }
             } while (changeCursor.Next().resultCode == ResultCode.Success);
@@ -359,24 +353,21 @@ public static class Searcher
         return forwardIndexKey;
     }
 
-    private static void InsertIndex(IndexType indexType, Guid objId, Guid fldId, ReadOnlySpan<byte> val, LightningTransaction txn, Environment environment)
+    private static void InsertIndex(FieldDataType indexType, Guid objId, Guid fldId, ReadOnlySpan<byte> val, LightningTransaction txn, Environment environment)
     {
         switch (indexType)
         {
-            case IndexType.String:
+            case FieldDataType.String:
                 InsertStringIndex(objId, fldId, MemoryMarshal.Cast<byte, char>(val), txn, environment.StringSearchIndex);
                 break;
-            case IndexType.DateTime:
+            case FieldDataType.DateTime:
                 InsertNonStringIndex<DateTime>(CustomIndexComparer.Comparison.DateTime, fldId, objId, val, txn, environment.NonStringSearchIndex);
                 break;
-            case IndexType.SignedLong:
+            case FieldDataType.Integer:
                 InsertNonStringIndex<long>(CustomIndexComparer.Comparison.SignedLong, fldId, objId, val, txn, environment.NonStringSearchIndex);
                 break;
-            case IndexType.Decimal:
+            case FieldDataType.Decimal:
                 InsertNonStringIndex<decimal>(CustomIndexComparer.Comparison.Decimal, fldId, objId, val, txn, environment.NonStringSearchIndex);
-                break;
-            case IndexType.Assoc:
-                InsertNonStringIndex<Guid>(CustomIndexComparer.Comparison.Assoc, fldId, objId, val, txn, environment.NonStringSearchIndex);
                 break;
             default:
                 throw new ArgumentOutOfRangeException();

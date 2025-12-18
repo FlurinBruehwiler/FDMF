@@ -5,7 +5,9 @@ namespace Shared;
 
 public class ProjectModel
 {
-    public EntityDefinition[] EntityDefinitions = [];
+    public required EntityDefinition[] EntityDefinitions;
+    public required Dictionary<Guid, FieldDefinition> FieldsById;
+    public required Dictionary<Guid, ReferenceFieldDefinition> AsoFieldsById;
 
     public static ProjectModel CreateFromDirectory(string dir)
     {
@@ -35,7 +37,9 @@ public class ProjectModel
 
         return new ProjectModel
         {
-            EntityDefinitions = entities.ToArray()
+            EntityDefinitions = entities.ToArray(),
+            FieldsById = entities.SelectMany(x => x.Fields).ToDictionary(x => x.Id, x => x),
+            AsoFieldsById = entities.SelectMany(x => x.ReferenceFields).ToDictionary(x => x.Id, x => x),
         };
     }
 }
@@ -55,6 +59,7 @@ public class FieldDefinition
     public string Key = "";
     public TranslationText Name;
     public FieldDataType DataType;
+    public bool IsIndexed;
 }
 
 public class ReferenceFieldDefinition
@@ -64,6 +69,7 @@ public class ReferenceFieldDefinition
     public TranslationText Name;
     public RefType RefType;
     public Guid OtherReferenceFielGuid;
+    public bool IsIndexed;
 
     [JsonIgnore]
     public EntityDefinition OwningEntity;

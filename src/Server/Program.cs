@@ -9,13 +9,7 @@ using Shared.Generated;
 
 try
 {
-    var env = Shared.Environment.Create(new Dictionary<Guid, IndexType>
-    {
-        { Folder.Fields.Name, IndexType.String },
-        { Folder.Fields.TestDateField, IndexType.DateTime },
-        { Folder.Fields.Parent, IndexType.Assoc },
-        { Folder.Fields.Subfolders, IndexType.Assoc }
-    });
+    var env = Shared.Environment.Create();
 
     Guid parentFolderObjId;
     Guid childObjId;

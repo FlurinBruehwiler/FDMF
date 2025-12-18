@@ -11,7 +11,8 @@
       "name": {
         "en": "Name"
       },
-      "datatype": "String"
+      "datatype": "String",
+      "isIndexed": true
     },
     {
       "id": "19AFB14D-E6E6-4FFA-947B-B4B861D0118E",
@@ -19,7 +20,8 @@
       "name": {
         "en": "A Date field used for testing"
       },
-      "datatype": "DateTime"
+      "datatype": "DateTime",
+      "isIndexed": true
     },
     {
       "id": "25B2926A-E77D-4A1F-BA75-9D3C76AC7DD7",
@@ -27,7 +29,8 @@
       "name": {
         "en": "A Decimal field used for testing"
       },
-    "datatype": "Decimal"
+      "datatype": "Decimal",
+      "isIndexed": true
     }
   ],
   "referenceFields": [
@@ -38,7 +41,8 @@
         "en": "Subfolders"
       },
       "refType": "Multiple",
-      "otherReferenceFielGuid": "83A0ADA7-BA53-4877-8262-BD47520EEAC7"
+      "otherReferenceFielGuid": "83A0ADA7-BA53-4877-8262-BD47520EEAC7",
+      "isIndexed": true
     },
     {
       "id": "83A0ADA7-BA53-4877-8262-BD47520EEAC7",
@@ -47,7 +51,8 @@
         "en": "Parent"
       },
       "refType": "SingleOptional",
-      "otherReferenceFielGuid": "B40BD476-D9A3-4554-A2F6-4F7760C0FFE4"
+      "otherReferenceFielGuid": "B40BD476-D9A3-4554-A2F6-4F7760C0FFE4",
+      "isIndexed": true
     }
   ]
 }

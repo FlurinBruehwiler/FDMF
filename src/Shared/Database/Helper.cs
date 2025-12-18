@@ -1,9 +1,15 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace Shared.Database;
 
 public static class Helper
 {
+    public static string GetRootDir([CallerFilePath] string str = "")
+    {
+        return Path.GetFullPath(Path.Combine(Path.GetDirectoryName(str)!, "../"));
+    }
+
     public static bool MemoryEquals<T>(T val, T other) where T : unmanaged
     {
         ReadOnlySpan<byte> value = MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref val, 1));
