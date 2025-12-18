@@ -3,15 +3,15 @@ using System.Text;
 using MemoryPack;
 using Shared;
 using Shared.Database;
-namespace Model.Generated;
+namespace TestModel.Generated;
 
 [MemoryPackable]
-public partial struct Folder : ITransactionObject, IEquatable<Folder>
+public partial struct TestingFolder : ITransactionObject, IEquatable<TestingFolder>
 {
     [Obsolete]
     [MemoryPackConstructor]
-    public Folder() { }
-    public Folder(DbSession dbSession)
+    public TestingFolder() { }
+    public TestingFolder(DbSession dbSession)
     {
         DbSession = dbSession;
         ObjId = DbSession.CreateObj(TypId);
@@ -40,18 +40,18 @@ public partial struct Folder : ITransactionObject, IEquatable<Folder>
         set => DbSession.SetFldValue(ObjId, Fields.TestDecimalField, new Slice<decimal>(&value, 1).AsByteSlice());
     }
     [MemoryPackIgnore]
-    public AssocCollection<Folder> Subfolders => new(DbSession, ObjId, Fields.Subfolders, Folder.Fields.Parent);
+    public AssocCollection<TestingFolder> Subfolders => new(DbSession, ObjId, Fields.Subfolders, TestingFolder.Fields.Parent);
     [MemoryPackIgnore]
-    public Folder? Parent
+    public TestingFolder? Parent
     {
-        get => GeneratedCodeHelper.GetNullableAssoc<Folder>(DbSession, ObjId, Fields.Parent);
-        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Parent, value?.ObjId ?? Guid.Empty, Folder.Fields.Subfolders);
+        get => GeneratedCodeHelper.GetNullableAssoc<TestingFolder>(DbSession, ObjId, Fields.Parent);
+        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Parent, value?.ObjId ?? Guid.Empty, TestingFolder.Fields.Subfolders);
     }
 
-    public static bool operator ==(Folder a, Folder b) => a.DbSession == b.DbSession && a.ObjId == b.ObjId;
-    public static bool operator !=(Folder a, Folder b) => a.DbSession != b.DbSession || a.ObjId != b.ObjId;
-    public bool Equals(Folder other) => this == other;
-    public override bool Equals(object? obj) => obj is Folder other && Equals(other);
+    public static bool operator ==(TestingFolder a, TestingFolder b) => a.DbSession == b.DbSession && a.ObjId == b.ObjId;
+    public static bool operator !=(TestingFolder a, TestingFolder b) => a.DbSession != b.DbSession || a.ObjId != b.ObjId;
+    public bool Equals(TestingFolder other) => this == other;
+    public override bool Equals(object? obj) => obj is TestingFolder other && Equals(other);
     public override int GetHashCode() => HashCode.Combine(DbSession, ObjId);
 
     public static Guid TypId { get; } = new Guid([139, 189, 204, 163, 86, 34, 75, 65, 164, 2, 26, 9, 28, 180, 7, 165]);

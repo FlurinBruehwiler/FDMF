@@ -17,9 +17,10 @@ public static class ModelGenerator
             sourceBuilder.AppendLine("using System.Runtime.InteropServices;");
             sourceBuilder.AppendLine("using System.Text;");
             sourceBuilder.AppendLine("using MemoryPack;");
+            sourceBuilder.AppendLine("using Shared;");
             sourceBuilder.AppendLine("using Shared.Database;");
 
-            sourceBuilder.AppendLine("namespace Shared.Generated;");
+            sourceBuilder.AppendLine($"namespace {Path.GetFileName(modelDirectory)}.Generated;");
             sourceBuilder.AppendLine();
 
             sourceBuilder.AppendLine("[MemoryPackable]");
@@ -29,7 +30,7 @@ public static class ModelGenerator
 
             sourceBuilder.AppendLine("[Obsolete]");
             sourceBuilder.AppendLine("[MemoryPackConstructor]");
-            sourceBuilder.AppendLine("public Folder() { }");
+            sourceBuilder.AppendLine($"public {entity.Key}() {{ }}");
 
 
             sourceBuilder.AppendLine($"public {entity.Key}(DbSession dbSession)");
@@ -122,7 +123,7 @@ public static class ModelGenerator
             sourceBuilder.AppendLine($"public static bool operator !=({entity.Key} a, {entity.Key} b) => a.DbSession != b.DbSession || a.ObjId != b.ObjId;");
 
             sourceBuilder.AppendLine($"public bool Equals({entity.Key} other) => this == other;");
-            sourceBuilder.AppendLine("public override bool Equals(object? obj) => obj is Folder other && Equals(other);");
+            sourceBuilder.AppendLine($"public override bool Equals(object? obj) => obj is {entity.Key} other && Equals(other);");
             sourceBuilder.AppendLine("public override int GetHashCode() => HashCode.Combine(DbSession, ObjId);");
 
             sourceBuilder.AppendLine();

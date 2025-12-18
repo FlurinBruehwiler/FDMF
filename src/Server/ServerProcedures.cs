@@ -1,5 +1,5 @@
-﻿using Shared;
-using Shared.Generated;
+﻿using Model.Generated;
+using Shared;
 
 namespace Server;
 

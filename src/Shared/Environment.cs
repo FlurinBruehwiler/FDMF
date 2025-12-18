@@ -4,8 +4,6 @@ using Shared.Database;
 
 namespace Shared;
 
-
-
 public class Environment
 {
     public required LightningEnvironment LightningEnvironment;
@@ -15,15 +13,13 @@ public class Environment
     public required LightningDatabase NonStringSearchIndex;
     public required ProjectModel Model;
 
-
-    public static Environment Create()
+    public static Environment Create(ProjectModel model, string dbName = "database")
     {
-        var root = Helper.GetRootDir();
-
-        var model = ProjectModel.CreateFromDirectory(Path.Combine(root, "Shared/Model"));
-
         //during testing we delete the old db
-        Directory.Delete("database", recursive: true);
+        if (Directory.Exists(dbName))
+        {
+            Directory.Delete(dbName, recursive: true);
+        }
 
         var env = new LightningEnvironment("database", new EnvironmentConfiguration
         {

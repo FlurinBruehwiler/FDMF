@@ -6,8 +6,8 @@ namespace Shared;
 public class ProjectModel
 {
     public required EntityDefinition[] EntityDefinitions;
-    public required Dictionary<Guid, FieldDefinition> FieldsById;
-    public required Dictionary<Guid, ReferenceFieldDefinition> AsoFieldsById;
+    public Dictionary<Guid, FieldDefinition> FieldsById = [];
+    public Dictionary<Guid, ReferenceFieldDefinition> AsoFieldsById = [];
 
     public static ProjectModel CreateFromDirectory(string dir)
     {
@@ -25,8 +25,19 @@ public class ProjectModel
             entities.Add(entity!);
         }
 
-        var dict = entities.SelectMany(x => x.ReferenceFields).ToDictionary(x => x.Id, x => x);
-        foreach (var entityDefinition in entities)
+        var model = new ProjectModel
+        {
+            EntityDefinitions = entities.ToArray(),
+        };
+        model.Resolve();
+
+        return model;
+    }
+
+    public ProjectModel Resolve()
+    {
+        var dict = EntityDefinitions.SelectMany(x => x.ReferenceFields).ToDictionary(x => x.Id, x => x);
+        foreach (var entityDefinition in EntityDefinitions)
         {
             foreach (var refField in entityDefinition.ReferenceFields)
             {
@@ -35,12 +46,10 @@ public class ProjectModel
             }
         }
 
-        return new ProjectModel
-        {
-            EntityDefinitions = entities.ToArray(),
-            FieldsById = entities.SelectMany(x => x.Fields).ToDictionary(x => x.Id, x => x),
-            AsoFieldsById = entities.SelectMany(x => x.ReferenceFields).ToDictionary(x => x.Id, x => x),
-        };
+        FieldsById = EntityDefinitions.SelectMany(x => x.Fields).ToDictionary(x => x.Id, x => x);
+        AsoFieldsById = EntityDefinitions.SelectMany(x => x.ReferenceFields).ToDictionary(x => x.Id, x => x);
+
+        return this;
     }
 }
 

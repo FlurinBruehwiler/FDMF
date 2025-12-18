@@ -7,7 +7,10 @@ using Environment = Shared.Environment;
 //we still want to serialize / deserialize everything, so we get the exact same behaviour
 //but we don't want a direct dependency on the WebSocket in the ServerProcedures
 
-var env = Environment.Create();
+var root = Helper.GetRootDir();
+var model = ProjectModel.CreateFromDirectory(Path.Combine(root, "Shared/Model"));
+
+var env = Environment.Create(model);
 
 Logging.LogFlags = LogFlags.Error;
 

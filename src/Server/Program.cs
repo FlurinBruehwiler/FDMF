@@ -1,6 +1,6 @@
-﻿using Shared;
+﻿using Model.Generated;
+using Shared;
 using Shared.Database;
-using Shared.Generated;
 
 //we can store all fields objId+fieldIds that where changed in a dictionary within the transaction,
 //when saving, we have a separate table where we store the "history" of all objects
@@ -9,7 +9,10 @@ using Shared.Generated;
 
 try
 {
-    var env = Shared.Environment.Create();
+    var root = Helper.GetRootDir();
+    var model = ProjectModel.CreateFromDirectory(Path.Combine(root, "Shared/Model"));
+
+    var env = Shared.Environment.Create(model);
 
     Guid parentFolderObjId;
     Guid childObjId;

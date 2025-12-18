@@ -45,13 +45,20 @@ public sealed class DbSession : IDisposable
         //so the alternative design, which may be better is to first update the readonly transaction of the TKV to the current version,
         //then execute all saveaction/validations, and only then commit
 
-        using var writeTransaction = Environment.LightningEnvironment.BeginTransaction();
+        using (var writeTransaction = Environment.LightningEnvironment.BeginTransaction())
+        {
 
-        Searcher.UpdateSearchIndex(Environment, writeTransaction, Store.ChangeSet);
+            Searcher.UpdateSearchIndex(Environment, writeTransaction, Store.ChangeSet);
 
-        Store.Commit(writeTransaction);
+            Store.Commit(writeTransaction);
 
-        writeTransaction.Commit();
+            writeTransaction.Commit();
+
+        }
+
+        Store.Dispose();
+        //reset the store
+        Store = new TransactionalKvStore(Environment.LightningEnvironment, Environment.ObjectDb);
     }
 
     /// <summary>
