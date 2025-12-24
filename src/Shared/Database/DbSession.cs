@@ -24,6 +24,8 @@ public sealed class DbSession : IDisposable
      * ASO: ObjIdA, FldIdA, ObjIdB, FldIdB
      * ASO: ObjIdB, FldIdB, ObjIdA, FldIdA
      * VAL: ObjId, FldId
+     * NEW_VAL: FldId, ObjId,
+     *
      *
      */
 

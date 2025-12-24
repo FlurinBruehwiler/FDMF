@@ -14,6 +14,7 @@ public static class ModelGenerator
         {
             var sourceBuilder = new SourceBuilder();
 
+            sourceBuilder.AppendLine("// ReSharper disable All");
             sourceBuilder.AppendLine("using System.Runtime.InteropServices;");
             sourceBuilder.AppendLine("using System.Text;");
             sourceBuilder.AppendLine("using MemoryPack;");
@@ -45,7 +46,7 @@ public static class ModelGenerator
             sourceBuilder.AppendLine();
 
             sourceBuilder.AppendLine("[MemoryPackIgnore]");
-            sourceBuilder.AppendLine("public DbSession DbSession { get; set; }");
+            sourceBuilder.AppendLine("public DbSession DbSession { get; set; } = null!;");
             sourceBuilder.AppendLine("public Guid ObjId { get; set; }");
             sourceBuilder.AppendLine();
 

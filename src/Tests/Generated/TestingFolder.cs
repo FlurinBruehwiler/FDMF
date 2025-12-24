@@ -1,3 +1,4 @@
+// ReSharper disable All
 using System.Runtime.InteropServices;
 using System.Text;
 using MemoryPack;
@@ -18,7 +19,7 @@ public partial struct TestingFolder : ITransactionObject, IEquatable<TestingFold
     }
 
     [MemoryPackIgnore]
-    public DbSession DbSession { get; set; }
+    public DbSession DbSession { get; set; } = null!;
     public Guid ObjId { get; set; }
 
     [MemoryPackIgnore]

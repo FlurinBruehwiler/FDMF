@@ -39,6 +39,11 @@ public class ProjectModel
         var dict = EntityDefinitions.SelectMany(x => x.ReferenceFields).ToDictionary(x => x.Id, x => x);
         foreach (var entityDefinition in EntityDefinitions)
         {
+            foreach (var fld in entityDefinition.Fields)
+            {
+                fld.OwningEntity = entityDefinition;
+            }
+
             foreach (var refField in entityDefinition.ReferenceFields)
             {
                 refField.OwningEntity = entityDefinition;
@@ -69,6 +74,9 @@ public class FieldDefinition
     public TranslationText Name;
     public FieldDataType DataType;
     public bool IsIndexed;
+
+    [JsonIgnore]
+    public EntityDefinition OwningEntity;
 }
 
 public class ReferenceFieldDefinition
