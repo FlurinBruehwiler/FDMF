@@ -38,15 +38,11 @@ public class SearchTests
 
         tsx.Commit();
 
-        var result = Searcher.Search<TestingFolder>(tsx, new SearchCriterion
+        var result = Searcher.Search<TestingFolder>(tsx, new StringCriterion
         {
-            Type = SearchCriterion.CriterionType.String,
-            String = new SearchCriterion.StringCriterion
-            {
-                FieldId = TestingFolder.Fields.Name,
-                Value = "Barbapapa",
-                Type = SearchCriterion.StringCriterion.MatchType.Exact
-            }
+            FieldId = TestingFolder.Fields.Name,
+            Value = "Barbapapa",
+            Type = StringCriterion.MatchType.Exact
         });
 
         AssertEqual([barbapapaFolder], result);
@@ -75,15 +71,11 @@ public class SearchTests
 
         tsx.Commit();
 
-        var result = Searcher.Search<TestingFolder>(tsx, new SearchCriterion
+        var result = Searcher.Search<TestingFolder>(tsx, new StringCriterion
         {
-            Type = SearchCriterion.CriterionType.String,
-            String = new SearchCriterion.StringCriterion
-            {
-                FieldId = TestingFolder.Fields.Name,
-                Value = "oooo",
-                Type = SearchCriterion.StringCriterion.MatchType.Substring,
-            }
+            FieldId = TestingFolder.Fields.Name,
+            Value = "oooo",
+            Type = StringCriterion.MatchType.Substring,
         });
 
         AssertEqual([folderB], result);
@@ -109,16 +101,12 @@ public class SearchTests
 
         tsx.Commit();
 
-        var result = Searcher.Search<TestingFolder>(tsx, new SearchCriterion
+        var result = Searcher.Search<TestingFolder>(tsx, new StringCriterion
         {
-            Type = SearchCriterion.CriterionType.String,
-            String = new SearchCriterion.StringCriterion
-            {
-                FieldId = TestingFolder.Fields.Name,
-                Value = "firfo",
-                Type = SearchCriterion.StringCriterion.MatchType.Fuzzy,
-                FuzzyCutoff = 0.3f
-            }
+            FieldId = TestingFolder.Fields.Name,
+            Value = "firfo",
+            Type = StringCriterion.MatchType.Fuzzy,
+            FuzzyCutoff = 0.3f
         });
 
         AssertEqual([folderB], result);
@@ -141,28 +129,20 @@ public class SearchTests
 
         tsx.Commit();
 
-        var result = Searcher.Search<TestingFolder>(tsx, new SearchCriterion
+        var result = Searcher.Search<TestingFolder>(tsx, new AssocCriterion
         {
-            Type = SearchCriterion.CriterionType.Assoc,
-            Assoc = new SearchCriterion.AssocCriterion
-            {
-                FieldId = TestingFolder.Fields.Parent,
-                ObjId = folderA.ObjId,
-                Type = SearchCriterion.AssocCriterion.AssocCriterionType.MatchGuid
-            }
+            FieldId = TestingFolder.Fields.Parent,
+            ObjId = folderA.ObjId,
+            Type = AssocCriterion.AssocCriterionType.MatchGuid
         });
 
         AssertEqual([folderB], result);
 
-        var result2 = Searcher.Search<TestingFolder>(tsx, new SearchCriterion
+        var result2 = Searcher.Search<TestingFolder>(tsx, new AssocCriterion
         {
-            Type = SearchCriterion.CriterionType.Assoc,
-            Assoc = new SearchCriterion.AssocCriterion
-            {
-                FieldId = TestingFolder.Fields.Subfolders,
-                ObjId = folderB.ObjId,
-                Type = SearchCriterion.AssocCriterion.AssocCriterionType.MatchGuid
-            }
+            FieldId = TestingFolder.Fields.Subfolders,
+            ObjId = folderB.ObjId,
+            Type = AssocCriterion.AssocCriterionType.MatchGuid
         });
 
         AssertEqual([folderA], result2);
@@ -202,15 +182,11 @@ public class SearchTests
 
         tsx.Commit();
 
-        var result = Searcher.Search<TestingFolder>(tsx, new SearchCriterion
+        var result = Searcher.Search<TestingFolder>(tsx, new DateTimeCriterion
         {
-            Type = SearchCriterion.CriterionType.DateTime,
-            DateTime = new SearchCriterion.DateTimeCriterion
-            {
-                FieldId  = TestingFolder.Fields.TestDateField,
-                From = new DateTime(2000, 09, 13),
-                To = new DateTime(2000, 09, 13).AddDays(1).AddTicks(-1)
-            }
+            FieldId  = TestingFolder.Fields.TestDateField,
+            From = new DateTime(2000, 09, 13),
+            To = new DateTime(2000, 09, 13).AddDays(1).AddTicks(-1)
         });
 
         AssertEqual([startOfDay, middleOfDay], result);
@@ -255,15 +231,11 @@ public class SearchTests
 
         tsx.Commit();
 
-        var result = Searcher.Search<TestingFolder>(tsx, new SearchCriterion
+        var result = Searcher.Search<TestingFolder>(tsx, new DecimalCriterion
         {
-            Type = SearchCriterion.CriterionType.Decimal,
-            Decimal = new SearchCriterion.DecimalCriterion
-            {
-                FieldId  = TestingFolder.Fields.TestDecimalField,
-                From = 15,
-                To = 20
-            }
+            FieldId  = TestingFolder.Fields.TestDecimalField,
+            From = 15,
+            To = 20
         });
 
         AssertEqual([folder2, folder5, folder3], result);
@@ -308,15 +280,11 @@ public class SearchTests
 
         tsx.Commit();
 
-        var result = Searcher.Search<TestingFolder>(tsx, new SearchCriterion
+        var result = Searcher.Search<TestingFolder>(tsx, new LongCriterion
         {
-            Type = SearchCriterion.CriterionType.Long,
-            Long = new SearchCriterion.LongCriterion
-            {
-                FieldId  = TestingFolder.Fields.TestIntegerField,
-                From = 15,
-                To = 20
-            }
+            FieldId  = TestingFolder.Fields.TestIntegerField,
+            From = 15,
+            To = 20
         });
 
         AssertEqual([folder2, folder5, folder3], result);

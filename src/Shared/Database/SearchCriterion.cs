@@ -1,79 +1,80 @@
 ﻿namespace Shared.Database;
 
-public struct SearchCriterion
+public interface ISearchCriterion;
+
+public class SearchQuery : ISearchCriterion
 {
-    public CriterionType Type;
-    public StringCriterion String;
+    public required Guid TypId;
+    public ISearchCriterion? SearchCriterion;
+}
 
-    //todo overlap the following fields so that the struct is smaller
-    public LongCriterion Long;
-    public DecimalCriterion Decimal;
-    public DateTimeCriterion DateTime;
-    public AssocCriterion Assoc;
+public class OrCriterion : ISearchCriterion
+{
+    public List<ISearchCriterion> OrCombinations = [];
+}
 
-    public enum CriterionType
+public class AndCriterion : ISearchCriterion
+{
+    public List<ISearchCriterion> AndCombinations = [];
+}
+
+public class IdCriterion : ISearchCriterion
+{
+    public Guid Guid;
+}
+
+public class AssocCriterion : ISearchCriterion
+{
+    public Guid FieldId;
+    public Guid ObjId;
+
+    public ISearchCriterion? SearchCriterion;
+
+    public AssocCriterionType Type;
+
+    public enum AssocCriterionType
     {
-        String,
-        Long,
-        Decimal,
-        DateTime,
-        Assoc
+        MatchGuid = 0, //Default
+        Null,
+        NotNull,
+        Subquery,
     }
+}
 
-    public struct AssocCriterion
+public class LongCriterion : ISearchCriterion
+{
+    public Guid FieldId;
+    public long From;
+    public long To;
+}
+
+public class DecimalCriterion : ISearchCriterion
+{
+    public Guid FieldId;
+    public decimal From;
+    public decimal To;
+}
+
+public class DateTimeCriterion : ISearchCriterion
+{
+    public Guid FieldId;
+    public DateTime From;
+    public DateTime To;
+}
+
+public class StringCriterion : ISearchCriterion
+{
+    public Guid FieldId;
+    public string Value = string.Empty;
+    public MatchType Type;
+    public float FuzzyCutoff = 0.5f;
+
+    public enum MatchType
     {
-        public Guid FieldId;
-        public Guid ObjId;
-        public AssocCriterionType Type;
-
-        public enum AssocCriterionType
-        {
-            MatchGuid = 0, //Default
-            Null,
-            NotNull,
-        }
-    }
-
-    public struct LongCriterion
-    {
-        public Guid FieldId;
-        public long From;
-        public long To;
-    }
-
-    public struct DecimalCriterion
-    {
-        public Guid FieldId;
-        public decimal From;
-        public decimal To;
-    }
-
-    public struct DateTimeCriterion
-    {
-        public Guid FieldId;
-        public DateTime From;
-        public DateTime To;
-    }
-
-    public struct StringCriterion
-    {
-        public Guid FieldId;
-        public string Value;
-        public MatchType Type;
-        public float FuzzyCutoff = 0.5f;
-
-        public StringCriterion()
-        {
-
-        }
-
-        public enum MatchType
-        {
-            Substring = 0, //default
-            Exact,
-            Prefix,
-            Postfix,
-            Fuzzy
-        }
+        Substring = 0, //default
+        Exact,
+        Prefix,
+        Postfix,
+        Fuzzy
     }
 }

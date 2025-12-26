@@ -54,15 +54,11 @@ try
     {
         using var t = new DbSession(env);
 
-        var result = Searcher.Search<Folder>(t, new SearchCriterion
+        var result = Searcher.Search<Folder>(t, new AssocCriterion
         {
-            Type = SearchCriterion.CriterionType.Assoc,
-            Assoc = new SearchCriterion.AssocCriterion
-            {
-                FieldId = Folder.Fields.Subfolders,
-                ObjId = childObjId,
-                Type = SearchCriterion.AssocCriterion.AssocCriterionType.MatchGuid
-            }
+            FieldId = Folder.Fields.Subfolders,
+            ObjId = childObjId,
+            Type = AssocCriterion.AssocCriterionType.MatchGuid
         });
 
         // var result = Searcher.Search<Folder>(t, new SearchCriterion
