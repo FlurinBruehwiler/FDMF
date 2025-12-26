@@ -112,3 +112,11 @@ public class CustomIndexComparer : IComparer<MDBValue>
         return CompareStatic(a.AsSpan(), b.AsSpan());
     }
 }
+
+public class GuidComparer : IComparer<Guid>
+{
+    public int Compare(Guid x, Guid y)
+    {
+        return BPlusTree.CompareSpan(x.AsSpan(), y.AsSpan());
+    }
+}

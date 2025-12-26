@@ -54,6 +54,7 @@ public partial struct Folder : ITransactionObject, IEquatable<Folder>
     public bool Equals(Folder other) => this == other;
     public override bool Equals(object? obj) => obj is Folder other && Equals(other);
     public override int GetHashCode() => HashCode.Combine(DbSession, ObjId);
+    public override string ToString() => ObjId.ToString();
 
     public static Guid TypId { get; } = new Guid([139, 189, 204, 163, 86, 34, 75, 65, 164, 2, 26, 9, 28, 180, 7, 165]);
 

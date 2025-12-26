@@ -3,27 +3,13 @@ using Shared.Database;
 
 namespace Tests;
 
-public class Fixture
+[CollectionDefinition(DatabaseCollection.DatabaseCollectionName)]
+public class TransactionalKvStoreTests
 {
-    public const string TestDirectory = "TestDbs";
-
-    public Fixture()
-    {
-        if (Directory.Exists(TestDirectory))
-        {
-            Directory.Delete(TestDirectory, recursive: true);
-        }
-    }
-}
-
-public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
-{
-    private readonly Fixture _fixture = fixture;
-
     [Fact]
     public void Data_From_The_Base_Set_Is_Visible()
     {
-        var env = new LightningEnvironment($"{Fixture.TestDirectory}/{nameof(Data_From_The_Base_Set_Is_Visible)}");
+        var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
         env.Open();
 
         LightningDatabase db;
@@ -44,7 +30,7 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
     [Fact]
     public void Data_From_The_Change_Set_Is_Visible()
     {
-        var env = new LightningEnvironment($"{Fixture.TestDirectory}/{nameof(Data_From_The_Change_Set_Is_Visible)}");
+        var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
         env.Open();
 
         LightningDatabase db;
@@ -65,7 +51,7 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
     [Fact]
     public void Data_From_The_Change_Overrides_Base_Set()
     {
-        var env = new LightningEnvironment($"{Fixture.TestDirectory}/{nameof(Data_From_The_Change_Overrides_Base_Set)}");
+        var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
         env.Open();
 
         LightningDatabase db;
@@ -87,7 +73,7 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
     [Fact]
     public void Entry_Can_Be_Deleted()
     {
-        var env = new LightningEnvironment($"{Fixture.TestDirectory}/{nameof(Entry_Can_Be_Deleted)}");
+        var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
         env.Open();
 
         LightningDatabase db;
@@ -109,7 +95,7 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
     [Fact]
     public void Entry_Can_Be_Deleted_And_Added_Again()
     {
-        var env = new LightningEnvironment($"{Fixture.TestDirectory}/{nameof(Entry_Can_Be_Deleted_And_Added_Again)}");
+        var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
         env.Open();
 
         LightningDatabase db;
@@ -135,7 +121,7 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
     [Fact]
     public void Entry_Can_Be_Overriden_And_Then_Deleted()
     {
-        var env = new LightningEnvironment($"{Fixture.TestDirectory}/{nameof(Entry_Can_Be_Overriden_And_Then_Deleted)}");
+        var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
         env.Open();
 
         LightningDatabase db;
@@ -161,7 +147,7 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
     [Fact]
     public void Cursor_Simple()
     {
-        var env = new LightningEnvironment($"{Fixture.TestDirectory}/{nameof(Cursor_Simple)}");
+        var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
         env.Open();
 
         LightningDatabase db;
@@ -188,7 +174,7 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
     [Fact]
     public void Cursor_Simple_2()
     {
-        var env = new LightningEnvironment($"{Fixture.TestDirectory}/{nameof(Cursor_Simple_2)}");
+        var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
         env.Open();
 
         LightningDatabase db;
@@ -215,7 +201,7 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
     [Fact]
     public void Cursor_Simple_3()
     {
-        var env = new LightningEnvironment($"{Fixture.TestDirectory}/{nameof(Cursor_Simple_3)}");
+        var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
         env.Open();
 
         LightningDatabase db;
@@ -241,7 +227,7 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
     [Fact]
     public void Cursor_Complex()
     {
-        var env = new LightningEnvironment($"{Fixture.TestDirectory}/{nameof(Cursor_Complex)}");
+        var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
         env.Open();
 
         LightningDatabase db;
@@ -278,7 +264,7 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
     [Fact]
     public void Cursor_Complex_2()
     {
-        var env = new LightningEnvironment($"{Fixture.TestDirectory}/{nameof(Cursor_Complex_2)}");
+        var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
         env.Open();
 
         LightningDatabase db;
@@ -315,7 +301,7 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
     [Fact]
     public void Cursor_Delete()
     {
-        var env = new LightningEnvironment($"{Fixture.TestDirectory}/{nameof(Cursor_Delete)}");
+        var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
         env.Open();
 
         LightningDatabase db;
@@ -346,7 +332,7 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
     [Fact]
     public void Cursor_Delete_2()
     {
-        var env = new LightningEnvironment($"{Fixture.TestDirectory}/{nameof(Cursor_Delete_2)}");
+        var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
         env.Open();
 
         LightningDatabase db;
@@ -377,7 +363,7 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
     [Fact]
     public void Cursor_Delete_3()
     {
-        var env = new LightningEnvironment($"{Fixture.TestDirectory}/{nameof(Cursor_Delete_3)}");
+        var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
         env.Open();
 
         LightningDatabase db;
@@ -408,7 +394,7 @@ public class TransactionalKvStoreTests(Fixture fixture) : IClassFixture<Fixture>
     [Fact]
     public void Cursor_Delete_4()
     {
-        var env = new LightningEnvironment($"{Fixture.TestDirectory}/{nameof(Cursor_Delete_4)}");
+        var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
         env.Open();
 
         LightningDatabase db;

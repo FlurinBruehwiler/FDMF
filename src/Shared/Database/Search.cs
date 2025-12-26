@@ -205,7 +205,7 @@ public static class Searcher
     {
         var fld = env.Model.AsoFieldsById[criterion.FieldId];
 
-        using var cursor = transaction.CreateCursor(env.NonStringSearchIndex);
+        using var cursor = transaction.CreateCursor(env.ObjectDb);
 
         switch (criterion.Type)
         {
@@ -223,7 +223,7 @@ public static class Searcher
                     {
                         var (_, k, _) = cursor.GetCurrent();
 
-                        if (!key.SequenceEqual(k.AsSpan().Slice(0, 2 * 16)))
+                        if (k.AsSpan().Length != 64 || !key.SequenceEqual(k.AsSpan().Slice(0, 2 * 16)))
                             break;
 
                         set.Add(MemoryMarshal.Read<Guid>(k.AsSpan().Slice(2 * 16, 16)));
@@ -234,11 +234,9 @@ public static class Searcher
             case SearchCriterion.AssocCriterion.AssocCriterionType.Null:
                 //we have decided that for now we won't index these two cases (null and notnull) as it would be quite expensive,
                 //and it is not clear if it is worth it.
-
-                break;
+                throw new NotImplementedException();
             case SearchCriterion.AssocCriterion.AssocCriterionType.NotNull:
-
-                break;
+                throw new NotImplementedException();
             default:
                 throw new ArgumentOutOfRangeException();
         }

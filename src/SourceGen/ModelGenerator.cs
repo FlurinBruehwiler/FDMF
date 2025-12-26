@@ -126,6 +126,7 @@ public static class ModelGenerator
             sourceBuilder.AppendLine($"public bool Equals({entity.Key} other) => this == other;");
             sourceBuilder.AppendLine($"public override bool Equals(object? obj) => obj is {entity.Key} other && Equals(other);");
             sourceBuilder.AppendLine("public override int GetHashCode() => HashCode.Combine(DbSession, ObjId);");
+            sourceBuilder.AppendLine("public override string ToString() => ObjId.ToString();");
 
             sourceBuilder.AppendLine();
 

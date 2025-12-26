@@ -28,6 +28,7 @@ public partial struct TestingDocument : ITransactionObject, IEquatable<TestingDo
     public bool Equals(TestingDocument other) => this == other;
     public override bool Equals(object? obj) => obj is TestingDocument other && Equals(other);
     public override int GetHashCode() => HashCode.Combine(DbSession, ObjId);
+    public override string ToString() => ObjId.ToString();
 
     public static Guid TypId { get; } = new Guid([186, 75, 24, 229, 112, 244, 171, 75, 174, 237, 40, 251, 144, 125, 163, 73]);
 

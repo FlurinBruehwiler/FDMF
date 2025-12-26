@@ -1,25 +1,23 @@
 ﻿using Shared;
 using Shared.Database;
 using TestModel.Generated;
-using Xunit.Abstractions;
 using Environment = Shared.Environment;
 
 namespace Tests;
 
-public class IndexingTests
+[CollectionDefinition(DatabaseCollection.DatabaseCollectionName)]
+public class SearchTests
 {
-    private readonly ITestOutputHelper _testOutputHelper;
 
-    public IndexingTests(ITestOutputHelper testOutputHelper)
-    {
-        _testOutputHelper = testOutputHelper;
-    }
-
-    [Fact]
-    public void Exact_String_Search()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Exact_String_Search(bool indexed)
     {
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
-        var env = Environment.Create(testModel, dbName: nameof(Exact_String_Search));
+        testModel.FieldsById[TestingFolder.Fields.Name].IsIndexed = indexed;
+
+        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -54,11 +52,14 @@ public class IndexingTests
         Assert.Equal([barbapapaFolder], result);
     }
 
-    [Fact]
-    public void Substring_Search()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Substring_Search(bool indexed)
     {
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
-        var env = Environment.Create(testModel, dbName: nameof(Substring_Search));
+        testModel.FieldsById[TestingFolder.Fields.Name].IsIndexed = indexed;
+        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -92,7 +93,7 @@ public class IndexingTests
     public void Fuzzy_Search()
     {
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
-        var env = Environment.Create(testModel, dbName: nameof(Fuzzy_Search));
+        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -127,7 +128,7 @@ public class IndexingTests
     public void Assoc_Search()
     {
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
-        var env = Environment.Create(testModel, dbName: nameof(Assoc_Search));
+        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -171,7 +172,7 @@ public class IndexingTests
     public void Type_Search()
     {
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
-        var env = Environment.Create(testModel, dbName: nameof(Type_Search));
+        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -186,6 +187,8 @@ public class IndexingTests
 
         var result = Searcher.Search<TestingFolder>(tsx);
 
-        Assert.Equal([folderA, folderB], result);
+        TestingFolder[] expected = [folderA, folderB];
+
+        Assert.Equal(expected.OrderBy(x => x.ObjId, new GuidComparer()) , result.OrderBy(x => x.ObjId, new GuidComparer()));
     }
 }
