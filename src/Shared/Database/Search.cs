@@ -16,7 +16,7 @@ namespace Shared.Database;
 //          which would be very efficient when searching. The problem its, that this would make other things more complex,
 //          such as deleting objs, so for now we could just stick with the current layout. Another possibility,
 //          is to make the type part of the objId, so that start of any ObjId, is actually its type.
-// [ ] implement ranking
+// [ ] implement ranking (only relevant for fuzzy search I think)
 // [ ] implement partial results
 // [ ] implement result info (for example in a substring search, we want to see the part of the substring that matched
 // [ ] implement profiling (we want to see what searches are slow, so the user can add indexes to these fields
@@ -32,28 +32,29 @@ namespace Shared.Database;
 /// </summary>
 public static class Searcher
 {
-    public static IEnumerable<T> Search<T>(DbSession dbSession, ISearchCriterion? searchQuery = null) where T : ITransactionObject, new()
+    public static List<T> Search<T>(DbSession dbSession, ISearchCriterion? searchQuery = null, int maxResults = int.MaxValue) where T : ITransactionObject, new()
     {
-        var result = new List<Guid>();
+        var result = new List<T>();
 
+        int count = 0;
         SearchInternal(dbSession, new SearchQuery
         {
             TypId = T.TypId,
             SearchCriterion = searchQuery
-        }, x =>
+        }, id =>
         {
-            result.Add(x);
-            return true;
+            result.Add(new T
+            {
+                DbSession = dbSession,
+                ObjId = id
+            });
+
+            count++;
+
+            return count < maxResults;
         });
 
-        foreach (var x in result)
-        {
-            yield return new T
-            {
-                ObjId = x,
-                DbSession = dbSession
-            };
-        }
+        return result;
     }
 
     public static void BuildIndex(Environment environment)
@@ -252,45 +253,49 @@ public static class Searcher
     }
 
     [SuppressMessage("ReSharper", "AccessToModifiedClosure")]
-    private static void SearchInternal(DbSession dbSession, ISearchCriterion criterion, Func<Guid, bool> addResult)
+    private static bool SearchInternal(DbSession dbSession, ISearchCriterion criterion, Func<Guid, bool> addResult)
     {
         switch (criterion)
         {
             case IdCriterion idCriterion:
                 if (dbSession.GetTypId(idCriterion.Guid) != Guid.Empty)
                 {
-                    addResult(idCriterion.Guid);
+                    return addResult(idCriterion.Guid);
                 }
-                break;
+
+                return true;
             case SearchQuery searchQuery:
                 if (searchQuery.SearchCriterion == null)
                 {
-                    ExecuteTypeSearch(dbSession.Environment, dbSession.Store.ReadTransaction, searchQuery.TypId, addResult);
-                }
-                else
-                {
-                    SearchInternal(dbSession, searchQuery.SearchCriterion, addResult);
+                    return ExecuteTypeSearch(dbSession.Environment, dbSession.Store.ReadTransaction, searchQuery.TypId, addResult);
                 }
 
-                break;
+                return SearchInternal(dbSession, searchQuery.SearchCriterion, addResult);
+
             case MultiCriterion { Type: MultiCriterion.MultiType.OR } multiCriterion:
 
                 HashSet<Guid> seen = [];
 
                 foreach (var crit in multiCriterion.Criterions)
                 {
-                    SearchInternal(dbSession, crit, guid =>
+                    var shouldContinue = SearchInternal(dbSession, crit, guid =>
                     {
                         if (seen.Add(guid))
                         {
-                            addResult(guid);
+                            if (!addResult(guid))
+                            {
+                                return false;
+                            }
                         }
 
                         return true;
                     });
+
+                    if (!shouldContinue)
+                        return false;
                 }
 
-                break;
+                return true;
             case MultiCriterion { Type: MultiCriterion.MultiType.AND } multiCriterion:
 
                 HashSet<Guid>? workingSet = null;
@@ -316,11 +321,14 @@ public static class Searcher
                 {
                     foreach (var guid in workingSet)
                     {
-                        addResult(guid);
+                        if (!addResult(guid))
+                        {
+                            return false;
+                        }
                     }
                 }
 
-                break;
+                return true;
             case MultiCriterion { Type: MultiCriterion.MultiType.XOR } multiCriterion:
                 HashSet<Guid> previous = [];
                 HashSet<Guid> current = [];
@@ -348,25 +356,25 @@ public static class Searcher
 
                 foreach (var guid in previous)
                 {
-                    addResult(guid);
+                    if (!addResult(guid))
+                    {
+                        return false;
+                    }
                 }
 
-                break;
+                return true;
             case AssocCriterion assocCriterion:
-                ExecuteAssocSearch(dbSession, assocCriterion, addResult);
-                break;
+                return ExecuteAssocSearch(dbSession, assocCriterion, addResult);
             case DateTimeCriterion dateTimeCriterion:
-                ExecuteNonStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, addResult, CustomIndexComparer.Comparison.DateTime, dateTimeCriterion.FieldId, dateTimeCriterion.From, dateTimeCriterion.To);
-                break;
+                return ExecuteNonStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, addResult, CustomIndexComparer.Comparison.DateTime, dateTimeCriterion.FieldId, dateTimeCriterion.From, dateTimeCriterion.To);
             case DecimalCriterion decimalCriterion:
-                ExecuteNonStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, addResult, CustomIndexComparer.Comparison.Decimal, decimalCriterion.FieldId, decimalCriterion.From, decimalCriterion.To);
-                break;
+                return ExecuteNonStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, addResult, CustomIndexComparer.Comparison.Decimal, decimalCriterion.FieldId, decimalCriterion.From, decimalCriterion.To);
             case LongCriterion longCriterion:
-                ExecuteNonStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, addResult, CustomIndexComparer.Comparison.SignedLong, longCriterion.FieldId, longCriterion.From, longCriterion.To);
-                break;
+                return ExecuteNonStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, addResult, CustomIndexComparer.Comparison.SignedLong, longCriterion.FieldId, longCriterion.From, longCriterion.To);
             case StringCriterion stringCriterion:
-                ExecuteStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, stringCriterion, addResult);
-                break;
+                return ExecuteStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, stringCriterion, addResult);
+            default:
+                throw new ArgumentOutOfRangeException();
         }
     }
 
@@ -409,7 +417,7 @@ public static class Searcher
     }
 
     [SuppressMessage("ReSharper", "AccessToDisposedClosure")]
-    private static void ExecuteAssocSearch(DbSession dbSession, AssocCriterion criterion, Func<Guid, bool> addResult)
+    private static bool ExecuteAssocSearch(DbSession dbSession, AssocCriterion criterion, Func<Guid, bool> addResult)
     {
         Environment env = dbSession.Environment;
         LightningTransaction transaction = dbSession.Store.ReadTransaction;
@@ -424,7 +432,7 @@ public static class Searcher
                 if (criterion.SearchCriterion != null)
                 {
                     //todo do we want to validate if this criterion is even valid, i.e. the object actually has the fields
-                    SearchInternal(dbSession, criterion.SearchCriterion, objId =>
+                    return SearchInternal(dbSession, criterion.SearchCriterion, objId =>
                     {
                         Span<byte> key = stackalloc byte[2 * 16];
                         MemoryMarshal.Write(key, objId);
@@ -439,7 +447,10 @@ public static class Searcher
                                 if (k.AsSpan().Length != 64 || !key.SequenceEqual(k.AsSpan().Slice(0, 2 * 16)))
                                     break;
 
-                                addResult(MemoryMarshal.Read<Guid>(k.AsSpan().Slice(2 * 16, 16)));
+                                if (!addResult(MemoryMarshal.Read<Guid>(k.AsSpan().Slice(2 * 16, 16))))
+                                {
+                                    return false;
+                                }
                             } while (cursor.Next().resultCode == MDBResultCode.Success);
                         }
 
@@ -449,6 +460,7 @@ public static class Searcher
                 else
                 {
                     Logging.Log(LogFlags.Error, "A SearchCriterion needs to be specified if the search type is Subquery");
+                    return true;
                 }
 
                 break;
@@ -481,29 +493,30 @@ public static class Searcher
         return false;
     }
 
-    private static void ExecuteNonStringSearch<T>(Environment environment, LightningTransaction transaction, Func<Guid, bool> addResult, CustomIndexComparer.Comparison comparison, Guid fieldId, T from, T to) where T : unmanaged, IComparable<T>
+    private static bool ExecuteNonStringSearch<T>(Environment environment, LightningTransaction transaction, Func<Guid, bool> addResult, CustomIndexComparer.Comparison comparison, Guid fieldId, T from, T to) where T : unmanaged, IComparable<T>
     {
         var fld = environment.Model.FieldsById.GetValueOrDefault(fieldId);
 
         if (fld == null)
         {
             Logging.Log(LogFlags.Error, $"There isn't a Field with the ID {fieldId}");
-            return;
+            return true;
         }
 
         if (!fld.IsIndexed)
         {
-            ExecuteTypeSearch(environment, transaction, fld.OwningEntity.Id, (objId) =>
+            return ExecuteTypeSearch(environment, transaction, fld.OwningEntity.Id, (objId) =>
             {
                 if (MatchNonStringSearch(environment, transaction, objId, fieldId, from, to))
                 {
-                    addResult(objId);
+                    if (!addResult(objId))
+                    {
+                        return false;
+                    }
                 }
 
                 return true;
             });
-
-            return;
         }
 
         using var cursor = transaction.CreateCursor(environment.NonStringSearchIndex);
@@ -523,12 +536,17 @@ public static class Searcher
                 if (CustomIndexComparer.CompareStatic(maxKey, key.AsSpan()) < 0)
                     break;
 
-                addResult(MemoryMarshal.Read<Guid>(value.AsSpan()));
+                if (!addResult(MemoryMarshal.Read<Guid>(value.AsSpan())))
+                {
+                    return false;
+                }
             } while (cursor.Next().resultCode == MDBResultCode.Success);
         }
+
+        return true;
     }
 
-    private static void ExecuteTypeSearch(Environment environment, LightningTransaction transaction, Guid typId, Func<Guid, bool> addResult)
+    private static bool ExecuteTypeSearch(Environment environment, LightningTransaction transaction, Guid typId, Func<Guid, bool> addResult)
     {
         using var cursor = transaction.CreateCursor(environment.NonStringSearchIndex);
 
@@ -544,9 +562,14 @@ public static class Searcher
 
                 var guid = MemoryMarshal.Read<Guid>(value.AsSpan());
 
-                addResult(guid);
+                if (!addResult(guid))
+                {
+                    return false;
+                }
             } while (cursor.NextDuplicate().resultCode == MDBResultCode.Success);
         }
+
+        return true;
     }
 
     private static ReadOnlySpan<T> GetFldValue<T>(Environment environment, LightningTransaction transaction, Guid objId, Guid fldId) where T : unmanaged
@@ -600,23 +623,24 @@ public static class Searcher
         }
     }
 
-    private static void ExecuteStringSearch(Environment environment, LightningTransaction transaction, StringCriterion criterion, Func<Guid, bool> addResult)
+    private static bool ExecuteStringSearch(Environment environment, LightningTransaction transaction, StringCriterion criterion, Func<Guid, bool> addResult)
     {
         var fld = environment.Model.FieldsById[criterion.FieldId];
 
         if (!fld.IsIndexed)
         {
-            ExecuteTypeSearch(environment, transaction, fld.OwningEntity.Id, (objId) =>
+            return ExecuteTypeSearch(environment, transaction, fld.OwningEntity.Id, (objId) =>
             {
                 if (MatchStringCriterion(environment, transaction, objId, criterion))
                 {
-                    addResult(objId);
+                    if (!addResult(objId))
+                    {
+                        return false;
+                    }
                 }
 
                 return true;
             });
-
-            return;
         }
 
 
@@ -627,19 +651,22 @@ public static class Searcher
         if (criterion.Type == StringCriterion.MatchType.Exact)
         {
             var exactKey = ConstructStringIndexKey(IndexFlag.Normal, criterion.FieldId, strValue);
-            Collect(exactKey, exact: true);
+            return Collect(exactKey, exact: true);
         }
-        else if (criterion.Type == StringCriterion.MatchType.Prefix)
+
+        if (criterion.Type == StringCriterion.MatchType.Prefix)
         {
             var prefixForwardKey = ConstructStringIndexKey(IndexFlag.Normal, criterion.FieldId, strValue);
-            Collect(prefixForwardKey, exact: false);
+            return Collect(prefixForwardKey, exact: false);
         }
-        else if (criterion.Type == StringCriterion.MatchType.Postfix)
+
+        if (criterion.Type == StringCriterion.MatchType.Postfix)
         {
             var prefixBackwardKey = ConstructStringIndexKey(IndexFlag.Reverse, criterion.FieldId, strValue);
-            Collect(prefixBackwardKey, exact: false);
+            return Collect(prefixBackwardKey, exact: false);
         }
-        else if (criterion.Type == StringCriterion.MatchType.Fuzzy && strValue.Length >= 3)
+
+        if (criterion.Type == StringCriterion.MatchType.Fuzzy && strValue.Length >= 3)
         {
             //this is very primitive fuzzy searching, we just count the number of ngram matches and if it is above a cutoff, we count it as a match.
 
@@ -675,11 +702,17 @@ public static class Searcher
 
                 if ((float)ngramMatches / searchTermNgramCount >= criterion.FuzzyCutoff)
                 {
-                    addResult(guid);
+                    if (!addResult(guid))
+                    {
+                        return false;
+                    }
                 }
             }
+
+            return true;
         }
-        else if (criterion.Type == StringCriterion.MatchType.Substring && strValue.Length >= 3)
+
+        if (criterion.Type == StringCriterion.MatchType.Substring && strValue.Length >= 3)
         {
             //ngram search
             HashSet<Guid> lastRound = [];
@@ -722,13 +755,20 @@ public static class Searcher
                 {
                     if (MemoryMarshal.Cast<byte, char>(v.AsSpan().Slice(1)).Contains(strValue.AsSpan(), StringComparison.OrdinalIgnoreCase))
                     {
-                        addResult(guid);
+                        if (!addResult(guid))
+                        {
+                            return false;
+                        }
                     }
                 }
             }
+
+            return true;
         }
 
-        void Collect(byte[] prefixKey, bool exact)
+        return true;
+
+        bool Collect(byte[] prefixKey, bool exact)
         {
             if (cursor.SetRange(prefixKey) == MDBResultCode.Success)
             {
@@ -742,9 +782,14 @@ public static class Searcher
                     if (!key.AsSpan().StartsWith(prefixKey))
                         break;
 
-                    addResult(MemoryMarshal.Read<Guid>(value.AsSpan()));
+                    if (!addResult(MemoryMarshal.Read<Guid>(value.AsSpan())))
+                    {
+                        return false;
+                    }
                 } while (cursor.Next().resultCode == MDBResultCode.Success);
             }
+
+            return true;
         }
     }
 
