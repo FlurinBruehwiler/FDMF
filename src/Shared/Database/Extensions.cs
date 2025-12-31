@@ -1,14 +1,9 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 
 namespace Shared.Database;
 
 public static class Extensions
 {
-    public static Slice<T> AsSlice<T>(this ReadOnlySpan<T> span) where T : unmanaged
-    {
-        return new Slice<T>(span);
-    }
-
     public static Span<byte> AsSpan<T>(this ref T value) where T : unmanaged
     {
         return MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref value, 1));

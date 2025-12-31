@@ -1,4 +1,4 @@
-﻿using Shared.Database;
+using Shared.Database;
 
 namespace Tests;
 
@@ -10,13 +10,13 @@ public class BPlusTreeTests
     public void Insert_And_Search_Single_Key()
     {
         var tree = new BPlusTree();
-        var key = B(1,2,3);
-        var value = B(9,9,9);
+        var key = B(1, 2, 3);
+        var value = B(9, 9, 9);
 
         tree.Put(key, value);
 
         var result = tree.Get(key);
-        Assert.Equal(value, result.Value);
+        AssertBytes.Equal(value, result.Value);
     }
 
     [Fact]
@@ -34,10 +34,10 @@ public class BPlusTreeTests
         var tree = new BPlusTree(branchingFactor: 4);
 
         for (int i = 0; i < 50; i++)
-            tree.Put([(byte)i], [(byte)(i+1)]);
+            tree.Put([(byte)i], [(byte)(i + 1)]);
 
         for (int i = 0; i < 50; i++)
-            Assert.Equal(new[]{(byte)(i+1)}, tree.Get([(byte)i]).Value);
+            AssertBytes.Equal(new[] { (byte)(i + 1) }, tree.Get([(byte)i]).Value);
     }
 
     [Fact]
@@ -46,10 +46,10 @@ public class BPlusTreeTests
         var tree = new BPlusTree(branchingFactor: 4);
 
         for (int i = 50; i >= 0; i--)
-            tree.Put([(byte)i], [(byte)(i+1)]);
+            tree.Put([(byte)i], [(byte)(i + 1)]);
 
         for (int i = 50; i >= 0; i--)
-            Assert.Equal(new[]{(byte)(i+1)}, tree.Get([(byte)i]).Value);
+            AssertBytes.Equal(new[] { (byte)(i + 1) }, tree.Get([(byte)i]).Value);
     }
 
     [Fact]
@@ -57,12 +57,11 @@ public class BPlusTreeTests
     {
         var tree = new BPlusTree(branchingFactor: 3);
 
-        // Force several splits
         for (int i = 0; i < 200; i++)
-            tree.Put([(byte)i], [(byte)(i*2)]);
+            tree.Put([(byte)i], [(byte)(i * 2)]);
 
         for (int i = 0; i < 200; i++)
-            Assert.Equal(new[]{(byte)(i*2)}, tree.Get([(byte)i]).Value);
+            AssertBytes.Equal(new[] { (byte)(i * 2) }, tree.Get([(byte)i]).Value);
     }
 
     [Fact]
@@ -70,13 +69,13 @@ public class BPlusTreeTests
     {
         var tree = new BPlusTree(branchingFactor: 4);
 
-        tree.Put(B(1,2,3), B(5));
-        tree.Put(B(1,2), B(6));
-        tree.Put(B(1,2,3,4), B(7));
+        tree.Put(B(1, 2, 3), B(5));
+        tree.Put(B(1, 2), B(6));
+        tree.Put(B(1, 2, 3, 4), B(7));
 
-        Assert.Equal(B(5), tree.Get(B(1,2,3)).Value);
-        Assert.Equal(B(6), tree.Get(B(1,2)).Value);
-        Assert.Equal(B(7), tree.Get(B(1,2,3,4)).Value);
+        AssertBytes.Equal(B(5), tree.Get(B(1, 2, 3)).Value);
+        AssertBytes.Equal(B(6), tree.Get(B(1, 2)).Value);
+        AssertBytes.Equal(B(7), tree.Get(B(1, 2, 3, 4)).Value);
     }
 
     [Fact]
@@ -88,7 +87,7 @@ public class BPlusTreeTests
         tree.Put(key, B(10));
         tree.Put(key, B(20));
 
-        Assert.Equal(B(20), tree.Get(key).Value);
+        AssertBytes.Equal(B(20), tree.Get(key).Value);
     }
 
     [Fact]
@@ -103,18 +102,18 @@ public class BPlusTreeTests
         cursor.SetRange(B(10));
 
         var current = cursor.GetCurrent();
-        Assert.Equal(B(10), current.key);
+        AssertBytes.Equal(B(10), current.Key);
 
         for (byte i = 11; i < 20; i++)
         {
             var n = cursor.Next();
 
-            Assert.Equal(ResultCode.Success, n.resultCode);
-            Assert.Equal(B(i), n.key);
-            Assert.Equal(B((byte)(i * 2)), n.value);
+            Assert.Equal(ResultCode.Success, n.ResultCode);
+            AssertBytes.Equal(B(i), n.Key);
+            AssertBytes.Equal(B((byte)(i * 2)), n.Value);
         }
 
-        Assert.Equal(ResultCode.NotFound, cursor.Next().resultCode);
+        Assert.Equal(ResultCode.NotFound, cursor.Next().ResultCode);
     }
 
     [Fact]
@@ -132,18 +131,18 @@ public class BPlusTreeTests
         cursor.SetRange(B(15));
 
         var current = cursor.GetCurrent();
-        Assert.Equal(B(20), current.key);
+        AssertBytes.Equal(B(20), current.Key);
 
         for (byte i = 21; i < 30; i++)
         {
             var n = cursor.Next();
 
-            Assert.Equal(ResultCode.Success, n.resultCode);
-            Assert.Equal(B(i), n.key);
-            Assert.Equal(B((byte)(i * 2)), n.value);
+            Assert.Equal(ResultCode.Success, n.ResultCode);
+            AssertBytes.Equal(B(i), n.Key);
+            AssertBytes.Equal(B((byte)(i * 2)), n.Value);
         }
 
-        Assert.Equal(ResultCode.NotFound, cursor.Next().resultCode);
+        Assert.Equal(ResultCode.NotFound, cursor.Next().ResultCode);
     }
 
     [Fact]

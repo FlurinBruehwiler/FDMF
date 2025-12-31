@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using LightningDB;
@@ -106,25 +106,25 @@ public static class Searcher
             {
                 var (_, key, value) = changeCursor.GetCurrent();
 
-                if (key.AsSpan().Length < 16)
+                if (key.Length < 16)
                     continue;
 
-                var objId = MemoryMarshal.Read<Guid>(key.AsSpan());
+                var objId = MemoryMarshal.Read<Guid>(key);
 
-                if (key.AsSpan().Length == 16) //obj
+                if (key.Length == 16) //obj
                 {
                     txn.Delete(environment.ObjectDb, objId.AsSpan());
 
-                    var typId = MemoryMarshal.Read<Guid>(value.AsSpan().Slice(2));
+                    var typId = MemoryMarshal.Read<Guid>(value.Slice(2));
 
                     if (value[0] == (byte)ValueFlag.AddModify)
                     {
                         InsertTypeIndex(environment, typId, txn, objId);
                     }
                 }
-                else if (key.AsSpan().Length == 32) //val
+                else if (key.Length == 32) //val
                 {
-                    var fldId = MemoryMarshal.Read<Guid>(key.AsSpan(16));
+                    var fldId = MemoryMarshal.Read<Guid>(key.Slice(16));
 
                     if (environment.Model.FieldsById.TryGetValue(fldId, out var fieldDefinition) && fieldDefinition.IsIndexed)
                     {
@@ -170,12 +170,12 @@ public static class Searcher
 
                         if (value[0] == (byte)ValueFlag.AddModify)
                         {
-                            var val = value.AsSpan(2);
+                            var val = value.Slice(2);
                             InsertIndex(fieldDefinition.DataType, objId, fldId, val, txn, environment);
                         }
                     }
                 }
-            } while (changeCursor.Next().resultCode == ResultCode.Success);
+            } while (changeCursor.Next().ResultCode == ResultCode.Success);
         }
     }
 

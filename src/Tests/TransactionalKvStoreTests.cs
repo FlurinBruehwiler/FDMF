@@ -1,4 +1,4 @@
-﻿using LightningDB;
+using LightningDB;
 using Shared.Database;
 
 namespace Tests;
@@ -23,9 +23,9 @@ public class TransactionalKvStoreTests
 
         var store = new TransactionalKvStore(env, db);
 
-        Assert.Equal([(byte)2], store.Get([1]).value.AsSpan());
+        Assert.Equal(ResultCode.Success, store.Get([1], out var value));
+        AssertBytes.Equal([(byte)2], value);
     }
-
 
     [Fact]
     public void Data_From_The_Change_Set_Is_Visible()
@@ -45,7 +45,8 @@ public class TransactionalKvStoreTests
 
         store.Put([3], [6]);
 
-        Assert.Equal([(byte)6], store.Get([3]).value.AsSpan());
+        Assert.Equal(ResultCode.Success, store.Get([3], out var value));
+        AssertBytes.Equal([(byte)6], value);
     }
 
     [Fact]
@@ -67,7 +68,8 @@ public class TransactionalKvStoreTests
 
         store.Put([1], [3]);
 
-        Assert.Equal([(byte)3], store.Get([1]).value.AsSpan());
+        Assert.Equal(ResultCode.Success, store.Get([1], out var value));
+        AssertBytes.Equal([(byte)3], value);
     }
 
     [Fact]
@@ -89,7 +91,7 @@ public class TransactionalKvStoreTests
 
         store.Delete([1]);
 
-        Assert.Equal(ResultCode.NotFound, store.Get([1]).resultCode);
+        Assert.Equal(ResultCode.NotFound, store.Get([1], out _));
     }
 
     [Fact]
@@ -111,11 +113,12 @@ public class TransactionalKvStoreTests
 
         store.Delete([1]);
 
-        Assert.Equal(ResultCode.NotFound, store.Get([1]).resultCode);
+        Assert.Equal(ResultCode.NotFound, store.Get([1], out _));
 
         store.Put([1], [3]);
 
-        Assert.Equal([(byte)3], store.Get([1]).value.AsSpan());
+        Assert.Equal(ResultCode.Success, store.Get([1], out var value));
+        AssertBytes.Equal([(byte)3], value);
     }
 
     [Fact]
@@ -137,11 +140,12 @@ public class TransactionalKvStoreTests
 
         store.Put([1], [3]);
 
-        Assert.Equal([(byte)3], store.Get([1]).value.AsSpan());
+        Assert.Equal(ResultCode.Success, store.Get([1], out var value));
+        AssertBytes.Equal([(byte)3], value);
 
         store.Delete([1]);
 
-        Assert.Equal(ResultCode.NotFound, store.Get([1]).resultCode);
+        Assert.Equal(ResultCode.NotFound, store.Get([1], out _));
     }
 
     [Fact]
@@ -166,9 +170,9 @@ public class TransactionalKvStoreTests
         using var cursor = store.CreateCursor();
         cursor.SetRange([1]);
 
-        Assert.Equal([(byte)2], cursor.GetCurrent().value);
-        Assert.Equal([(byte)3], cursor.Next().value);
-        Assert.Equal(ResultCode.NotFound, cursor.Next().resultCode);
+        AssertBytes.Equal([(byte)2], cursor.GetCurrent().Value);
+        AssertBytes.Equal([(byte)3], cursor.Next().Value);
+        Assert.Equal(ResultCode.NotFound, cursor.Next().ResultCode);
     }
 
     [Fact]
@@ -193,9 +197,9 @@ public class TransactionalKvStoreTests
         using var cursor = store.CreateCursor();
         cursor.SetRange([1]);
 
-        Assert.Equal([(byte)2], cursor.GetCurrent().value);
-        Assert.Equal([(byte)3], cursor.Next().value);
-        Assert.Equal(ResultCode.NotFound, cursor.Next().resultCode);
+        AssertBytes.Equal([(byte)2], cursor.GetCurrent().Value);
+        AssertBytes.Equal([(byte)3], cursor.Next().Value);
+        Assert.Equal(ResultCode.NotFound, cursor.Next().ResultCode);
     }
 
     [Fact]
@@ -220,8 +224,8 @@ public class TransactionalKvStoreTests
         using var cursor = store.CreateCursor();
         cursor.SetRange([1]);
 
-        Assert.Equal([(byte)3], cursor.GetCurrent().value);
-        Assert.Equal(ResultCode.NotFound, cursor.Next().resultCode);
+        AssertBytes.Equal([(byte)3], cursor.GetCurrent().Value);
+        Assert.Equal(ResultCode.NotFound, cursor.Next().ResultCode);
     }
 
     [Fact]
@@ -252,13 +256,13 @@ public class TransactionalKvStoreTests
         using var cursor = store.CreateCursor();
         cursor.SetRange([0]);
 
-        Assert.Equal([(byte)1], cursor.GetCurrent().value);
-        Assert.Equal([(byte)2], cursor.Next().value);
-        Assert.Equal([(byte)3], cursor.Next().value);
-        Assert.Equal([(byte)8], cursor.Next().value);
-        Assert.Equal([(byte)10], cursor.Next().value);
-        Assert.Equal([(byte)12], cursor.Next().value);
-        Assert.Equal(ResultCode.NotFound, cursor.Next().resultCode);
+        AssertBytes.Equal([(byte)1], cursor.GetCurrent().Value);
+        AssertBytes.Equal([(byte)2], cursor.Next().Value);
+        AssertBytes.Equal([(byte)3], cursor.Next().Value);
+        AssertBytes.Equal([(byte)8], cursor.Next().Value);
+        AssertBytes.Equal([(byte)10], cursor.Next().Value);
+        AssertBytes.Equal([(byte)12], cursor.Next().Value);
+        Assert.Equal(ResultCode.NotFound, cursor.Next().ResultCode);
     }
 
     [Fact]
@@ -289,13 +293,13 @@ public class TransactionalKvStoreTests
         using var cursor = store.CreateCursor();
         cursor.SetRange([0]);
 
-        Assert.Equal([(byte)1], cursor.GetCurrent().value);
-        Assert.Equal([(byte)2], cursor.Next().value);
-        Assert.Equal([(byte)3], cursor.Next().value);
-        Assert.Equal([(byte)4], cursor.Next().value);
-        Assert.Equal([(byte)10], cursor.Next().value);
-        Assert.Equal([(byte)12], cursor.Next().value);
-        Assert.Equal(ResultCode.NotFound, cursor.Next().resultCode);
+        AssertBytes.Equal([(byte)1], cursor.GetCurrent().Value);
+        AssertBytes.Equal([(byte)2], cursor.Next().Value);
+        AssertBytes.Equal([(byte)3], cursor.Next().Value);
+        AssertBytes.Equal([(byte)4], cursor.Next().Value);
+        AssertBytes.Equal([(byte)10], cursor.Next().Value);
+        AssertBytes.Equal([(byte)12], cursor.Next().Value);
+        Assert.Equal(ResultCode.NotFound, cursor.Next().ResultCode);
     }
 
     [Fact]
@@ -323,10 +327,10 @@ public class TransactionalKvStoreTests
         using var cursor = store.CreateCursor();
         cursor.SetRange([0]);
 
-        Assert.Equal([(byte)8], cursor.GetCurrent().value);
-        Assert.Equal([(byte)12], cursor.Next().value);
+        AssertBytes.Equal([(byte)8], cursor.GetCurrent().Value);
+        AssertBytes.Equal([(byte)12], cursor.Next().Value);
 
-        Assert.Equal(ResultCode.NotFound, cursor.Next().resultCode);
+        Assert.Equal(ResultCode.NotFound, cursor.Next().ResultCode);
     }
 
     [Fact]
@@ -354,10 +358,10 @@ public class TransactionalKvStoreTests
         using var cursor = store.CreateCursor();
         cursor.SetRange([0]);
 
-        Assert.Equal([(byte)8], cursor.GetCurrent().value);
-        Assert.Equal([(byte)10], cursor.Next().value);
+        AssertBytes.Equal([(byte)8], cursor.GetCurrent().Value);
+        AssertBytes.Equal([(byte)10], cursor.Next().Value);
 
-        Assert.Equal(ResultCode.NotFound, cursor.Next().resultCode);
+        Assert.Equal(ResultCode.NotFound, cursor.Next().ResultCode);
     }
 
     [Fact]
@@ -385,10 +389,10 @@ public class TransactionalKvStoreTests
         using var cursor = store.CreateCursor();
         cursor.SetRange([0]);
 
-        Assert.Equal([(byte)10], cursor.GetCurrent().value);
-        Assert.Equal([(byte)12], cursor.Next().value);
+        AssertBytes.Equal([(byte)10], cursor.GetCurrent().Value);
+        AssertBytes.Equal([(byte)12], cursor.Next().Value);
 
-        Assert.Equal(ResultCode.NotFound, cursor.Next().resultCode);
+        Assert.Equal(ResultCode.NotFound, cursor.Next().ResultCode);
     }
 
     [Fact]
@@ -418,6 +422,6 @@ public class TransactionalKvStoreTests
         using var cursor = store.CreateCursor();
         cursor.SetRange([0]);
 
-        Assert.Equal(ResultCode.NotFound, cursor.Next().resultCode);
+        Assert.Equal(ResultCode.NotFound, cursor.Next().ResultCode);
     }
 }

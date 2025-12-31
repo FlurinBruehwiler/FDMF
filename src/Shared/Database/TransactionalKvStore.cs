@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using LightningDB;
 
 namespace Shared.Database;
@@ -9,10 +10,12 @@ public sealed class TransactionalKvStore : IDisposable
     public readonly LightningDatabase Database;
     public readonly LightningEnvironment Environment;
 
-    //if we have the flag in the value, we have to copy the value around (to insert the flag at the beginning),
-    //so we could also just append it to the key, which is usually smaller...., but this would lead to incorrect sorting, so it is not an option
-    //so the flag is in the beginning of the value
+    // Values in the changeset are prefixed with a ValueFlag.
     public readonly BPlusTree ChangeSet = new();
+
+    private readonly ByteArena _arena = new();
+
+
 
     public TransactionalKvStore(LightningEnvironment env, LightningDatabase database)
     {
@@ -23,7 +26,6 @@ public sealed class TransactionalKvStore : IDisposable
 
     public void Commit(LightningTransaction writeTransaction)
     {
-        //loop over changeset and apply changes
         var cursor = ChangeSet.CreateCursor();
         if (cursor.SetRange([0]) == ResultCode.Success)
         {
@@ -31,9 +33,15 @@ public sealed class TransactionalKvStore : IDisposable
             {
                 var (_, key, value) = cursor.GetCurrent();
 
+                if (value.Length == 0)
+                {
+                    Logging.Log(LogFlags.Error, "Invalid value!!");
+                    continue;
+                }
+
                 if (value[0] == (byte)ValueFlag.AddModify)
                 {
-                    writeTransaction.Put(Database, key.AsSpan(), value.AsSpan(1));
+                    writeTransaction.Put(Database, key, value.Slice(1));
                 }
                 else if (value[0] == (byte)ValueFlag.Delete)
                 {
@@ -43,97 +51,128 @@ public sealed class TransactionalKvStore : IDisposable
                 {
                     Logging.Log(LogFlags.Error, "Invalid value!!");
                 }
-
-            } while (cursor.Next().resultCode == ResultCode.Success);
+            } while (cursor.Next().ResultCode == ResultCode.Success);
         }
+
+        ChangeSet.Clear();
+        _arena.Reset();
     }
 
     public ResultCode Put(ReadOnlySpan<byte> key, ReadOnlySpan<byte> value)
     {
-        //todo, don't call ToArray
-        return ChangeSet.Put(key.ToArray(), WrapValue(value.ToArray(), ValueFlag.AddModify));
+        var keySlice = _arena.Copy(key);
+
+        var valueMem = _arena.Allocate(1 + value.Length, out var valueSlice);
+        valueMem.Span[0] = (byte)ValueFlag.AddModify;
+        value.CopyTo(valueMem.Span.Slice(1));
+
+        return ChangeSet.Put(keySlice, valueSlice);
     }
 
-    public (ResultCode resultCode, Slice<byte> key, byte[] value) Get(ReadOnlySpan<byte> key)
+    public ResultCode Get(ReadOnlySpan<byte> key, [UnscopedRef] out ReadOnlySpan<byte> value)
     {
-        //check the deleted changeset
-        //check the additive changeset
-        //check the lmdb transaction
-
-        //todo don't call ToArray
-        var (additiveResult, _, newValue) = ChangeSet.Get(key);
-        if (additiveResult == ResultCode.Success)
+        var res = ChangeSet.Get(key);
+        if (res.ResultCode == ResultCode.Success)
         {
-            if(newValue[0] == (byte)ValueFlag.Delete)
-                return (ResultCode.NotFound, Slice<byte>.Empty(), []);
+            if (res.Value.Length == 0 || res.Value[0] == (byte)ValueFlag.Delete)
+            {
+                value = ReadOnlySpan<byte>.Empty;
+                return ResultCode.NotFound;
+            }
 
-            return (ResultCode.Success, new Slice<byte>(key), newValue.Slice(1).ToArray());
+            value = res.Value.Slice(1);
+            return ResultCode.Success;
         }
 
-        var (lmdbResult, _, value) = ReadTransaction.Get(Database, key);
+        var (lmdbResult, _, lmdbValue) = ReadTransaction.Get(Database, key);
         if (lmdbResult == MDBResultCode.Success)
-            return (ResultCode.Success, new Slice<byte>(key), value.CopyToNewArray()); //todo don't create array
+        {
+            value = lmdbValue.AsSpan();
+            return ResultCode.Success;
+        }
 
-        return (ResultCode.NotFound, Slice<byte>.Empty(), []);
+        value = ReadOnlySpan<byte>.Empty;
+        return ResultCode.NotFound;
     }
+
 
     public ResultCode Delete(ReadOnlySpan<byte> key)
     {
         if (ReadTransaction.Get(Database, key).resultCode == MDBResultCode.Success)
         {
-            ChangeSet.Put(key.ToArray(), [ (byte)ValueFlag.Delete ]);
+            var keySlice = _arena.Copy(key);
+
+            var valueMem = _arena.Allocate(1, out var valueSlice);
+            valueMem.Span[0] = (byte)ValueFlag.Delete;
+
+            ChangeSet.Put(keySlice, valueSlice);
         }
         else
         {
-            ChangeSet.Delete(key.ToArray());
+            ChangeSet.Delete(key);
         }
 
-        return ResultCode.Success; //todo should we check if it existed
+        return ResultCode.Success;
     }
 
     public Cursor CreateCursor()
     {
-        return new Cursor
+        return new Cursor(this)
         {
             LightningCursor = ReadTransaction.CreateCursor(Database),
-            ChangeSetCursor = ChangeSet.CreateCursor(),
-            ChangeSet = ChangeSet
+            ChangeSetCursor = ChangeSet.CreateCursor()
         };
     }
 
-    private static byte[] WrapValue(ReadOnlySpan<byte> data, ValueFlag flag)
+    public sealed class Cursor : IDisposable
     {
-        var arr = new byte[data.Length + 1];
-        arr[0] = (byte)flag;
-        data.CopyTo(arr.AsSpan(1));
-        return arr;
-    }
+        private readonly TransactionalKvStore _store;
 
-    //This has to be a class, because the LightningCursor is a class,
-    //and we don't want accidental copies of this cursor to point to the same underlying lightning cursor.
-    //we could make it work, if the struct doesn't hold any other state, other than the LightningCursor, but I don't think this is possible
-    public class Cursor : IDisposable
-    {
         public required LightningCursor LightningCursor;
         public required BPlusTree.Cursor ChangeSetCursor;
-        public required BPlusTree ChangeSet;
 
         public bool BaseIsFinished;
         public bool ChangeIsFinished;
 
+        public Cursor(TransactionalKvStore store)
+        {
+            _store = store;
+        }
+
+        public readonly ref struct CursorResult
+        {
+            public readonly ResultCode ResultCode;
+            public readonly ReadOnlySpan<byte> Key;
+            public readonly ReadOnlySpan<byte> Value;
+
+            public CursorResult(ResultCode resultCode, ReadOnlySpan<byte> key, ReadOnlySpan<byte> value)
+            {
+                ResultCode = resultCode;
+                Key = key;
+                Value = value;
+            }
+
+            public void Deconstruct(out ResultCode resultCode, out ReadOnlySpan<byte> key, out ReadOnlySpan<byte> value)
+            {
+                resultCode = ResultCode;
+                key = Key;
+                value = Value;
+            }
+        }
+
         public ResultCode SetRange(ReadOnlySpan<byte> key)
         {
             BaseIsFinished = LightningCursor.SetRange(key) == MDBResultCode.NotFound;
-            ChangeIsFinished = ChangeSetCursor.SetRange(key.ToArray()) == ResultCode.NotFound;
+            ChangeIsFinished = ChangeSetCursor.SetRange(key) == ResultCode.NotFound;
 
             if (!ChangeIsFinished && !BaseIsFinished)
             {
-                var a = LightningCursor.GetCurrent();
-                var b = ChangeSetCursor.GetCurrent();
+                var baseCurrent = LightningCursor.GetCurrent();
+                var changeCurrent = ChangeSetCursor.GetCurrent();
 
-                if (BPlusTree.CompareSpan(a.key.AsSpan(), b.key) == 0 && b.value[0] == (byte)ValueFlag.Delete)
+                if (BPlusTree.CompareSpan(baseCurrent.key.AsSpan(), changeCurrent.Key) == 0 && changeCurrent.Value.Length > 0 && changeCurrent.Value[0] == (byte)ValueFlag.Delete)
                 {
-                    return Next().resultCode;
+                    return Next().ResultCode;
                 }
             }
 
@@ -142,82 +181,93 @@ public sealed class TransactionalKvStore : IDisposable
 
         public ResultCode Delete()
         {
-            var baseSet = LightningCursor.GetCurrent();
-            var changeSet = ChangeSetCursor.GetCurrent();
+            var currentKey = GetCurrent().Key;
+            if (currentKey.Length == 0)
+                return ResultCode.NotFound;
 
-            var comp = BPlusTree.CompareSpan(baseSet.key.AsSpan(), changeSet.key.AsSpan());
-            if (comp <= 0)
-            {
-                ChangeSet.Put(baseSet.key.CopyToNewArray(), []);
-            }
-            else
-            {
-                //change is smaller than base
-                ChangeSetCursor.Delete();
-            }
+            _store.Delete(currentKey);
+
+            ChangeIsFinished = ChangeSetCursor.SetRange(currentKey) == ResultCode.NotFound;
 
             return ResultCode.Success;
         }
 
-        public (ResultCode resultCode, byte[] key, byte[] value) GetCurrent()
+        public CursorResult GetCurrent()
         {
-            var baseSet = LightningCursor.GetCurrent();
-            var changeSet = ChangeSetCursor.GetCurrent();
+            if (ChangeIsFinished && BaseIsFinished)
+                return new CursorResult(ResultCode.NotFound, ReadOnlySpan<byte>.Empty, ReadOnlySpan<byte>.Empty);
 
-            //return the lower, if both are the same, return changeSet
-
-            var comp = BPlusTree.CompareSpan(baseSet.key.AsSpan(), changeSet.key.AsSpan());
-            if (ChangeIsFinished || (comp < 0 && !BaseIsFinished))
+            if (ChangeIsFinished)
             {
-                // baseSet is smaller than changeSet
-                return (ResultCode.Success, baseSet.key.CopyToNewArray(), baseSet.value.CopyToNewArray());
+                var baseSet = LightningCursor.GetCurrent();
+                return new CursorResult(ResultCode.Success, baseSet.key.AsSpan(), baseSet.value.AsSpan());
             }
 
-            Debug.Assert(changeSet.value[0] == (byte)ValueFlag.AddModify);
+            if (BaseIsFinished)
+            {
+                var changeSet = ChangeSetCursor.GetCurrent();
+                Debug.Assert(changeSet.Value.Length > 0);
+                Debug.Assert(changeSet.Value[0] == (byte)ValueFlag.AddModify);
 
-            return (ResultCode.Success, changeSet.key, changeSet.value.AsSpan(1).ToArray());
+                return new CursorResult(ResultCode.Success, changeSet.Key, changeSet.Value.Slice(1));
+            }
+
+            var baseCurrent = LightningCursor.GetCurrent();
+            var changeCurrent = ChangeSetCursor.GetCurrent();
+
+            var comp = BPlusTree.CompareSpan(baseCurrent.key.AsSpan(), changeCurrent.Key);
+            if (comp < 0)
+            {
+                return new CursorResult(ResultCode.Success, baseCurrent.key.AsSpan(), baseCurrent.value.AsSpan());
+            }
+
+            if (changeCurrent.Value.Length == 0 || changeCurrent.Value[0] != (byte)ValueFlag.AddModify)
+            {
+                // This can happen when the current key is deleted.
+                return Next();
+            }
+
+            return new CursorResult(ResultCode.Success, changeCurrent.Key, changeCurrent.Value.Slice(1));
         }
 
-        public (ResultCode resultCode, byte[] key, byte[] value) Next()
+        public CursorResult Next()
         {
-            //Unfortunately, this logic here is non-trivial.
-            //I haven't figured out a way to make it simple, the only thing we have for now is a lot of tests.
-
             next:
-            var a = LightningCursor.GetCurrent();
-            var b = ChangeSetCursor.GetCurrent();
+            if (ChangeIsFinished && BaseIsFinished)
+                return new CursorResult(ResultCode.NotFound, ReadOnlySpan<byte>.Empty, ReadOnlySpan<byte>.Empty);
 
-            var comp = BPlusTree.CompareSpan(a.key.AsSpan(), b.key.AsSpan());
+            var baseCurrent = LightningCursor.GetCurrent();
+            var changeCurrent = ChangeSetCursor.GetCurrent();
+
+            var comp = BPlusTree.CompareSpan(baseCurrent.key.AsSpan(), changeCurrent.Key);
 
             if (comp == 0)
             {
                 AdvanceBase();
                 if (AdvanceChange())
-                {
                     goto next;
-                }
             }
             else
             {
                 if (ChangeIsFinished || (!BaseIsFinished && comp < 0))
                 {
                     AdvanceBase();
-                    if (b.value[0] == (byte)ValueFlag.Delete && BPlusTree.CompareSpan(LightningCursor.GetCurrent().key.AsSpan(), b.key.AsSpan()) == 0)
+                    if (!ChangeIsFinished)
                     {
-                        goto next;
+                        if (changeCurrent.Value.Length > 0 && changeCurrent.Value[0] == (byte)ValueFlag.Delete && !BaseIsFinished)
+                        {
+                            var newBaseCurrent = LightningCursor.GetCurrent();
+                            if (BPlusTree.CompareSpan(newBaseCurrent.key.AsSpan(), changeCurrent.Key) == 0)
+                                goto next;
+                        }
                     }
                 }
                 else if (BaseIsFinished || (!ChangeIsFinished && comp > 0))
                 {
                     if (AdvanceChange())
-                    {
                         goto next;
-                    }
                 }
             }
-
-            if (ChangeIsFinished && BaseIsFinished)
-                return (ResultCode.NotFound, [], []);
 
             return GetCurrent();
 
@@ -228,16 +278,14 @@ public sealed class TransactionalKvStore : IDisposable
 
             bool AdvanceChange()
             {
-                var (result, _, value) = ChangeSetCursor.Next();
+                var nextChange = ChangeSetCursor.Next();
 
-                ChangeIsFinished = result == ResultCode.NotFound;
+                ChangeIsFinished = nextChange.ResultCode == ResultCode.NotFound;
 
-                if (result == ResultCode.Success)
+                if (nextChange.ResultCode == ResultCode.Success)
                 {
-                    if (value[0] == (byte)ValueFlag.Delete)
-                    {
+                    if (nextChange.Value.Length > 0 && nextChange.Value[0] == (byte)ValueFlag.Delete)
                         return true;
-                    }
                 }
 
                 return false;
@@ -253,5 +301,6 @@ public sealed class TransactionalKvStore : IDisposable
     public void Dispose()
     {
         ReadTransaction.Dispose();
+        _arena.Dispose();
     }
 }

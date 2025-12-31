@@ -1,5 +1,6 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 
 
@@ -77,11 +78,11 @@ public sealed class DbSession : IDisposable
     {
         var keyBuf = MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref objId, 1));
 
-        var (resultCode, key, value) = Store.Get(keyBuf);
+        var resultCode = Store.Get(keyBuf, out var value);
 
         if (resultCode == ResultCode.Success)
         {
-            return MemoryMarshal.Read<ObjValue>(value.AsSpan()).TypId;
+            return MemoryMarshal.Read<ObjValue>(value).TypId;
         }
 
         return Guid.Empty;
@@ -104,19 +105,19 @@ public sealed class DbSession : IDisposable
             {
                 var (_, k, v) = Cursor.GetCurrent();
 
-                if(!k.AsSpan().Slice(0, 16).SequenceEqual(prefix))
+                if (!k.Slice(0, 16).SequenceEqual(prefix))
                     break;
 
-                if (v.AsSpan()[0] == (byte)ValueTyp.Aso)
+                if (v.Length > 0 && v[0] == (byte)ValueTyp.Aso)
                 {
                     //flip to get other assoc
-                    k.AsSpan().Slice(0, 2 * 16).CopyTo(tempBuf.Slice(2 * 16, 2 * 16));
-                    k.AsSpan().Slice(16 * 2, 2 * 16).CopyTo(tempBuf.Slice(0, 2 * 16));
+                    k.Slice(0, 2 * 16).CopyTo(tempBuf.Slice(2 * 16, 2 * 16));
+                    k.Slice(16 * 2, 2 * 16).CopyTo(tempBuf.Slice(0, 2 * 16));
                     Store.Delete(tempBuf);
                 }
 
                 Cursor.Delete();
-            } while (Cursor.Next().resultCode == ResultCode.Success);
+            } while (Cursor.Next().ResultCode == ResultCode.Success);
         }
     }
 
@@ -195,23 +196,23 @@ public sealed class DbSession : IDisposable
             {
                 var (_, k, v) = Cursor.GetCurrent();
 
-                if(!k.AsSpan().Slice(0, 2*16).SequenceEqual(prefix))
+                if (!k.Slice(0, 2 * 16).SequenceEqual(prefix))
                     break;
 
-                if (v.AsSpan()[0] == (byte)ValueTyp.Aso)
+                if (v.Length > 0 && v[0] == (byte)ValueTyp.Aso)
                 {
                     //flip to get other assoc
-                    k.AsSpan().Slice(0, 2 * 16).CopyTo(tempBuf.Slice(2 * 16, 2 * 16));
-                    k.AsSpan().Slice(16 * 2, 2 * 16).CopyTo(tempBuf.Slice(0, 2 * 16));
+                    k.Slice(0, 2 * 16).CopyTo(tempBuf.Slice(2 * 16, 2 * 16));
+                    k.Slice(16 * 2, 2 * 16).CopyTo(tempBuf.Slice(0, 2 * 16));
                     Store.Delete(tempBuf);
                 }
 
                 //todo, why is this unused
-                var otherObjId = MemoryMarshal.Read<Guid>(k.AsSpan().Slice(16 * 2, 16 * 1));
-                var otherFldId = MemoryMarshal.Read<Guid>(k.AsSpan().Slice(16 * 3, 16 * 1));
+                var otherObjId = MemoryMarshal.Read<Guid>(k.Slice(16 * 2, 16 * 1));
+                var otherFldId = MemoryMarshal.Read<Guid>(k.Slice(16 * 3, 16 * 1));
 
                 Cursor.Delete();
-            } while (Cursor.Next().resultCode == ResultCode.Success);
+            } while (Cursor.Next().ResultCode == ResultCode.Success);
         }
     }
 
@@ -248,13 +249,13 @@ public sealed class DbSession : IDisposable
     /// <summary>
     /// Sets the value of a field
     /// </summary>
-    public void SetFldValue(Guid objId, Guid fldId, Slice<byte> span)
+    public void SetFldValue(Guid objId, Guid fldId, ReadOnlySpan<byte> span)
     {
         //todo, in debug mode we could check if the obj exists!
 
         Span<byte> keyBuf = stackalloc byte[2 * 16];
-        MemoryMarshal.Write(keyBuf.Slice(0*16, 16), objId);
-        MemoryMarshal.Write(keyBuf.Slice(1*16, 16), fldId);
+        MemoryMarshal.Write(keyBuf.Slice(0 * 16, 16), objId);
+        MemoryMarshal.Write(keyBuf.Slice(1 * 16, 16), fldId);
 
         if (span.Length == 0)
         {
@@ -264,29 +265,30 @@ public sealed class DbSession : IDisposable
         {
             Span<byte> valueBuf = stackalloc byte[1 + span.Length]; //todo ensure span.length is not too large, should use arena here....
             valueBuf[0] = (byte)ValueTyp.Val;
-            span.AsSpan().CopyTo(valueBuf.Slice(1));
+            span.CopyTo(valueBuf.Slice(1));
 
             Store.Put(keyBuf, valueBuf);
         }
     }
 
     /// <summary>
-    /// Gets a field value as a Slice, the slice points to valid memory as long as the transaction persists.
+    /// Gets a field value as a span. The returned span is valid as long as the session persists.
     /// </summary>
-    public unsafe Slice<byte> GetFldValue(Guid objId, Guid fldId)
+    public byte[] GetFldValue(Guid objId, Guid fldId)
     {
         Span<byte> keyBuf = stackalloc byte[2 * 16];
-        MemoryMarshal.Write(keyBuf.Slice(0*16, 16), objId);
-        MemoryMarshal.Write(keyBuf.Slice(1*16, 16), fldId);
+        MemoryMarshal.Write(keyBuf.Slice(0 * 16, 16), objId);
+        MemoryMarshal.Write(keyBuf.Slice(1 * 16, 16), fldId);
 
-        var (s, k, v) = Store.Get(keyBuf);
+        var code = Store.Get(keyBuf, out var value);
+        if (code != ResultCode.Success || value.Length == 0)
+            return [];
 
-        if (s != ResultCode.Success) //todo logging
-            return default;
+        // Stored as: [ValueTyp][payload]
+        if (value[0] != (byte)ValueTyp.Val)
+            return [];
 
-        //todo this code is not correct, we can't just have a pointer to a byte[] without pinning the byte array!!!!!!!
-        //we need to have some kind of data type that can have either a ptr or a byte array as the backing storage, and exposes this as a Span
-        return new Slice<byte>(v.AsSpan().Slice(1)); //todo check if the first byte is correct!
+        return value.Slice(1).ToArray();
     }
 
     /// <summary>
@@ -355,16 +357,14 @@ public sealed class DbSession : IDisposable
         {
             do
             {
-                var current = Cursor.GetCurrent();
-                var currentKey = current.key.AsSpan();
-                var currentValue = current.value.AsSpan();
+                var (_, currentKey, currentValue) = Cursor.GetCurrent();
 
-                if (currentValue[0] == (byte)ValueTyp.Obj)
+                if (currentValue.Length > 0 && currentValue[0] == (byte)ValueTyp.Obj)
                 {
                     yield return (MemoryMarshal.Read<Guid>(currentKey), MemoryMarshal.Read<ObjValue>(currentValue).TypId);
                 }
             }
-            while (Cursor.Next().resultCode == ResultCode.Success);
+            while (Cursor.Next().ResultCode == ResultCode.Success);
         }
     }
 
@@ -439,11 +439,11 @@ public struct AsoFldEnumerator : IEnumerator<AsoEnumeratorObj>
     public bool MoveNext()
     {
         ResultCode code;
-        byte[] key;
+        ReadOnlySpan<byte> key;
 
         Span<byte> prefixKeyBuf = stackalloc byte[2 * 16];
-        MemoryMarshal.Write(prefixKeyBuf.Slice(0*16, 16), objId);
-        MemoryMarshal.Write(prefixKeyBuf.Slice(1*16, 16), fldId);
+        MemoryMarshal.Write(prefixKeyBuf.Slice(0 * 16, 16), objId);
+        MemoryMarshal.Write(prefixKeyBuf.Slice(1 * 16, 16), fldId);
 
         if (isFirst)
         {
@@ -451,22 +451,28 @@ public struct AsoFldEnumerator : IEnumerator<AsoEnumeratorObj>
             if (code != ResultCode.Success)
                 return false;
 
-            (_, key, _) = cursor.GetCurrent();
+            var current = cursor.GetCurrent();
+            if (current.ResultCode != ResultCode.Success)
+                return false;
+
+            key = current.Key;
             isFirst = false;
         }
         else
         {
-            (code, key, _) = cursor.Next();
+            var next = cursor.Next();
+            code = next.ResultCode;
+            key = next.Key;
         }
 
         if (code != ResultCode.Success)
             return false;
 
-        if (!key.AsSpan().Slice(0, 2 * 16).SequenceEqual(prefixKeyBuf))
+        if (key.Length < 2 * 16 || !key.Slice(0, 2 * 16).SequenceEqual(prefixKeyBuf))
             return false;
 
-        _current1.ObjId = MemoryMarshal.Read<Guid>(key.AsSpan().Slice(2 * 16, 16));
-        _current1.FldId = MemoryMarshal.Read<Guid>(key.AsSpan().Slice(3 * 16, 16));
+        _current1.ObjId = MemoryMarshal.Read<Guid>(key.Slice(2 * 16, 16));
+        _current1.FldId = MemoryMarshal.Read<Guid>(key.Slice(3 * 16, 16));
 
         return true;
     }

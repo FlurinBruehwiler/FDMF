@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using Shared;
 
@@ -74,17 +74,17 @@ public static class ModelGenerator
 
                 var fromFunction = field.DataType switch
                 {
-                    FieldDataType.Integer => "new Slice<long>(&value, 1).AsByteSlice()",
-                    FieldDataType.Decimal => "new Slice<decimal>(&value, 1).AsByteSlice()",
-                    FieldDataType.String => "Encoding.Unicode.GetBytes(value).AsSpan().AsSlice()",
-                    FieldDataType.DateTime => "new Slice<DateTime>(&value, 1).AsByteSlice()",
-                    FieldDataType.Boolean => "new Slice<bool>(&value, 1).AsByteSlice()",
+                    FieldDataType.Integer => "value.AsSpan()",
+                    FieldDataType.Decimal => "value.AsSpan()",
+                    FieldDataType.String => "Encoding.Unicode.GetBytes(value)",
+                    FieldDataType.DateTime => "value.AsSpan()",
+                    FieldDataType.Boolean => "value.AsSpan()",
                     _ => throw new ArgumentOutOfRangeException()
                 };
 
                 //could be improving performance here....
                 sourceBuilder.AppendLine("[MemoryPackIgnore]");
-                sourceBuilder.AppendLine($"public unsafe {dataType} {field.Key}");
+                sourceBuilder.AppendLine($"public {dataType} {field.Key}");
                 sourceBuilder.AppendLine("{");
                 sourceBuilder.AddIndent();
                 sourceBuilder.AppendLine($"get => {string.Format(toFunction, $"DbSession.GetFldValue(ObjId, Fields.{field.Key}).AsSpan()")};");

@@ -23,22 +23,22 @@ public partial struct Folder : ITransactionObject, IEquatable<Folder>
     public Guid ObjId { get; set; }
 
     [MemoryPackIgnore]
-    public unsafe string Name
+    public string Name
     {
         get => Encoding.Unicode.GetString(DbSession.GetFldValue(ObjId, Fields.Name).AsSpan());
-        set => DbSession.SetFldValue(ObjId, Fields.Name, Encoding.Unicode.GetBytes(value).AsSpan().AsSlice());
+        set => DbSession.SetFldValue(ObjId, Fields.Name, Encoding.Unicode.GetBytes(value));
     }
     [MemoryPackIgnore]
-    public unsafe DateTime TestDateField
+    public DateTime TestDateField
     {
         get => MemoryMarshal.Read<DateTime>(DbSession.GetFldValue(ObjId, Fields.TestDateField).AsSpan());
-        set => DbSession.SetFldValue(ObjId, Fields.TestDateField, new Slice<DateTime>(&value, 1).AsByteSlice());
+        set => DbSession.SetFldValue(ObjId, Fields.TestDateField, value.AsSpan());
     }
     [MemoryPackIgnore]
-    public unsafe decimal TestDecimalField
+    public decimal TestDecimalField
     {
         get => MemoryMarshal.Read<decimal>(DbSession.GetFldValue(ObjId, Fields.TestDecimalField).AsSpan());
-        set => DbSession.SetFldValue(ObjId, Fields.TestDecimalField, new Slice<decimal>(&value, 1).AsByteSlice());
+        set => DbSession.SetFldValue(ObjId, Fields.TestDecimalField, value.AsSpan());
     }
     [MemoryPackIgnore]
     public AssocCollection<Folder> Subfolders => new(DbSession, ObjId, Fields.Subfolders, Folder.Fields.Parent);

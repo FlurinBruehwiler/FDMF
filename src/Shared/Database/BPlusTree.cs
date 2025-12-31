@@ -1,16 +1,16 @@
-﻿namespace Shared.Database;
+namespace Shared.Database;
 
-// A simple B+Tree implementation that stores key-value pairs as byte[]
+// A simple B+Tree implementation.
 // Keys are compared lexicographically.
-// TODO, this is a very bad and unoptimized implementation of a B+ Tree, this should be refactored to allocate way less memory.
+// TODO: This is a very bad and unoptimized implementation of a B+ Tree.
 
-public class BPlusTree
+public sealed class BPlusTree
 {
-    public ref struct Result
+    public readonly ref struct Result
     {
-        public ResultCode ResultCode;
-        public ReadOnlySpan<byte> Key;
-        public ReadOnlySpan<byte> Value;
+        public readonly ResultCode ResultCode;
+        public readonly ReadOnlySpan<byte> Key;
+        public readonly ReadOnlySpan<byte> Value;
 
         public Result(ResultCode resultCode, ReadOnlySpan<byte> key, ReadOnlySpan<byte> value)
         {
@@ -27,22 +27,43 @@ public class BPlusTree
         }
     }
 
+    public readonly ref struct CursorResult
+    {
+        public readonly ResultCode ResultCode;
+        public readonly ReadOnlySpan<byte> Key;
+        public readonly ReadOnlySpan<byte> Value;
+
+        public CursorResult(ResultCode resultCode, ReadOnlySpan<byte> key, ReadOnlySpan<byte> value)
+        {
+            ResultCode = resultCode;
+            Key = key;
+            Value = value;
+        }
+
+        public void Deconstruct(out ResultCode resultCode, out ReadOnlySpan<byte> key, out ReadOnlySpan<byte> value)
+        {
+            resultCode = ResultCode;
+            key = Key;
+            value = Value;
+        }
+    }
+
     private abstract class Node
     {
-        public List<byte[]> Keys = new List<byte[]>();
+        public List<ReadOnlyMemory<byte>> Keys = [];
         public abstract bool IsLeaf { get; }
     }
 
-    private class InternalNode : Node
+    private sealed class InternalNode : Node
     {
-        public List<Node> Children = new List<Node>();
+        public List<Node> Children = [];
         public override bool IsLeaf => false;
     }
 
-    private class LeafNode : Node
+    private sealed class LeafNode : Node
     {
-        public List<byte[]> Values = new List<byte[]>();
-        public LeafNode Next;
+        public List<ReadOnlyMemory<byte>> Values = [];
+        public LeafNode? Next;
         public override bool IsLeaf => true;
     }
 
@@ -51,25 +72,37 @@ public class BPlusTree
 
     public BPlusTree(int branchingFactor = 32)
     {
-        if (branchingFactor < 3) throw new ArgumentException("branchingFactor must be >= 3");
+        if (branchingFactor < 3)
+            throw new ArgumentException("branchingFactor must be >= 3");
+
         _branchingFactor = branchingFactor;
         _root = new LeafNode();
     }
 
-    // Lexicographic compare of byte[] keys
+    public void Clear()
+    {
+        _root = new LeafNode();
+    }
+
     public static int CompareSpan(ReadOnlySpan<byte> a, ReadOnlySpan<byte> b)
     {
         int len = Math.Min(a.Length, b.Length);
         for (int i = 0; i < len; i++)
         {
             int diff = a[i].CompareTo(b[i]);
-            if (diff != 0) return diff;
+            if (diff != 0)
+                return diff;
         }
+
         return a.Length.CompareTo(b.Length);
     }
 
-    // Public Insert API
     public ResultCode Put(byte[] key, byte[] value)
+    {
+        return Put((ReadOnlyMemory<byte>)key, (ReadOnlyMemory<byte>)value);
+    }
+
+    public ResultCode Put(ReadOnlyMemory<byte> key, ReadOnlyMemory<byte> value)
     {
         var split = InsertInternal(_root, key, value);
         if (split != null)
@@ -84,13 +117,13 @@ public class BPlusTree
         return ResultCode.Success;
     }
 
-    public ResultCode Delete(byte[] key)
+    public ResultCode Delete(byte[] key) => Delete(key.AsSpan());
+
+    public ResultCode Delete(ReadOnlySpan<byte> key)
     {
         bool removed = DeleteInternal(_root, key, out _);
 
-        // root collapsed?
-        if (_root is InternalNode internalRoot &&
-            internalRoot.Children.Count == 1)
+        if (_root is InternalNode internalRoot && internalRoot.Children.Count == 1)
         {
             _root = internalRoot.Children[0];
         }
@@ -98,31 +131,28 @@ public class BPlusTree
         return removed ? ResultCode.Success : ResultCode.NotFound;
     }
 
-    private bool DeleteInternal(Node node, byte[] key, out bool shouldDeleteNode)
+    private bool DeleteInternal(Node node, ReadOnlySpan<byte> key, out bool shouldDeleteNode)
     {
         shouldDeleteNode = false;
 
         if (node.IsLeaf)
         {
             var leaf = (LeafNode)node;
-            int index = leaf.Keys.BinarySearch(key);
+            int index = BinarySearch(leaf.Keys, key);
 
             if (index < 0)
-                return false; // not found
+                return false;
 
-            // Remove key/value
             leaf.Keys.RemoveAt(index);
             leaf.Values.RemoveAt(index);
 
-            // Check underflow
             shouldDeleteNode = leaf.Keys.Count == 0;
             return true;
         }
 
         var internalNode = (InternalNode)node;
 
-        // Find child
-        int childIndex = internalNode.Keys.BinarySearch(key);
+        int childIndex = BinarySearch(internalNode.Keys, key);
         if (childIndex >= 0)
             childIndex++;
         else
@@ -130,14 +160,13 @@ public class BPlusTree
 
         bool removed = DeleteInternal(internalNode.Children[childIndex], key, out bool deleteChild);
 
-        if (!removed) return false;
+        if (!removed)
+            return false;
 
-        // If child node became empty, remove it
         if (deleteChild)
         {
             internalNode.Children.RemoveAt(childIndex);
 
-            // Remove the separator (unless child was last)
             if (childIndex < internalNode.Keys.Count)
                 internalNode.Keys.RemoveAt(childIndex);
             else if (childIndex > 0)
@@ -145,14 +174,12 @@ public class BPlusTree
         }
         else
         {
-            // Fix separator keys after leaf delete
             if (childIndex > 0 && internalNode.Keys.Count > 0)
             {
                 var child = internalNode.Children[childIndex];
                 if (child.IsLeaf)
                 {
-                    internalNode.Keys[childIndex - 1] =
-                        ((LeafNode)child).Keys[0];
+                    internalNode.Keys[childIndex - 1] = ((LeafNode)child).Keys[0];
                 }
             }
         }
@@ -161,21 +188,20 @@ public class BPlusTree
         return true;
     }
 
-    private class SplitResult
+    private sealed class SplitResult
     {
-        public byte[] Separator;
-        public Node Left;
-        public Node Right;
+        public required ReadOnlyMemory<byte> Separator;
+        public required Node Left;
+        public required Node Right;
     }
 
-    private SplitResult InsertInternal(Node node, byte[] key, byte[] value)
+    private SplitResult? InsertInternal(Node node, ReadOnlyMemory<byte> key, ReadOnlyMemory<byte> value)
     {
         if (node.IsLeaf)
         {
             var leaf = (LeafNode)node;
-            int pos = BinarySearch(leaf.Keys, key);
+            int pos = BinarySearch(leaf.Keys, key.Span);
 
-            //if the key already exists, we replace the value
             if (pos >= 0)
             {
                 leaf.Values[pos] = value;
@@ -186,27 +212,31 @@ public class BPlusTree
             leaf.Keys.Insert(pos, key);
             leaf.Values.Insert(pos, value);
 
-            if (leaf.Keys.Count <= _branchingFactor) return
-                null;
+            if (leaf.Keys.Count <= _branchingFactor)
+                return null;
+
             return SplitLeaf(leaf);
         }
+
+        var internalNode = (InternalNode)node;
+        int childIndex = BinarySearch(internalNode.Keys, key.Span);
+        if (childIndex >= 0)
+            childIndex++;
         else
-        {
-            var internalNode = (InternalNode)node;
-            int childIndex = BinarySearch(internalNode.Keys, key);
-            if (childIndex >= 0) childIndex++;
-            else childIndex = ~childIndex;
+            childIndex = ~childIndex;
 
-            var split = InsertInternal(internalNode.Children[childIndex], key, value);
-            if (split == null) return null;
+        var split = InsertInternal(internalNode.Children[childIndex], key, value);
+        if (split == null)
+            return null;
 
-            internalNode.Keys.Insert(childIndex, split.Separator);
-            internalNode.Children[childIndex] = split.Left;
-            internalNode.Children.Insert(childIndex + 1, split.Right);
+        internalNode.Keys.Insert(childIndex, split.Separator);
+        internalNode.Children[childIndex] = split.Left;
+        internalNode.Children.Insert(childIndex + 1, split.Right);
 
-            if (internalNode.Keys.Count <= _branchingFactor) return null;
-            return SplitInternal(internalNode);
-        }
+        if (internalNode.Keys.Count <= _branchingFactor)
+            return null;
+
+        return SplitInternal(internalNode);
     }
 
     private SplitResult SplitLeaf(LeafNode leaf)
@@ -239,7 +269,7 @@ public class BPlusTree
         right.Keys.AddRange(node.Keys.GetRange(mid + 1, node.Keys.Count - (mid + 1)));
         right.Children.AddRange(node.Children.GetRange(mid + 1, node.Children.Count - (mid + 1)));
 
-        byte[] separator = node.Keys[mid];
+        var separator = node.Keys[mid];
 
         node.Keys.RemoveRange(mid, node.Keys.Count - mid);
         node.Children.RemoveRange(mid + 1, node.Children.Count - (mid + 1));
@@ -252,7 +282,6 @@ public class BPlusTree
         };
     }
 
-    // Lookup
     public Result Get(ReadOnlySpan<byte> key)
     {
         return SearchExactInternal(_root, key);
@@ -260,34 +289,38 @@ public class BPlusTree
 
     private Result SearchExactInternal(Node node, ReadOnlySpan<byte> key)
     {
-        if (node.IsLeaf) {
+        if (node.IsLeaf)
+        {
             var leaf = (LeafNode)node;
             int pos = BinarySearch(leaf.Keys, key);
             if (pos >= 0)
-                return new Result(ResultCode.Success, key, leaf.Values[pos]);
-            else
-                return new Result(ResultCode.NotFound, default, default);
+                return new Result(ResultCode.Success, key, leaf.Values[pos].Span);
+
+            return new Result(ResultCode.NotFound, default, default);
         }
+
+        var internalNode = (InternalNode)node;
+        int childIndex = BinarySearch(internalNode.Keys, key);
+        if (childIndex >= 0)
+            childIndex++;
         else
-        {
-            var internalNode = (InternalNode)node;
-            int childIndex = BinarySearch(internalNode.Keys, key);
-            if (childIndex >= 0) childIndex++;
-            else childIndex = ~childIndex;
-            return SearchExactInternal(internalNode.Children[childIndex], key);
-        }
+            childIndex = ~childIndex;
+
+        return SearchExactInternal(internalNode.Children[childIndex], key);
     }
 
-    private int BinarySearch(List<byte[]> array, ReadOnlySpan<byte> value)
+    private static int BinarySearch(List<ReadOnlyMemory<byte>> array, ReadOnlySpan<byte> value)
     {
         int lo = 0;
         int hi = array.Count - 1;
         while (lo <= hi)
         {
             int i = lo + ((hi - lo) >> 1);
-            int order = CompareSpan(array[i], value);
+            int order = CompareSpan(array[i].Span, value);
 
-            if (order == 0) return i;
+            if (order == 0)
+                return i;
+
             if (order < 0)
             {
                 lo = i + 1;
@@ -301,7 +334,7 @@ public class BPlusTree
         return ~lo;
     }
 
-    private (byte[] key, byte[] value, bool didNotFindGreater) SearchGreaterOrEqualsThan(Node node, byte[] key, bool onlyGreater)
+    private static (ReadOnlyMemory<byte> key, ReadOnlyMemory<byte> value, bool didNotFindGreater) SearchGreaterOrEqualsThan(Node node, ReadOnlySpan<byte> key, bool onlyGreater)
     {
         if (node.IsLeaf)
         {
@@ -313,90 +346,88 @@ public class BPlusTree
                 if (onlyGreater)
                 {
                     pos++;
-                    if (leaf.Values.Count > pos)
-                    {
-                        return (leaf.Keys[pos], leaf.Values[pos], false);
-                    }
-                    else
-                    {
-                        return (null, null, true);
-                    }
-                }
-                else
-                {
-                    return (key, leaf.Values[pos], false);
                 }
 
+                if (pos < leaf.Keys.Count)
+                    return (leaf.Keys[pos], leaf.Values[pos], false);
+
+                if (leaf.Next != null && leaf.Next.Keys.Count > 0)
+                    return (leaf.Next.Keys[0], leaf.Next.Values[0], false);
+
+                return (default, default, true);
             }
 
             pos = ~pos;
-            return (leaf.Keys[pos], leaf.Values[pos], false);
+
+            if (pos < leaf.Keys.Count)
+                return (leaf.Keys[pos], leaf.Values[pos], false);
+
+            if (leaf.Next != null && leaf.Next.Keys.Count > 0)
+                return (leaf.Next.Keys[0], leaf.Next.Values[0], false);
+
+            return (default, default, true);
         }
+
+        var internalNode = (InternalNode)node;
+        int childIndex = BinarySearch(internalNode.Keys, key);
+        if (childIndex >= 0)
+            childIndex++;
         else
-        {
-            var internalNode = (InternalNode)node;
-            int childIndex = BinarySearch(internalNode.Keys, key);
-            if (childIndex >= 0) childIndex++;
-            else childIndex = ~childIndex;
-            var res = SearchGreaterOrEqualsThan(internalNode.Children[childIndex], key, onlyGreater);
-            if (!res.didNotFindGreater)
-            {
-                return res;
-            }
-            else
-            {
-                childIndex++;
-                if (internalNode.Children.Count > childIndex)
-                {
-                    return SearchGreaterOrEqualsThan(internalNode.Children[childIndex], key, onlyGreater);
-                }
+            childIndex = ~childIndex;
 
-                return (null, null, false);
-            }
+        var res = SearchGreaterOrEqualsThan(internalNode.Children[childIndex], key, onlyGreater);
+        if (!res.didNotFindGreater)
+            return res;
+
+        childIndex++;
+        if (internalNode.Children.Count > childIndex)
+        {
+            return SearchGreaterOrEqualsThan(internalNode.Children[childIndex], key, onlyGreater);
         }
+
+        return (default, default, true);
     }
 
-    public Cursor CreateCursor()
-    {
-        return new Cursor(this);
-    }
+    public Cursor CreateCursor() => new(this);
 
-    public class Cursor(BPlusTree tree)
+    public sealed class Cursor
     {
-        private byte[] key;
-        private byte[] value;
+        private readonly BPlusTree _tree;
+        private ReadOnlyMemory<byte> _key;
+        private ReadOnlyMemory<byte> _value;
 
-        public ResultCode SetRange(byte[] inputKey)
+        public Cursor(BPlusTree tree)
         {
-            (key, value, var s) = tree.SearchGreaterOrEqualsThan(tree._root, inputKey, false);
-            return s ? ResultCode.NotFound : ResultCode.Success;
+            _tree = tree;
         }
 
-        public (ResultCode resultCode, byte[] key, byte[] value) GetCurrent()
+        public ResultCode SetRange(ReadOnlySpan<byte> inputKey)
         {
-            return (ResultCode.Success, key, value);
+            (_key, _value, var didNotFind) = SearchGreaterOrEqualsThan(_tree._root, inputKey, onlyGreater: false);
+            return didNotFind ? ResultCode.NotFound : ResultCode.Success;
         }
 
-        public (ResultCode resultCode, byte[] key, byte[] value) Next()
+        public CursorResult GetCurrent()
         {
-            //don't search again from the top...
-            var(k, v, r) = tree.SearchGreaterOrEqualsThan(tree._root, key, true);
+            return new CursorResult(ResultCode.Success, _key.Span, _value.Span);
+        }
 
-            if (r)
-            {
-                return (ResultCode.NotFound, [], []);
-            }
+        public CursorResult Next()
+        {
+            var (k, v, didNotFind) = SearchGreaterOrEqualsThan(_tree._root, _key.Span, onlyGreater: true);
 
-            key = k;
-            value = v;
+            if (didNotFind)
+                return new CursorResult(ResultCode.NotFound, ReadOnlySpan<byte>.Empty, ReadOnlySpan<byte>.Empty);
 
-            return (ResultCode.Success, key, value);
+            _key = k;
+            _value = v;
+
+            return new CursorResult(ResultCode.Success, _key.Span, _value.Span);
         }
 
         public ResultCode Delete()
         {
-            //todo don't search again
-            return tree.Delete(key);
+            return _tree.Delete(_key.Span);
         }
     }
 }
