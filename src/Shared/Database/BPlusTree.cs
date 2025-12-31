@@ -1,11 +1,46 @@
 namespace Shared.Database;
 
 // A simple B+Tree implementation.
-// Keys are compared lexicographically.
+// Keys are compared lexicographically by default.
 // TODO: This is a very bad and unoptimized implementation of a B+ Tree.
 
 public sealed class BPlusTree
 {
+    public delegate int KeyComparer(ReadOnlySpan<byte> a, ReadOnlySpan<byte> b);
+
+    public static int CompareLexicographic(ReadOnlySpan<byte> a, ReadOnlySpan<byte> b)
+    {
+        int len = Math.Min(a.Length, b.Length);
+        for (int i = 0; i < len; i++)
+        {
+            int diff = a[i].CompareTo(b[i]);
+            if (diff != 0)
+                return diff;
+        }
+
+        return a.Length.CompareTo(b.Length);
+    }
+
+    /// <summary>
+    /// Compares keys lexicographically while ignoring the last byte.
+    /// Intended for "flag-in-key" overlays.
+    /// </summary>
+    public static int CompareIgnoreLastByte(ReadOnlySpan<byte> a, ReadOnlySpan<byte> b)
+    {
+        var aLen = Math.Max(0, a.Length - 1);
+        var bLen = Math.Max(0, b.Length - 1);
+
+        int len = Math.Min(aLen, bLen);
+        for (int i = 0; i < len; i++)
+        {
+            int diff = a[i].CompareTo(b[i]);
+            if (diff != 0)
+                return diff;
+        }
+
+        return aLen.CompareTo(bLen);
+    }
+
     public readonly ref struct Result
     {
         public readonly ResultCode ResultCode;
@@ -68,33 +103,22 @@ public sealed class BPlusTree
     }
 
     private readonly int _branchingFactor;
+    private readonly KeyComparer _compare;
     private Node _root;
 
-    public BPlusTree(int branchingFactor = 32)
+    public BPlusTree(int branchingFactor = 32, KeyComparer? comparer = null)
     {
         if (branchingFactor < 3)
             throw new ArgumentException("branchingFactor must be >= 3");
 
         _branchingFactor = branchingFactor;
+        _compare = comparer ?? CompareLexicographic;
         _root = new LeafNode();
     }
 
     public void Clear()
     {
         _root = new LeafNode();
-    }
-
-    public static int CompareSpan(ReadOnlySpan<byte> a, ReadOnlySpan<byte> b)
-    {
-        int len = Math.Min(a.Length, b.Length);
-        for (int i = 0; i < len; i++)
-        {
-            int diff = a[i].CompareTo(b[i]);
-            if (diff != 0)
-                return diff;
-        }
-
-        return a.Length.CompareTo(b.Length);
     }
 
     public ResultCode Put(byte[] key, byte[] value)
@@ -205,6 +229,7 @@ public sealed class BPlusTree
             if (pos >= 0)
             {
                 leaf.Values[pos] = value;
+                leaf.Keys[pos] = key;
                 return null;
             }
 
@@ -294,7 +319,7 @@ public sealed class BPlusTree
             var leaf = (LeafNode)node;
             int pos = BinarySearch(leaf.Keys, key);
             if (pos >= 0)
-                return new Result(ResultCode.Success, key, leaf.Values[pos].Span);
+                return new Result(ResultCode.Success, leaf.Keys[pos].Span, leaf.Values[pos].Span);
 
             return new Result(ResultCode.NotFound, default, default);
         }
@@ -309,14 +334,14 @@ public sealed class BPlusTree
         return SearchExactInternal(internalNode.Children[childIndex], key);
     }
 
-    private static int BinarySearch(List<ReadOnlyMemory<byte>> array, ReadOnlySpan<byte> value)
+    private int BinarySearch(List<ReadOnlyMemory<byte>> array, ReadOnlySpan<byte> value)
     {
         int lo = 0;
         int hi = array.Count - 1;
         while (lo <= hi)
         {
             int i = lo + ((hi - lo) >> 1);
-            int order = CompareSpan(array[i].Span, value);
+            int order = _compare(array[i].Span, value);
 
             if (order == 0)
                 return i;
@@ -334,7 +359,7 @@ public sealed class BPlusTree
         return ~lo;
     }
 
-    private static (ReadOnlyMemory<byte> key, ReadOnlyMemory<byte> value, bool didNotFindGreater) SearchGreaterOrEqualsThan(Node node, ReadOnlySpan<byte> key, bool onlyGreater)
+    private (ReadOnlyMemory<byte> key, ReadOnlyMemory<byte> value, bool didNotFindGreater) SearchGreaterOrEqualsThan(Node node, ReadOnlySpan<byte> key, bool onlyGreater)
     {
         if (node.IsLeaf)
         {
@@ -403,7 +428,7 @@ public sealed class BPlusTree
 
         public ResultCode SetRange(ReadOnlySpan<byte> inputKey)
         {
-            (_key, _value, var didNotFind) = SearchGreaterOrEqualsThan(_tree._root, inputKey, onlyGreater: false);
+            (_key, _value, var didNotFind) = _tree.SearchGreaterOrEqualsThan(_tree._root, inputKey, onlyGreater: false);
             return didNotFind ? ResultCode.NotFound : ResultCode.Success;
         }
 
@@ -414,7 +439,7 @@ public sealed class BPlusTree
 
         public CursorResult Next()
         {
-            var (k, v, didNotFind) = SearchGreaterOrEqualsThan(_tree._root, _key.Span, onlyGreater: true);
+            var (k, v, didNotFind) = _tree.SearchGreaterOrEqualsThan(_tree._root, _key.Span, onlyGreater: true);
 
             if (didNotFind)
                 return new CursorResult(ResultCode.NotFound, ReadOnlySpan<byte>.Empty, ReadOnlySpan<byte>.Empty);

@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using LightningDB;
 using Shared.Database;
 
@@ -96,8 +96,8 @@ public class CustomIndexComparer : IComparer<MDBValue>
             Comparison.SignedLong => CompareGeneric<long>(aData, bData),
             Comparison.DateTime => CompareGeneric<DateTime>(aData, bData),
             Comparison.Decimal => CompareGeneric<decimal>(aData, bData),
-            Comparison.Assoc => BPlusTree.CompareSpan(aData, bData),
-            Comparison.Type => BPlusTree.CompareSpan(aData, bData),
+            Comparison.Assoc => BPlusTree.CompareLexicographic(aData, bData),
+            Comparison.Type => BPlusTree.CompareLexicographic(aData, bData),
             _ => throw new ArgumentOutOfRangeException()
         };
     }
@@ -117,6 +117,6 @@ public class GuidComparer : IComparer<Guid>
 {
     public int Compare(Guid x, Guid y)
     {
-        return BPlusTree.CompareSpan(x.AsSpan(), y.AsSpan());
+        return BPlusTree.CompareLexicographic(x.AsSpan(), y.AsSpan());
     }
 }

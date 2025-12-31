@@ -100,11 +100,21 @@ public static class Searcher
         var changeCursor = changeSet.CreateCursor();
         using var baseCursor = txn.CreateCursor(environment.ObjectDb);
 
-        if (changeCursor.SetRange([0]) == ResultCode.Success)
+        Span<byte> startKey = stackalloc byte[2];
+        startKey[0] = 0;
+        startKey[1] = 0;
+
+        if (changeCursor.SetRange(startKey) == ResultCode.Success)
         {
             do
             {
-                var (_, key, value) = changeCursor.GetCurrent();
+                var (_, keyWithFlag, value) = changeCursor.GetCurrent();
+
+                if (keyWithFlag.Length == 0)
+                    continue;
+
+                var flag = (ValueFlag)keyWithFlag[^1];
+                var key = keyWithFlag.Slice(0, keyWithFlag.Length - 1);
 
                 if (key.Length < 16)
                     continue;
@@ -115,10 +125,9 @@ public static class Searcher
                 {
                     txn.Delete(environment.ObjectDb, objId.AsSpan());
 
-                    var typId = MemoryMarshal.Read<Guid>(value.Slice(2));
-
-                    if (value[0] == (byte)ValueFlag.AddModify)
+                    if (flag == ValueFlag.AddModify)
                     {
+                        var typId = MemoryMarshal.Read<Guid>(value.Slice(1));
                         InsertTypeIndex(environment, typId, txn, objId);
                     }
                 }
@@ -168,9 +177,9 @@ public static class Searcher
                             }
                         }
 
-                        if (value[0] == (byte)ValueFlag.AddModify)
+                        if (flag == ValueFlag.AddModify)
                         {
-                            var val = value.Slice(2);
+                            var val = value.Slice(1);
                             InsertIndex(fieldDefinition.DataType, objId, fldId, val, txn, environment);
                         }
                     }
