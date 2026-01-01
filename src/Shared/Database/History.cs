@@ -50,14 +50,14 @@ public readonly struct HistoryEvent
         TypId = typId;
     }
 
-    public static HistoryEvent ObjCreated(Guid typId) => new(HistoryEventType.ObjCreated, default, default, default, [], [], typId);
-    public static HistoryEvent ObjDeleted() => new(HistoryEventType.ObjDeleted, default, default, default, [], [], default);
+    public static HistoryEvent ObjCreated(Guid typId) => new(HistoryEventType.ObjCreated, Guid.Empty, Guid.Empty, Guid.Empty, [], [], typId);
+    public static HistoryEvent ObjDeleted() => new(HistoryEventType.ObjDeleted, Guid.Empty, Guid.Empty, Guid.Empty, [], [], Guid.Empty);
 
-    public static HistoryEvent FldChanged(Guid fldId, byte[] oldValue, byte[] newValue) => new(HistoryEventType.FldChanged, fldId, default, default, oldValue, newValue, default);
+    public static HistoryEvent FldChanged(Guid fldId, byte[] oldValue, byte[] newValue) => new(HistoryEventType.FldChanged, fldId, Guid.Empty, Guid.Empty, oldValue, newValue, Guid.Empty);
 
-    public static HistoryEvent AsoAdded(Guid fldAId, Guid objBId, Guid fldBId) => new(HistoryEventType.AsoAdded, fldAId, objBId, fldBId, [], [], default);
+    public static HistoryEvent AsoAdded(Guid fldAId, Guid objBId, Guid fldBId) => new(HistoryEventType.AsoAdded, fldAId, objBId, fldBId, [], [], Guid.Empty);
 
-    public static HistoryEvent AsoRemoved(Guid fldAId, Guid objBId, Guid fldBId) => new(HistoryEventType.AsoRemoved, fldAId, objBId, fldBId, [], [], default);
+    public static HistoryEvent AsoRemoved(Guid fldAId, Guid objBId, Guid fldBId) => new(HistoryEventType.AsoRemoved, fldAId, objBId, fldBId, [], [], Guid.Empty);
 }
 
 public sealed class HistoryCommit
@@ -141,7 +141,7 @@ public static class History
 
         int objectCount = 0;
 
-        Guid currentObjId = default;
+        Guid currentObjId = Guid.Empty;
         bool hasCurrentObj = false;
         int currentObjEventCount = 0;
         int currentObjEventCountOffset = 0;
@@ -273,7 +273,6 @@ public static class History
                     writer.WriteGuidLittleEndian(objBId);
                     writer.WriteGuidLittleEndian(fldBId);
                     currentObjEventCount++;
-                    continue;
                 }
 
             } while (changeCursor.Next().ResultCode == ResultCode.Success);
@@ -491,89 +490,5 @@ public static class History
 
         _ = originalLen; // kept for future display
         return bytes;
-    }
-
-    private ref struct PooledBufferWriter
-    {
-        private byte[] _buffer;
-        private int _position;
-        private Span<byte> _guidScratch;
-
-        public PooledBufferWriter(int initialCapacity, Span<byte> guidScratch)
-        {
-            _buffer = ArrayPool<byte>.Shared.Rent(initialCapacity);
-            _position = 0;
-            _guidScratch = guidScratch;
-        }
-
-        public ReadOnlySpan<byte> Written => _buffer.AsSpan(0, _position);
-
-        public PooledLease DetachLease()
-        {
-            var lease = new PooledLease(_buffer, _position);
-            _buffer = Array.Empty<byte>();
-            _position = 0;
-            _guidScratch = Span<byte>.Empty;
-            return lease;
-        }
-
-        public void WriteByte(byte value)
-        {
-            Ensure(1);
-            _buffer[_position++] = value;
-        }
-
-        public void WriteInt32(int value)
-        {
-            Ensure(4);
-            BinaryPrimitives.WriteInt32LittleEndian(_buffer.AsSpan(_position, 4), value);
-            _position += 4;
-        }
-
-        public void WriteInt64(long value)
-        {
-            Ensure(8);
-            BinaryPrimitives.WriteInt64LittleEndian(_buffer.AsSpan(_position, 8), value);
-            _position += 8;
-        }
-
-        public void WriteGuidLittleEndian(Guid guid)
-        {
-            guid.TryWriteBytes(_guidScratch, bigEndian: false, out _);
-            WriteBytes(_guidScratch);
-        }
-
-        public int ReserveInt32()
-        {
-            Ensure(4);
-            int offset = _position;
-            _position += 4;
-            return offset;
-        }
-
-        public void PatchInt32(int offset, int value)
-        {
-            BinaryPrimitives.WriteInt32LittleEndian(_buffer.AsSpan(offset, 4), value);
-        }
-
-        public void WriteBytes(ReadOnlySpan<byte> data)
-        {
-            Ensure(data.Length);
-            data.CopyTo(_buffer.AsSpan(_position));
-            _position += data.Length;
-        }
-
-        private void Ensure(int additional)
-        {
-            int required = _position + additional;
-            if (required <= _buffer.Length)
-                return;
-
-            int newSize = Math.Max(required, _buffer.Length * 2);
-            var newBuf = ArrayPool<byte>.Shared.Rent(newSize);
-            _buffer.AsSpan(0, _position).CopyTo(newBuf);
-            ArrayPool<byte>.Shared.Return(_buffer);
-            _buffer = newBuf;
-        }
     }
 }
