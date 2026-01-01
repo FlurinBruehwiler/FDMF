@@ -11,6 +11,7 @@ public class Environment
     public required LightningDatabase HistoryDb;
     public required LightningDatabase StringSearchIndex;
     public required LightningDatabase NonStringSearchIndex;
+    public required LightningDatabase FieldPresenceIndex;
     public required ProjectModel Model;
 
     public static Environment Create(ProjectModel model, string dbName = "database")
@@ -53,9 +54,14 @@ public class Environment
         };
         customComparer.CompareWith(new CustomIndexComparer());
         var nonStringSearchIndex = lightningTransaction.OpenDatabase(name: "NonStringIndexDb", customComparer);
+ 
+        var fieldPresenceIndex = lightningTransaction.OpenDatabase(name: "FieldPresenceIndexDb", new DatabaseConfiguration
+        {
+            Flags = DatabaseOpenFlags.Create | DatabaseOpenFlags.DuplicatesSort
+        });
 
         lightningTransaction.Commit();
-
+ 
         return new Environment
         {
             LightningEnvironment = env,
@@ -63,6 +69,7 @@ public class Environment
             HistoryDb = histDb,
             StringSearchIndex = stringSearchIndex,
             NonStringSearchIndex = nonStringSearchIndex,
+            FieldPresenceIndex = fieldPresenceIndex,
             Model = model
         };
     }

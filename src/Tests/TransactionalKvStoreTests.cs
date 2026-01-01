@@ -455,7 +455,7 @@ public class TransactionalKvStoreTests
     }
 
     [Fact]
-    public void Cursor_Delete_Current_Base_Entry_Removes_It()
+    public void Cursor_Delete_Base_Entry()
     {
         var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
         env.Open();
@@ -485,7 +485,7 @@ public class TransactionalKvStoreTests
     }
 
     [Fact]
-    public void Cursor_Delete_Current_ChangeSetOnly_Entry_Removes_It()
+    public void Cursor_Delete_ChangeSet_Only_Entry()
     {
         var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
         env.Open();
@@ -511,7 +511,7 @@ public class TransactionalKvStoreTests
     }
 
     [Fact]
-    public void Cursor_Delete_Current_Overridden_Base_Entry_Deletes_Base()
+    public void Cursor_Delete_Overridden_Base_Entry()
     {
         var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
         env.Open();

@@ -268,6 +268,132 @@ public class SearchTests
         AssertEqual([folderA], result);
     }
 
+    [Fact]
+    public void Default_String_Search()
+    {
+        var testModel = ProjectModel.CreateFromDirectory("TestModel");
+        testModel.FieldsById[TestingFolder.Fields.Name].IsIndexed = true;
+
+        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+
+        using var tsx = new DbSession(env);
+
+        var defaultFolder = new TestingFolder(tsx);
+
+        _ = new TestingFolder(tsx)
+        {
+            Name = "abc"
+        };
+
+        tsx.Commit();
+
+        var result = Searcher.Search<TestingFolder>(tsx, new StringCriterion
+        {
+            FieldId = TestingFolder.Fields.Name,
+            Value = string.Empty,
+            Type = StringCriterion.MatchType.Exact,
+        });
+
+        // Expect unset fields to behave like default(empty string).
+        AssertEqual([defaultFolder], result);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Default_Integer_Search(bool indexed)
+    {
+        var testModel = ProjectModel.CreateFromDirectory("TestModel");
+        testModel.FieldsById[TestingFolder.Fields.TestIntegerField].IsIndexed = indexed;
+
+        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+
+        using var tsx = new DbSession(env);
+
+        var defaultFolder = new TestingFolder(tsx);
+
+        _ = new TestingFolder(tsx)
+        {
+            TestIntegerField = 1
+        };
+
+        tsx.Commit();
+
+        var result = Searcher.Search<TestingFolder>(tsx, new LongCriterion
+        {
+            FieldId = TestingFolder.Fields.TestIntegerField,
+            From = 0,
+            To = 0
+        });
+
+        // Expect unset fields to behave like default(0).
+        AssertEqual([defaultFolder], result);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Default_Decimal_Search(bool indexed)
+    {
+        var testModel = ProjectModel.CreateFromDirectory("TestModel");
+        testModel.FieldsById[TestingFolder.Fields.TestDecimalField].IsIndexed = indexed;
+
+        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+
+        using var tsx = new DbSession(env);
+
+        var defaultFolder = new TestingFolder(tsx);
+
+        _ = new TestingFolder(tsx)
+        {
+            TestDecimalField = 1
+        };
+
+        tsx.Commit();
+
+        var result = Searcher.Search<TestingFolder>(tsx, new DecimalCriterion
+        {
+            FieldId = TestingFolder.Fields.TestDecimalField,
+            From = 0,
+            To = 0
+        });
+
+        // Expect unset fields to behave like default(0m).
+        AssertEqual([defaultFolder], result);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Default_DateTime_Search(bool indexed)
+    {
+        var testModel = ProjectModel.CreateFromDirectory("TestModel");
+        testModel.FieldsById[TestingFolder.Fields.TestDateField].IsIndexed = indexed;
+
+        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+
+        using var tsx = new DbSession(env);
+
+        var defaultFolder = new TestingFolder(tsx);
+
+        _ = new TestingFolder(tsx)
+        {
+            TestDateField = new DateTime(2000, 01, 01)
+        };
+
+        tsx.Commit();
+
+        var result = Searcher.Search<TestingFolder>(tsx, new DateTimeCriterion
+        {
+            FieldId = TestingFolder.Fields.TestDateField,
+            From = default,
+            To = default
+        });
+
+        // Expect unset fields to behave like default(DateTime).
+        AssertEqual([defaultFolder], result);
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

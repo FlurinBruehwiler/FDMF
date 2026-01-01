@@ -22,7 +22,7 @@ namespace Shared.Database;
 // [ ] implement profiling (we want to see what searches are slow, so the user can add indexes to these fields
 // [x] implement more complex operators (not only AND, but also OR)
 // [x] implement sub queries
-// [ ] implement default value search (assoc null/not null, 0/not 0, empty datetime/nonempty datetime) (without indexing for now..)
+// [x] implement default value search (assoc null/not null, 0/not 0, empty datetime/nonempty datetime)
 // [ ] implement better substring/fuzzy search
 // [ ] improve the performance (reducing allocations)
 // [x] implement search by type (indexed)
@@ -74,6 +74,10 @@ public static class Searcher
 
                     var objId = MemoryMarshal.Read<Guid>(key.AsSpan().Slice(0, 16));
                     var fldId = MemoryMarshal.Read<Guid>(key.AsSpan().Slice(16));
+
+                    // Field is present (has a VAL entry).
+                    txn.Put(environment.FieldPresenceIndex, fldId.AsSpan(), objId.AsSpan());
+
                     if (environment.Model.FieldsById.TryGetValue(fldId, out var fld) && fld.IsIndexed)
                     {
                         InsertIndex(fld.DataType, objId, fldId, dataValue, txn, environment);
@@ -131,59 +135,74 @@ public static class Searcher
                         InsertTypeIndex(environment, typId, txn, objId);
                     }
                 }
-                else if (key.Length == 32) //val
-                {
-                    var fldId = MemoryMarshal.Read<Guid>(key.Slice(16));
+                 else if (key.Length == 32) //val
+                 {
+                     var fldId = MemoryMarshal.Read<Guid>(key.Slice(16));
 
-                    if (environment.Model.FieldsById.TryGetValue(fldId, out var fieldDefinition) && fieldDefinition.IsIndexed)
-                    {
-                        var (r, _, v) = txn.Get(environment.ObjectDb, key);
+                     var (r, _, v) = txn.Get(environment.ObjectDb, key);
+                     bool oldExists = r == MDBResultCode.Success;
 
-                        if (r == MDBResultCode.Success) //the value already existed, we remove it
-                        {
-                            var oldValue = v.AsSpan().Slice(1);
-                            switch (fieldDefinition.DataType)
-                            {
-                                case FieldDataType.String:
-                                    var oldValueSpan = Normalize(MemoryMarshal.Cast<byte, char>(oldValue)).AsSpan();
+                     if (oldExists && v.AsSpan().Length > 0 && v.AsSpan()[0] == (byte)ValueTyp.Val)
+                     {
+                         // Transition: present -> missing
+                         if (flag == ValueFlag.Delete)
+                         {
+                             txn.Delete(environment.FieldPresenceIndex, fldId.AsSpan(), objId.AsSpan());
+                         }
 
-                                    var indexKey = ConstructStringIndexKey(IndexFlag.Normal, fldId, oldValueSpan); //ignore tag
-                                    txn.Delete(environment.StringSearchIndex, indexKey, objId.AsSpan());
+                         // If the field is indexed, remove the old value from its search index.
+                         if (environment.Model.FieldsById.TryGetValue(fldId, out var fieldDefinition) && fieldDefinition.IsIndexed)
+                         {
+                             var oldValue = v.AsSpan().Slice(1);
+                             switch (fieldDefinition.DataType)
+                             {
+                                 case FieldDataType.String:
+                                     var oldValueSpan = Normalize(MemoryMarshal.Cast<byte, char>(oldValue)).AsSpan();
 
-                                    var indexKey2 = ConstructStringIndexKey(IndexFlag.Reverse, fldId, oldValueSpan); //ignore tag
-                                    txn.Delete(environment.StringSearchIndex, indexKey2, objId.AsSpan());
+                                     var indexKey = ConstructStringIndexKey(IndexFlag.Normal, fldId, oldValueSpan); //ignore tag
+                                     txn.Delete(environment.StringSearchIndex, indexKey, objId.AsSpan());
 
-                                    if (oldValueSpan.Length >= 3)
-                                    {
-                                        for (int i = 0; i < oldValueSpan.Length - 2; i++)
-                                        {
-                                            var ngramIndexKey = ConstructStringIndexKey(IndexFlag.NGram, fldId, oldValueSpan.Slice(i, 3));
-                                            txn.Delete(environment.StringSearchIndex, ngramIndexKey, objId.AsSpan());
-                                        }
-                                    }
+                                     var indexKey2 = ConstructStringIndexKey(IndexFlag.Reverse, fldId, oldValueSpan); //ignore tag
+                                     txn.Delete(environment.StringSearchIndex, indexKey2, objId.AsSpan());
 
-                                    break;
-                                case FieldDataType.DateTime:
-                                    objId = RemoveNonStringIndexValue<DateTime>(oldValue, CustomIndexComparer.Comparison.DateTime, fldId, objId, txn, environment.NonStringSearchIndex);
-                                    break;
-                                case FieldDataType.Integer:
-                                    objId = RemoveNonStringIndexValue<long>(oldValue, CustomIndexComparer.Comparison.SignedLong, fldId, objId, txn, environment.NonStringSearchIndex);
-                                    break;
-                                case FieldDataType.Decimal:
-                                    objId = RemoveNonStringIndexValue<decimal>(oldValue, CustomIndexComparer.Comparison.Decimal, fldId, objId, txn, environment.NonStringSearchIndex);
-                                    break;
-                                default:
-                                    throw new ArgumentOutOfRangeException();
-                            }
-                        }
+                                     if (oldValueSpan.Length >= 3)
+                                     {
+                                         for (int i = 0; i < oldValueSpan.Length - 2; i++)
+                                         {
+                                             var ngramIndexKey = ConstructStringIndexKey(IndexFlag.NGram, fldId, oldValueSpan.Slice(i, 3));
+                                             txn.Delete(environment.StringSearchIndex, ngramIndexKey, objId.AsSpan());
+                                         }
+                                     }
 
-                        if (flag == ValueFlag.AddModify)
-                        {
-                            var val = value.Slice(1);
-                            InsertIndex(fieldDefinition.DataType, objId, fldId, val, txn, environment);
-                        }
-                    }
-                }
+                                     break;
+                                 case FieldDataType.DateTime:
+                                     RemoveNonStringIndexValue<DateTime>(oldValue, CustomIndexComparer.Comparison.DateTime, fldId, objId, txn, environment.NonStringSearchIndex);
+                                     break;
+                                 case FieldDataType.Integer:
+                                     RemoveNonStringIndexValue<long>(oldValue, CustomIndexComparer.Comparison.SignedLong, fldId, objId, txn, environment.NonStringSearchIndex);
+                                     break;
+                                 case FieldDataType.Decimal:
+                                     RemoveNonStringIndexValue<decimal>(oldValue, CustomIndexComparer.Comparison.Decimal, fldId, objId, txn, environment.NonStringSearchIndex);
+                                     break;
+                                 default:
+                                     throw new ArgumentOutOfRangeException();
+                             }
+                         }
+                     }
+
+                     // Transition: missing -> present
+                     if (!oldExists && flag == ValueFlag.AddModify)
+                     {
+                         txn.Put(environment.FieldPresenceIndex, fldId.AsSpan(), objId.AsSpan());
+                     }
+
+                     // If the field is indexed, insert the new value.
+                     if (flag == ValueFlag.AddModify && environment.Model.FieldsById.TryGetValue(fldId, out var newFieldDefinition) && newFieldDefinition.IsIndexed)
+                     {
+                         var val = value.Slice(1);
+                         InsertIndex(newFieldDefinition.DataType, objId, fldId, val, txn, environment);
+                     }
+                 }
             } while (changeCursor.Next().ResultCode == ResultCode.Success);
         }
     }
@@ -561,7 +580,11 @@ public static class Searcher
         var val = GetFldValue<byte>(environment, transaction, objId, fieldId);
 
         if (val.Length == 0)
-            return false;
+        {
+            // Missing value behaves like default(T).
+            var def = default(T);
+            return def.CompareTo(from) >= 0 && def.CompareTo(to) <= 0;
+        }
 
         if (CustomIndexComparer.CompareGeneric<T>(val, from.AsSpan()) >= 0)
         {
@@ -600,6 +623,8 @@ public static class Searcher
             });
         }
 
+        HashSet<Guid>? seen = null;
+
         using var cursor = transaction.CreateCursor(environment.NonStringSearchIndex);
 
         Span<byte> minKey = stackalloc byte[GetNonStringKeySize<T>()];
@@ -607,6 +632,10 @@ public static class Searcher
 
         Span<byte> maxKey = stackalloc byte[GetNonStringKeySize<T>()];
         ConstructNonStringIndexKey(comparison, fieldId, to, maxKey);
+
+        bool includesDefault = default(T).CompareTo(from) >= 0 && default(T).CompareTo(to) <= 0;
+        if (includesDefault)
+            seen = [];
 
         if (cursor.SetRange(minKey) == MDBResultCode.Success)
         {
@@ -617,14 +646,21 @@ public static class Searcher
                 if (CustomIndexComparer.CompareStatic(maxKey, key.AsSpan()) < 0)
                     break;
 
-                if (!addResult(MemoryMarshal.Read<Guid>(value.AsSpan())))
+                var id = MemoryMarshal.Read<Guid>(value.AsSpan());
+                if (seen == null || seen.Add(id))
                 {
-                    return false;
+                    if (!addResult(id))
+                    {
+                        return false;
+                    }
                 }
             } while (cursor.Next().resultCode == MDBResultCode.Success);
         }
 
-        return true;
+        if (!includesDefault)
+            return true;
+
+        return AddMissingFieldValues(environment, transaction, fld.OwningEntity.Id, fieldId, seen!, addResult);
     }
 
     private static bool ExecuteTypeSearch(Environment environment, LightningTransaction transaction, Guid typId, Func<Guid, bool> addResult)
@@ -666,6 +702,55 @@ public static class Searcher
         }
 
         return ReadOnlySpan<T>.Empty;
+    }
+
+    private static bool AddMissingFieldValues(Environment environment, LightningTransaction transaction, Guid typId, Guid fieldId, HashSet<Guid> seen, Func<Guid, bool> addResult)
+    {
+        using var typeCursor = transaction.CreateCursor(environment.NonStringSearchIndex);
+
+        Span<byte> typeKey = stackalloc byte[1 + 16];
+        typeKey[0] = (byte)CustomIndexComparer.Comparison.Type;
+        typId.AsSpan().CopyTo(typeKey.Slice(1));
+
+        if (typeCursor.SetKey(typeKey).resultCode != MDBResultCode.Success)
+            return true;
+
+        using var presenceCursor = transaction.CreateCursor(environment.FieldPresenceIndex);
+
+        bool hasPresence = presenceCursor.SetKey(fieldId.AsSpan()).resultCode == MDBResultCode.Success;
+        Guid currentPresence = default;
+        if (hasPresence)
+        {
+            var (_, _, value) = presenceCursor.GetCurrent();
+            currentPresence = MemoryMarshal.Read<Guid>(value.AsSpan());
+        }
+
+        do
+        {
+            var (_, _, typeValue) = typeCursor.GetCurrent();
+            var objId = MemoryMarshal.Read<Guid>(typeValue.AsSpan());
+
+            while (hasPresence && BPlusTree.CompareLexicographic(currentPresence.AsSpan(), objId.AsSpan()) < 0)
+            {
+                hasPresence = presenceCursor.NextDuplicate().resultCode == MDBResultCode.Success;
+                if (hasPresence)
+                {
+                    var (_, _, v) = presenceCursor.GetCurrent();
+                    currentPresence = MemoryMarshal.Read<Guid>(v.AsSpan());
+                }
+            }
+
+            bool isPresent = hasPresence && currentPresence == objId;
+            if (!isPresent && seen.Add(objId))
+            {
+                if (!addResult(objId))
+                {
+                    return false;
+                }
+            }
+        } while (typeCursor.NextDuplicate().resultCode == MDBResultCode.Success);
+
+        return true;
     }
 
     private static bool MatchStringCriterion(Environment environment, LightningTransaction transaction, Guid objId, StringCriterion criterion)
@@ -732,19 +817,32 @@ public static class Searcher
         if (criterion.Type == StringCriterion.MatchType.Exact)
         {
             var exactKey = ConstructStringIndexKey(IndexFlag.Normal, criterion.FieldId, strValue);
-            return Collect(exactKey, exact: true);
+
+            HashSet<Guid>? seen = null;
+            if (strValue.Length == 0)
+                seen = [];
+
+            if (!Collect(exactKey, exact: true, seen))
+                return false;
+
+            if (strValue.Length == 0)
+            {
+                return AddMissingFieldValues(environment, transaction, fld.OwningEntity.Id, criterion.FieldId, seen!, addResult);
+            }
+
+            return true;
         }
 
         if (criterion.Type == StringCriterion.MatchType.Prefix)
         {
             var prefixForwardKey = ConstructStringIndexKey(IndexFlag.Normal, criterion.FieldId, strValue);
-            return Collect(prefixForwardKey, exact: false);
+            return Collect(prefixForwardKey, exact: false, seen: null);
         }
 
         if (criterion.Type == StringCriterion.MatchType.Postfix)
         {
             var prefixBackwardKey = ConstructStringIndexKey(IndexFlag.Reverse, criterion.FieldId, strValue);
-            return Collect(prefixBackwardKey, exact: false);
+            return Collect(prefixBackwardKey, exact: false, seen: null);
         }
 
         if (criterion.Type == StringCriterion.MatchType.Fuzzy && strValue.Length >= 3)
@@ -849,7 +947,7 @@ public static class Searcher
 
         return true;
 
-        bool Collect(byte[] prefixKey, bool exact)
+        bool Collect(byte[] prefixKey, bool exact, HashSet<Guid>? seen = null)
         {
             if (cursor.SetRange(prefixKey) == MDBResultCode.Success)
             {
@@ -863,9 +961,13 @@ public static class Searcher
                     if (!key.AsSpan().StartsWith(prefixKey))
                         break;
 
-                    if (!addResult(MemoryMarshal.Read<Guid>(value.AsSpan())))
+                    var guid = MemoryMarshal.Read<Guid>(value.AsSpan());
+                    if (seen == null || seen.Add(guid))
                     {
-                        return false;
+                        if (!addResult(guid))
+                        {
+                            return false;
+                        }
                     }
                 } while (cursor.Next().resultCode == MDBResultCode.Success);
             }

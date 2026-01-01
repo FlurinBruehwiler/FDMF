@@ -146,7 +146,7 @@ public class BPlusTreeTests
     }
 
     [Fact]
-    public void Cursor_DeleteCurrent_RemovesItem_And_Continues()
+    public void Cursor_Delete_RemovesItem_And_Continues()
     {
         var tree = new BPlusTree(branchingFactor: 3);
 
@@ -167,7 +167,7 @@ public class BPlusTreeTests
     }
 
     [Fact]
-    public void Cursor_DeleteCurrent_Can_Delete_All_Items_In_Order()
+    public void Cursor_Delete_Can_Delete_All_Items_In_Order()
     {
         var tree = new BPlusTree(branchingFactor: 3);
 
