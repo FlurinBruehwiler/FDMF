@@ -181,11 +181,14 @@ public static class Searcher
                                  case FieldDataType.Integer:
                                      RemoveNonStringIndexValue<long>(oldValue, CustomIndexComparer.Comparison.SignedLong, fldId, objId, txn, environment.NonStringSearchIndex);
                                      break;
-                                 case FieldDataType.Decimal:
-                                     RemoveNonStringIndexValue<decimal>(oldValue, CustomIndexComparer.Comparison.Decimal, fldId, objId, txn, environment.NonStringSearchIndex);
-                                     break;
-                                 default:
-                                     throw new ArgumentOutOfRangeException();
+                                case FieldDataType.Decimal:
+                                    RemoveNonStringIndexValue<decimal>(oldValue, CustomIndexComparer.Comparison.Decimal, fldId, objId, txn, environment.NonStringSearchIndex);
+                                    break;
+                                case FieldDataType.Boolean:
+                                    RemoveNonStringIndexValue<bool>(oldValue, CustomIndexComparer.Comparison.Boolean, fldId, objId, txn, environment.NonStringSearchIndex);
+                                    break;
+                                default:
+                                    throw new ArgumentOutOfRangeException();
                              }
                          }
                      }
@@ -267,6 +270,8 @@ public static class Searcher
                 return MatchNonStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, obj, dateTimeCriterion.FieldId, dateTimeCriterion.From, dateTimeCriterion.To);
             case DecimalCriterion decimalCriterion:
                 return MatchNonStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, obj, decimalCriterion.FieldId, decimalCriterion.From, decimalCriterion.To);
+            case BooleanCriterion booleanCriterion:
+                return MatchBooleanCriterion(dbSession.Environment, dbSession.Store.ReadTransaction, obj, booleanCriterion);
             case IdCriterion idCriterion:
                 return obj == idCriterion.Guid;
             case LongCriterion longCriterion:
@@ -429,6 +434,8 @@ public static class Searcher
                 return ExecuteNonStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, addResult, CustomIndexComparer.Comparison.Decimal, decimalCriterion.FieldId, decimalCriterion.From, decimalCriterion.To);
             case LongCriterion longCriterion:
                 return ExecuteNonStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, addResult, CustomIndexComparer.Comparison.SignedLong, longCriterion.FieldId, longCriterion.From, longCriterion.To);
+            case BooleanCriterion booleanCriterion:
+                return ExecuteBooleanSearch(dbSession.Environment, dbSession.Store.ReadTransaction, booleanCriterion, addResult);
             case StringCriterion stringCriterion:
                 return ExecuteStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, stringCriterion, addResult);
             default:
@@ -440,6 +447,10 @@ public static class Searcher
     {
         switch (searchCriterion)
         {
+            case StringCriterion stringCriterion:
+                if (model.FieldsById[stringCriterion.FieldId].IsIndexed)
+                    return 0;
+                return 1000;
             case AssocCriterion assocCriterion:
                 if (assocCriterion.SearchCriterion != null)
                     return 50 + EstimateCriterionCost(assocCriterion.SearchCriterion, model);
@@ -459,18 +470,12 @@ public static class Searcher
                 if (model.FieldsById[longCriterion.FieldId].IsIndexed)
                     return 0;
                 return 1000;
-            case MultiCriterion:
-                return 1000;
-            case SearchQuery searchQuery:
-                if (searchQuery.SearchCriterion == null)
-                    return 50;
-                return EstimateCriterionCost(searchQuery.SearchCriterion, model);
-            case StringCriterion stringCriterion:
-                if (model.FieldsById[stringCriterion.FieldId].IsIndexed)
+            case BooleanCriterion booleanCriterion:
+                if (model.FieldsById[booleanCriterion.FieldId].IsIndexed)
                     return 0;
                 return 1000;
             default:
-                throw new ArgumentOutOfRangeException(nameof(searchCriterion));
+                throw new ArgumentOutOfRangeException(searchCriterion + nameof(searchCriterion));
         }
     }
 
@@ -753,6 +758,19 @@ public static class Searcher
         return true;
     }
 
+    private static bool MatchBooleanCriterion(Environment environment, LightningTransaction transaction, Guid objId, BooleanCriterion criterion)
+    {
+        var val = GetFldValue<byte>(environment, transaction, objId, criterion.FieldId);
+
+        if (val.Length == 0)
+        {
+            // Missing value behaves like default(bool) == false.
+            return criterion.Value == false;
+        }
+
+        return MemoryMarshal.Read<bool>(val) == criterion.Value;
+    }
+
     private static bool MatchStringCriterion(Environment environment, LightningTransaction transaction, Guid objId, StringCriterion criterion)
     {
         switch (criterion.Type)
@@ -787,6 +805,61 @@ public static class Searcher
             default:
                 throw new ArgumentOutOfRangeException();
         }
+    }
+
+    private static bool ExecuteBooleanSearch(Environment environment, LightningTransaction transaction, BooleanCriterion criterion, Func<Guid, bool> addResult)
+    {
+        var fld = environment.Model.FieldsById.GetValueOrDefault(criterion.FieldId);
+        if (fld == null)
+        {
+            Logging.Log(LogFlags.Error, $"There isn't a Field with the ID {criterion.FieldId}");
+            return true;
+        }
+
+        if (!fld.IsIndexed)
+        {
+            return ExecuteTypeSearch(environment, transaction, fld.OwningEntity.Id, objId =>
+            {
+                if (MatchBooleanCriterion(environment, transaction, objId, criterion))
+                {
+                    if (!addResult(objId))
+                        return false;
+                }
+
+                return true;
+            });
+        }
+
+        HashSet<Guid>? seen = null;
+        if (criterion.Value == false)
+            seen = [];
+
+        using var cursor = transaction.CreateCursor(environment.NonStringSearchIndex);
+
+        Span<byte> key = stackalloc byte[GetNonStringKeySize<bool>()];
+        ConstructNonStringIndexKey(CustomIndexComparer.Comparison.Boolean, criterion.FieldId, criterion.Value, key);
+
+        if (cursor.SetKey(key).resultCode == MDBResultCode.Success)
+        {
+            do
+            {
+                var (_, _, value) = cursor.GetCurrent();
+                var id = MemoryMarshal.Read<Guid>(value.AsSpan());
+
+                if (seen == null || seen.Add(id))
+                {
+                    if (!addResult(id))
+                        return false;
+                }
+            } while (cursor.NextDuplicate().resultCode == MDBResultCode.Success);
+        }
+
+        if (criterion.Value == false)
+        {
+            return AddMissingFieldValues(environment, transaction, fld.OwningEntity.Id, criterion.FieldId, seen!, addResult);
+        }
+
+        return true;
     }
 
     private static bool ExecuteStringSearch(Environment environment, LightningTransaction transaction, StringCriterion criterion, Func<Guid, bool> addResult)
@@ -1028,6 +1101,9 @@ public static class Searcher
                 break;
             case FieldDataType.Decimal:
                 InsertNonStringIndex<decimal>(CustomIndexComparer.Comparison.Decimal, fldId, objId, val, txn, environment.NonStringSearchIndex);
+                break;
+            case FieldDataType.Boolean:
+                InsertNonStringIndex<bool>(CustomIndexComparer.Comparison.Boolean, fldId, objId, val, txn, environment.NonStringSearchIndex);
                 break;
             default:
                 throw new ArgumentOutOfRangeException();

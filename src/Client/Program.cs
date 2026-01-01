@@ -10,7 +10,7 @@ using Environment = Shared.Environment;
 var root = Helper.GetRootDir();
 var model = ProjectModel.CreateFromDirectory(Path.Combine(root, "Shared/Model"));
 
-var env = Environment.Create(model);
+using var env = Environment.Create(model);
 
 Logging.LogFlags = LogFlags.Error;
 

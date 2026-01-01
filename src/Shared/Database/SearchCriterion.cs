@@ -1,4 +1,4 @@
-﻿namespace Shared.Database;
+namespace Shared.Database;
 
 public interface ISearchCriterion;
 
@@ -78,4 +78,10 @@ public class StringCriterion : ISearchCriterion
         Postfix,
         Fuzzy
     }
+}
+
+public class BooleanCriterion : ISearchCriterion
+{
+    public Guid FieldId;
+    public bool Value;
 }

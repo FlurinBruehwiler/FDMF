@@ -1,4 +1,4 @@
-﻿{
+{
   "id": "A3CCBD8B-2256-414B-A402-1A091CB407A5",
   "key": "TestingFolder",
   "name": {
@@ -39,6 +39,15 @@
         "en": "A Integer field used for testing"
       },
       "datatype": "Integer",
+      "isIndexed": true
+    },
+    {
+      "id": "D2F1F644-4A30-4F6E-9A3C-39D9E7B6A1E2",
+      "key": "TestBoolField",
+      "name": {
+        "en": "A Boolean field used for testing"
+      },
+      "datatype": "Boolean",
       "isIndexed": true
     }
   ],

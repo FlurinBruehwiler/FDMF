@@ -4,7 +4,7 @@ using Shared.Database;
 
 namespace Shared;
 
-public class Environment
+public class Environment : IDisposable
 {
     public required LightningEnvironment LightningEnvironment;
     public required LightningDatabase ObjectDb;
@@ -73,6 +73,17 @@ public class Environment
             Model = model
         };
     }
+
+
+    public void Dispose()
+    {
+        ObjectDb.Dispose();
+        HistoryDb.Dispose();
+        StringSearchIndex.Dispose();
+        NonStringSearchIndex.Dispose();
+        FieldPresenceIndex.Dispose();
+        LightningEnvironment.Dispose();
+    }
 }
 
 public class CustomIndexComparer : IComparer<MDBValue>
@@ -82,6 +93,7 @@ public class CustomIndexComparer : IComparer<MDBValue>
         SignedLong,
         DateTime,
         Decimal,
+        Boolean,
         Assoc,
         Type
     }
@@ -103,6 +115,7 @@ public class CustomIndexComparer : IComparer<MDBValue>
             Comparison.SignedLong => CompareGeneric<long>(aData, bData),
             Comparison.DateTime => CompareGeneric<DateTime>(aData, bData),
             Comparison.Decimal => CompareGeneric<decimal>(aData, bData),
+            Comparison.Boolean => CompareGeneric<bool>(aData, bData),
             Comparison.Assoc => BPlusTree.CompareLexicographic(aData, bData),
             Comparison.Type => BPlusTree.CompareLexicographic(aData, bData),
             _ => throw new ArgumentOutOfRangeException()

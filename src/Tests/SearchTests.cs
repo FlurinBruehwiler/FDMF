@@ -17,7 +17,7 @@ public class SearchTests
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
         testModel.FieldsById[TestingFolder.Fields.Name].IsIndexed = indexed;
 
-        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+        using var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -57,7 +57,7 @@ public class SearchTests
     {
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
         testModel.FieldsById[TestingFolder.Fields.Name].IsIndexed = indexed;
-        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+        using var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -87,7 +87,7 @@ public class SearchTests
     public void Fuzzy_Search()
     {
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
-        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+        using var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -118,7 +118,7 @@ public class SearchTests
     public void Assoc_Search()
     {
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
-        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+        using var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -160,7 +160,7 @@ public class SearchTests
     public void Assoc_Parent_Null_Search()
     {
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
-        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+        using var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -188,7 +188,7 @@ public class SearchTests
     public void Assoc_Parent_NotNull_Search()
     {
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
-        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+        using var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -216,7 +216,7 @@ public class SearchTests
     public void Assoc_Subfolders_Null_Search()
     {
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
-        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+        using var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -244,7 +244,7 @@ public class SearchTests
     public void Assoc_Subfolders_NotNull_Search()
     {
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
-        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+        using var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -274,7 +274,7 @@ public class SearchTests
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
         testModel.FieldsById[TestingFolder.Fields.Name].IsIndexed = true;
 
-        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+        using var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -306,7 +306,7 @@ public class SearchTests
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
         testModel.FieldsById[TestingFolder.Fields.TestIntegerField].IsIndexed = indexed;
 
-        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+        using var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -338,7 +338,7 @@ public class SearchTests
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
         testModel.FieldsById[TestingFolder.Fields.TestDecimalField].IsIndexed = indexed;
 
-        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+        using var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -370,7 +370,7 @@ public class SearchTests
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
         testModel.FieldsById[TestingFolder.Fields.TestDateField].IsIndexed = indexed;
 
-        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+        using var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -397,12 +397,73 @@ public class SearchTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    public void Boolean_Search(bool indexed)
+    {
+        var boolFieldId = TestingFolder.Fields.TestBoolField;
+
+        var testModel = ProjectModel.CreateFromDirectory("TestModel");
+        testModel.FieldsById[boolFieldId].IsIndexed = indexed;
+
+        using var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+        using var tsx = new DbSession(env);
+
+        _ = new TestingFolder(tsx);
+
+        var trueFolder = new TestingFolder(tsx);
+        var trueValue = true;
+        tsx.SetFldValue(trueFolder.ObjId, boolFieldId, trueValue.AsSpan());
+
+        tsx.Commit();
+
+        var result = Searcher.Search<TestingFolder>(tsx, new BooleanCriterion
+        {
+            FieldId = boolFieldId,
+            Value = true
+        });
+
+        AssertEqual([trueFolder], result);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Default_Boolean_Search(bool indexed)
+    {
+        var boolFieldId = TestingFolder.Fields.TestBoolField;
+
+        var testModel = ProjectModel.CreateFromDirectory("TestModel");
+        testModel.FieldsById[boolFieldId].IsIndexed = indexed;
+
+        using var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+        using var tsx = new DbSession(env);
+
+        var defaultA = new TestingFolder(tsx);
+        var defaultB = new TestingFolder(tsx);
+
+        var trueFolder = new TestingFolder(tsx);
+        var trueValue = true;
+        tsx.SetFldValue(trueFolder.ObjId, boolFieldId, trueValue.AsSpan());
+
+        tsx.Commit();
+
+        var result = Searcher.Search<TestingFolder>(tsx, new BooleanCriterion
+        {
+            FieldId = boolFieldId,
+            Value = false
+        });
+
+        AssertEqual([defaultA, defaultB], result);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
     public void DateTime_Search(bool indexed)
     {
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
         testModel.FieldsById[TestingFolder.Fields.TestDateField].IsIndexed = indexed;
 
-        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+        using var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -446,7 +507,7 @@ public class SearchTests
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
         testModel.FieldsById[TestingFolder.Fields.TestDecimalField].IsIndexed = indexed;
 
-        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+        using var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -495,7 +556,7 @@ public class SearchTests
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
         testModel.FieldsById[TestingFolder.Fields.TestIntegerField].IsIndexed = indexed;
 
-        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+        using var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -540,7 +601,7 @@ public class SearchTests
     public void Type_Search()
     {
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
-        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+        using var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -562,7 +623,7 @@ public class SearchTests
     public void SubQuery_Search()
     {
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
-        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+        using var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -607,7 +668,7 @@ public class SearchTests
     public void LogicalAnd_Search()
     {
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
-        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+        using var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 
@@ -659,7 +720,7 @@ public class SearchTests
     public void LogicalOr_Search()
     {
         var testModel = ProjectModel.CreateFromDirectory("TestModel");
-        var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+        using var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
 
         using var tsx = new DbSession(env);
 

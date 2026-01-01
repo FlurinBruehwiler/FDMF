@@ -12,7 +12,7 @@ try
     var root = Helper.GetRootDir();
     var model = ProjectModel.CreateFromDirectory(Path.Combine(root, "Shared/Model"));
 
-    var env = Shared.Environment.Create(model);
+    using var env = Shared.Environment.Create(model);
 
     Guid parentFolderObjId;
     Guid childObjId;
