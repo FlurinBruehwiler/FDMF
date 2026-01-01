@@ -9,6 +9,7 @@ public class Environment : IDisposable
     public required LightningEnvironment LightningEnvironment;
     public required LightningDatabase ObjectDb;
     public required LightningDatabase HistoryDb;
+    public required LightningDatabase HistoryObjIndexDb;
     public required LightningDatabase StringSearchIndex;
     public required LightningDatabase NonStringSearchIndex;
     public required LightningDatabase FieldPresenceIndex;
@@ -40,6 +41,11 @@ public class Environment : IDisposable
             Flags = DatabaseOpenFlags.Create
         });
 
+        var historyObjIndexDb = lightningTransaction.OpenDatabase(name: "HistoryObjIndexDb", new DatabaseConfiguration
+        {
+            Flags = DatabaseOpenFlags.Create | DatabaseOpenFlags.DuplicatesSort
+        });
+
         var stringSearchIndex = lightningTransaction.OpenDatabase(name: "StringIndexDb", new DatabaseConfiguration
         {
             Flags = DatabaseOpenFlags.Create | DatabaseOpenFlags.DuplicatesSort
@@ -67,6 +73,7 @@ public class Environment : IDisposable
             LightningEnvironment = env,
             ObjectDb = objDb,
             HistoryDb = histDb,
+            HistoryObjIndexDb = historyObjIndexDb,
             StringSearchIndex = stringSearchIndex,
             NonStringSearchIndex = nonStringSearchIndex,
             FieldPresenceIndex = fieldPresenceIndex,
@@ -79,6 +86,7 @@ public class Environment : IDisposable
     {
         ObjectDb.Dispose();
         HistoryDb.Dispose();
+        HistoryObjIndexDb.Dispose();
         StringSearchIndex.Dispose();
         NonStringSearchIndex.Dispose();
         FieldPresenceIndex.Dispose();

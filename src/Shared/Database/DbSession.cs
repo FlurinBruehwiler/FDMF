@@ -61,13 +61,18 @@ public sealed class DbSession : IDisposable
 
         using (var writeTransaction = Environment.LightningEnvironment.BeginTransaction())
         {
+            var commitId = History.CreateCommitId();
+            var userId = Guid.NewGuid();
+            var timestampUtc = DateTime.UtcNow;
+
+            using var historyLease = History.WriteCommit(Environment, writeTransaction, Store.ChangeSet!, commitId, timestampUtc, userId);
 
             Searcher.UpdateSearchIndex(Environment, writeTransaction, Store.ChangeSet!);
-
+ 
             Store.Commit(writeTransaction);
-
+ 
             writeTransaction.Commit();
-
+ 
         }
 
         Cursor.Dispose();
@@ -110,9 +115,14 @@ public sealed class DbSession : IDisposable
         //delete everything that starts with the ObjId
         if (Cursor.SetRange(prefix) == ResultCode.Success)
         {
-            do
+            while (true)
             {
-                var (_, k, v) = Cursor.GetCurrent();
+                var current = Cursor.GetCurrent();
+                if (current.ResultCode != ResultCode.Success)
+                    break;
+
+                var k = current.Key;
+                var v = current.Value;
 
                 if (!k.Slice(0, 16).SequenceEqual(prefix))
                     break;
@@ -126,7 +136,7 @@ public sealed class DbSession : IDisposable
                 }
 
                 Cursor.Delete();
-            } while (Cursor.Next().ResultCode == ResultCode.Success);
+            }
         }
     }
 
@@ -207,27 +217,31 @@ public sealed class DbSession : IDisposable
         //delete everything that starts with the ObjId and Aso
         if (Cursor.SetRange(prefix) == ResultCode.Success)
         {
-            do
+            while (true)
             {
-                var (_, k, v) = Cursor.GetCurrent();
+                var current = Cursor.GetCurrent();
+                if (current.ResultCode != ResultCode.Success)
+                    break;
 
-                if (!k.Slice(0, 2 * 16).SequenceEqual(prefix))
+                var k = current.Key;
+                var v = current.Value;
+
+                if (k.Length < 2 * 16 || !k.Slice(0, 2 * 16).SequenceEqual(prefix))
                     break;
 
                 if (v.Length > 0 && v[0] == (byte)ValueTyp.Aso)
                 {
+                    if (k.Length < 4 * 16)
+                        break;
+
                     //flip to get other assoc
                     k.Slice(0, 2 * 16).CopyTo(tempBuf.Slice(2 * 16, 2 * 16));
                     k.Slice(16 * 2, 2 * 16).CopyTo(tempBuf.Slice(0, 2 * 16));
                     Store.Delete(tempBuf);
                 }
 
-                //todo, why is this unused
-                var otherObjId = MemoryMarshal.Read<Guid>(k.Slice(16 * 2, 16 * 1));
-                var otherFldId = MemoryMarshal.Read<Guid>(k.Slice(16 * 3, 16 * 1));
-
                 Cursor.Delete();
-            } while (Cursor.Next().ResultCode == ResultCode.Success);
+            }
         }
     }
 
