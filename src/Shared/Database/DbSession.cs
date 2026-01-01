@@ -13,7 +13,7 @@ namespace Shared.Database;
 // [ ] do we want some kind of validation of the db, that checks if all constraints are met
 // [ ] implement inheritance / unions
 // [ ] implement readonly transactions
-// [ ] improve kvstore to work with less allocations
+// [x] improve kvstore to work with less allocations
 
 
 //todo do we want/need locks in here to ensure that there aren't multiple threads at the same time interacting with the transaction
@@ -40,16 +40,20 @@ public sealed class DbSession : IDisposable
     public readonly TransactionalKvStore.Cursor Cursor;
     public TransactionalKvStore Store;
     public Environment Environment;
+    public bool IsReadOnly { get; }
 
-    public DbSession(Environment environment)
+    public DbSession(Environment environment, bool readOnly = false)
     {
-        Store = new TransactionalKvStore(environment.LightningEnvironment, environment.ObjectDb);
+        Store = new TransactionalKvStore(environment.LightningEnvironment, environment.ObjectDb, readOnly: readOnly);
         Cursor = Store.CreateCursor();
         Environment = environment;
+        IsReadOnly = readOnly;
     }
 
     public void Commit()
     {
+        EnsureWritable();
+
         //so this will work differently in the future, right now this just commits the data to LMDB,
         //but we want to have our SaveAction on Validation logic before that.
         //so the alternative design, which may be better is to first update the readonly transaction of the TKV to the current version,
@@ -58,7 +62,7 @@ public sealed class DbSession : IDisposable
         using (var writeTransaction = Environment.LightningEnvironment.BeginTransaction())
         {
 
-            Searcher.UpdateSearchIndex(Environment, writeTransaction, Store.ChangeSet);
+            Searcher.UpdateSearchIndex(Environment, writeTransaction, Store.ChangeSet!);
 
             Store.Commit(writeTransaction);
 
@@ -68,7 +72,7 @@ public sealed class DbSession : IDisposable
 
         Store.Dispose();
         //reset the store
-        Store = new TransactionalKvStore(Environment.LightningEnvironment, Environment.ObjectDb);
+        Store = new TransactionalKvStore(Environment.LightningEnvironment, Environment.ObjectDb, readOnly: IsReadOnly);
     }
 
     /// <summary>
@@ -94,6 +98,8 @@ public sealed class DbSession : IDisposable
     /// </summary>
     public void DeleteObj(Guid id)
     {
+        EnsureWritable();
+
         var prefix = MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref id, 1));
 
         Span<byte> tempBuf = stackalloc byte[4 * 16];
@@ -126,6 +132,8 @@ public sealed class DbSession : IDisposable
     /// </summary>
     public Guid CreateObj(Guid typId)
     {
+        EnsureWritable();
+
         //The idea here is to have the objects ordered by creation time in the db, in an attempt to have frequently used objects closer together,
         var id = Guid.CreateVersion7();
 
@@ -154,6 +162,8 @@ public sealed class DbSession : IDisposable
     /// </summary>
     public bool CreateAso(Guid objIdA, Guid fldIdA, Guid objIdB, Guid fldIdB)
     {
+        EnsureWritable();
+
         Span<byte> keyBuf = stackalloc byte[4 * 16];
         MemoryMarshal.Write(keyBuf.Slice(0*16, 16), objIdA);
         MemoryMarshal.Write(keyBuf.Slice(1*16, 16), fldIdA);
@@ -183,6 +193,8 @@ public sealed class DbSession : IDisposable
     /// </summary>
     public void RemoveAllAso(Guid objId, Guid fldId)
     {
+        EnsureWritable();
+
         Span<byte> prefix = stackalloc byte[2 * 16];
         MemoryMarshal.Write(prefix.Slice(0*16, 16), objId);
         MemoryMarshal.Write(prefix.Slice(1*16, 16), fldId);
@@ -222,6 +234,8 @@ public sealed class DbSession : IDisposable
     /// </summary>
     public bool RemoveAso(Guid objIdA, Guid fldIdA, Guid objIdB, Guid fldIdB)
     {
+        EnsureWritable();
+
         Span<byte> keyBuf = stackalloc byte[4 * 16];
         MemoryMarshal.Write(keyBuf.Slice(0*16, 16), objIdA);
         MemoryMarshal.Write(keyBuf.Slice(1*16, 16), fldIdA);
@@ -251,7 +265,10 @@ public sealed class DbSession : IDisposable
     /// </summary>
     public void SetFldValue(Guid objId, Guid fldId, ReadOnlySpan<byte> span)
     {
+        EnsureWritable();
+
         //todo, in debug mode we could check if the obj exists!
+
 
         Span<byte> keyBuf = stackalloc byte[2 * 16];
         MemoryMarshal.Write(keyBuf.Slice(0 * 16, 16), objId);
@@ -347,6 +364,13 @@ public sealed class DbSession : IDisposable
         Cursor.Dispose();
         Store.Dispose();
     }
+
+    private void EnsureWritable()
+    {
+        if (IsReadOnly)
+            throw new InvalidOperationException("DbSession is read-only");
+    }
+
 
     //Todo this method should be replaced by the searching system...
     public IEnumerable<(Guid objId, Guid typId)> EnumerateObjs()

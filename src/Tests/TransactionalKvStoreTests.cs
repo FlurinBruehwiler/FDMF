@@ -7,6 +7,35 @@ namespace Tests;
 public class TransactionalKvStoreTests
 {
     [Fact]
+    public void ReadOnly_Forwards_Reads_And_Blocks_Writes()
+    {
+        var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
+        env.Open();
+
+        LightningDatabase db;
+        using (var tx = env.BeginTransaction())
+        {
+            db = tx.OpenDatabase();
+
+            tx.Put(db, [1], [2]);
+            tx.Commit();
+        }
+
+        var store = new TransactionalKvStore(env, db, readOnly: true);
+
+        Assert.Equal(ResultCode.Success, store.Get([1], out var value));
+        AssertBytes.Equal([(byte)2], value);
+
+        Assert.Throws<InvalidOperationException>(() => store.Put([3], [6]));
+        Assert.Throws<InvalidOperationException>(() => store.Delete([1]));
+
+        using var cursor = store.CreateCursor();
+        Assert.Equal(ResultCode.Success, cursor.SetRange([0]));
+        AssertBytes.Equal([(byte)2], cursor.GetCurrent().Value);
+        Assert.Throws<InvalidOperationException>(() => cursor.Delete());
+    }
+
+    [Fact]
     public void Data_From_The_Base_Set_Is_Visible()
     {
         var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
@@ -423,5 +452,88 @@ public class TransactionalKvStoreTests
         cursor.SetRange([0]);
 
         Assert.Equal(ResultCode.NotFound, cursor.Next().ResultCode);
+    }
+
+    [Fact]
+    public void Cursor_Delete_Current_Base_Entry_Removes_It()
+    {
+        var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
+        env.Open();
+
+        LightningDatabase db;
+        using (var tx = env.BeginTransaction())
+        {
+            db = tx.OpenDatabase();
+
+            tx.Put(db, [1], [1]);
+            tx.Put(db, [2], [2]);
+            tx.Commit();
+        }
+
+        var store = new TransactionalKvStore(env, db);
+
+        using var cursor = store.CreateCursor();
+        cursor.SetRange([1]);
+
+        AssertBytes.Equal([(byte)1], cursor.GetCurrent().Value);
+        Assert.Equal(ResultCode.Success, cursor.Delete());
+
+        Assert.Equal(ResultCode.NotFound, store.Get([1], out _));
+
+        AssertBytes.Equal([(byte)2], cursor.GetCurrent().Value);
+        Assert.Equal(ResultCode.NotFound, cursor.Next().ResultCode);
+    }
+
+    [Fact]
+    public void Cursor_Delete_Current_ChangeSetOnly_Entry_Removes_It()
+    {
+        var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
+        env.Open();
+
+        LightningDatabase db;
+        using (var tx = env.BeginTransaction())
+        {
+            db = tx.OpenDatabase();
+            tx.Commit();
+        }
+
+        var store = new TransactionalKvStore(env, db);
+        store.Put([1], [1]);
+
+        using var cursor = store.CreateCursor();
+        cursor.SetRange([1]);
+
+        AssertBytes.Equal([(byte)1], cursor.GetCurrent().Value);
+        Assert.Equal(ResultCode.Success, cursor.Delete());
+
+        Assert.Equal(ResultCode.NotFound, store.Get([1], out _));
+        Assert.Equal(ResultCode.NotFound, cursor.GetCurrent().ResultCode);
+    }
+
+    [Fact]
+    public void Cursor_Delete_Current_Overridden_Base_Entry_Deletes_Base()
+    {
+        var env = new LightningEnvironment(DatabaseCollection.GetTempDbDirectory());
+        env.Open();
+
+        LightningDatabase db;
+        using (var tx = env.BeginTransaction())
+        {
+            db = tx.OpenDatabase();
+            tx.Put(db, [1], [1]);
+            tx.Commit();
+        }
+
+        var store = new TransactionalKvStore(env, db);
+        store.Put([1], [9]);
+
+        using var cursor = store.CreateCursor();
+        cursor.SetRange([1]);
+
+        AssertBytes.Equal([(byte)9], cursor.GetCurrent().Value);
+        Assert.Equal(ResultCode.Success, cursor.Delete());
+
+        Assert.Equal(ResultCode.NotFound, store.Get([1], out _));
+        Assert.Equal(ResultCode.NotFound, cursor.GetCurrent().ResultCode);
     }
 }

@@ -10,22 +10,34 @@ public sealed class TransactionalKvStore : IDisposable
     public readonly LightningDatabase Database;
     public readonly LightningEnvironment Environment;
 
-    // Flag is stored in the last byte of the key. The changeset tree uses a comparer that ignores that byte.
-    public readonly BPlusTree ChangeSet = new(comparer: BPlusTree.CompareIgnoreLastByte);
+    public bool IsReadOnly { get; }
 
-    private readonly ByteArena _arena = new();
+    // Flag is stored in the last byte of the key. The changeset tree uses a comparer that ignores that byte.
+    public readonly BPlusTree? ChangeSet;
+
+    private readonly ByteArena? _arena;
     private byte[] _searchKeyBuffer = new byte[64];
 
-    public TransactionalKvStore(LightningEnvironment env, LightningDatabase database)
+    public TransactionalKvStore(LightningEnvironment env, LightningDatabase database, bool readOnly = false)
     {
         ReadTransaction = env.BeginTransaction(TransactionBeginFlags.ReadOnly);
         Database = database;
         Environment = env;
+        IsReadOnly = readOnly;
+
+        if (!readOnly)
+        {
+            ChangeSet = new BPlusTree(comparer: BPlusTree.CompareIgnoreLastByte);
+            _arena = new ByteArena();
+        }
     }
 
     public void Commit(LightningTransaction writeTransaction)
     {
-        var cursor = ChangeSet.CreateCursor();
+        if (IsReadOnly)
+            throw new InvalidOperationException("TransactionalKvStore is read-only");
+
+        var cursor = ChangeSet!.CreateCursor();
 
         Span<byte> startKey = stackalloc byte[2]; // 1 byte key + 1 byte flag
         startKey[0] = 0;
@@ -61,41 +73,48 @@ public sealed class TransactionalKvStore : IDisposable
             } while (cursor.Next().ResultCode == ResultCode.Success);
         }
 
-        ChangeSet.Clear();
-        _arena.Reset();
+        ChangeSet!.Clear();
+        _arena!.Reset();
     }
 
     public ResultCode Put(ReadOnlySpan<byte> key, ReadOnlySpan<byte> value)
     {
-        var keySlice = CopyKeyWithFlag(key, ValueFlag.AddModify);
-        var valueSlice = _arena.Copy(value);
+        if (IsReadOnly)
+            throw new InvalidOperationException("TransactionalKvStore is read-only");
 
-        return ChangeSet.Put(keySlice, valueSlice);
+        var keySlice = CopyKeyWithFlag(key, ValueFlag.AddModify);
+        var valueSlice = _arena!.Copy(value);
+
+        return ChangeSet!.Put(keySlice, valueSlice);
     }
 
     public ResultCode Get(ReadOnlySpan<byte> key, [UnscopedRef] out ReadOnlySpan<byte> value)
     {
-        var searchKey = CreateSearchKey(key);
-
-        var res = ChangeSet.Get(searchKey);
-        if (res.ResultCode == ResultCode.Success)
+        if (!IsReadOnly)
         {
-            if (res.Key.Length == 0)
-            {
-                value = ReadOnlySpan<byte>.Empty;
-                return ResultCode.NotFound;
-            }
+            var searchKey = CreateSearchKey(key);
 
-            var flag = (ValueFlag)res.Key[^1];
-            if (flag == ValueFlag.Delete)
+            var res = ChangeSet!.Get(searchKey);
+            if (res.ResultCode == ResultCode.Success)
             {
-                value = ReadOnlySpan<byte>.Empty;
-                return ResultCode.NotFound;
-            }
+                if (res.Key.Length == 0)
+                {
+                    value = ReadOnlySpan<byte>.Empty;
+                    return ResultCode.NotFound;
+                }
 
-            value = res.Value;
-            return ResultCode.Success;
+                var flag = (ValueFlag)res.Key[^1];
+                if (flag == ValueFlag.Delete)
+                {
+                    value = ReadOnlySpan<byte>.Empty;
+                    return ResultCode.NotFound;
+                }
+
+                value = res.Value;
+                return ResultCode.Success;
+            }
         }
+
 
         var (lmdbResult, _, lmdbValue) = ReadTransaction.Get(Database, key);
         if (lmdbResult == MDBResultCode.Success)
@@ -110,17 +129,20 @@ public sealed class TransactionalKvStore : IDisposable
 
     public ResultCode Delete(ReadOnlySpan<byte> key)
     {
+        if (IsReadOnly)
+            throw new InvalidOperationException("TransactionalKvStore is read-only");
+
         if (ReadTransaction.Get(Database, key).resultCode == MDBResultCode.Success)
         {
             var keySlice = CopyKeyWithFlag(key, ValueFlag.Delete);
-            ChangeSet.Put(keySlice, ReadOnlyMemory<byte>.Empty);
+            ChangeSet!.Put(keySlice, ReadOnlyMemory<byte>.Empty);
         }
         else
         {
             Span<byte> searchKey = stackalloc byte[key.Length + 1];
             key.CopyTo(searchKey);
             searchKey[^1] = 0;
-            ChangeSet.Delete(searchKey);
+            ChangeSet!.Delete(searchKey);
         }
 
         return ResultCode.Success;
@@ -131,13 +153,13 @@ public sealed class TransactionalKvStore : IDisposable
         return new Cursor(this)
         {
             LightningCursor = ReadTransaction.CreateCursor(Database),
-            ChangeSetCursor = ChangeSet.CreateCursor()
+            ChangeSetCursor = IsReadOnly ? null : ChangeSet!.CreateCursor()
         };
     }
 
     private ReadOnlyMemory<byte> CopyKeyWithFlag(ReadOnlySpan<byte> key, ValueFlag flag)
     {
-        var mem = _arena.Allocate(key.Length + 1, out var slice);
+        var mem = _arena!.Allocate(key.Length + 1, out var slice);
         key.CopyTo(mem.Span);
         mem.Span[^1] = (byte)flag;
         return slice;
@@ -161,7 +183,7 @@ public sealed class TransactionalKvStore : IDisposable
         private readonly TransactionalKvStore _store;
 
         public required LightningCursor LightningCursor;
-        public required BPlusTree.Cursor ChangeSetCursor;
+        public BPlusTree.Cursor? ChangeSetCursor;
 
         public bool BaseIsFinished;
         public bool ChangeIsFinished;
@@ -196,15 +218,21 @@ public sealed class TransactionalKvStore : IDisposable
         {
             BaseIsFinished = LightningCursor.SetRange(key) == MDBResultCode.NotFound;
 
+            if (_store.IsReadOnly)
+            {
+                ChangeIsFinished = true;
+                return BaseIsFinished ? ResultCode.NotFound : ResultCode.Success;
+            }
+
             Span<byte> searchKey = stackalloc byte[key.Length + 1];
             key.CopyTo(searchKey);
             searchKey[^1] = 0;
-            ChangeIsFinished = ChangeSetCursor.SetRange(searchKey) == ResultCode.NotFound;
+            ChangeIsFinished = ChangeSetCursor!.SetRange(searchKey) == ResultCode.NotFound;
 
             if (!ChangeIsFinished && !BaseIsFinished)
             {
                 var a = LightningCursor.GetCurrent();
-                var b = ChangeSetCursor.GetCurrent();
+                var b = ChangeSetCursor!.GetCurrent();
 
                 var bKey = b.Key.Slice(0, b.Key.Length - 1);
                 var bFlag = (ValueFlag)b.Key[^1];
@@ -220,130 +248,204 @@ public sealed class TransactionalKvStore : IDisposable
 
         public ResultCode Delete()
         {
-            var currentKey = GetCurrent().Key;
-            if (currentKey.Length == 0)
+            if (_store.IsReadOnly)
+                throw new InvalidOperationException("TransactionalKvStore is read-only");
+
+            var current = GetCurrent();
+            var currentKey = current.Key;
+
+            if (current.ResultCode != ResultCode.Success || currentKey.Length == 0)
                 return ResultCode.NotFound;
 
-            _store.Delete(currentKey);
+            // Determine where the current value came from.
+            bool currentFromChange;
+            bool baseHasSameKey;
 
-            Span<byte> searchKey = stackalloc byte[currentKey.Length + 1];
-            currentKey.CopyTo(searchKey);
-            searchKey[^1] = 0;
-            ChangeIsFinished = ChangeSetCursor.SetRange(searchKey) == ResultCode.NotFound;
+            if (ChangeIsFinished)
+            {
+                currentFromChange = false;
+                baseHasSameKey = true;
+            }
+            else if (BaseIsFinished)
+            {
+                currentFromChange = true;
+                baseHasSameKey = false;
+            }
+            else
+            {
+                var baseCurrent = LightningCursor.GetCurrent();
+                var changeCurrent = ChangeSetCursor!.GetCurrent();
+                var changeKey = changeCurrent.Key.Slice(0, changeCurrent.Key.Length - 1);
+
+                var comp = BPlusTree.CompareLexicographic(baseCurrent.key.AsSpan(), changeKey);
+                currentFromChange = comp >= 0;
+                baseHasSameKey = comp == 0;
+            }
+
+            if (!currentFromChange)
+            {
+                // Current came from base, so it definitely exists in base.
+                _store.ChangeSet!.Put(_store.CopyKeyWithFlag(currentKey, ValueFlag.Delete), ReadOnlyMemory<byte>.Empty);
+
+                BaseIsFinished = LightningCursor.Next().resultCode == MDBResultCode.NotFound;
+
+                Span<byte> searchKey = stackalloc byte[currentKey.Length + 1];
+                currentKey.CopyTo(searchKey);
+                searchKey[^1] = 0;
+                ChangeIsFinished = ChangeSetCursor!.SetRange(searchKey) == ResultCode.NotFound;
+
+                // Ensure we don't sit on a delete marker.
+                if (!ChangeIsFinished)
+                {
+                    var cc = ChangeSetCursor!.GetCurrent();
+                    if (cc.Key.Length > 0 && (ValueFlag)cc.Key[^1] == ValueFlag.Delete)
+                        ChangeIsFinished = ChangeSetCursor!.Next().ResultCode == ResultCode.NotFound;
+                }
+
+                return ResultCode.Success;
+            }
+
+            // Current came from changeset.
+            if (baseHasSameKey)
+            {
+                // Changeset entry shadows a base key -> final state should be Delete.
+                _store.ChangeSet!.Put(_store.CopyKeyWithFlag(currentKey, ValueFlag.Delete), ReadOnlyMemory<byte>.Empty);
+
+                // Skip the base key as well.
+                BaseIsFinished = LightningCursor.Next().resultCode == MDBResultCode.NotFound;
+
+                Span<byte> searchKey = stackalloc byte[currentKey.Length + 1];
+                currentKey.CopyTo(searchKey);
+                searchKey[^1] = 0;
+                ChangeIsFinished = ChangeSetCursor!.SetRange(searchKey) == ResultCode.NotFound;
+
+                if (!ChangeIsFinished)
+                {
+                    var cc = ChangeSetCursor!.GetCurrent();
+                    if (cc.Key.Length > 0 && (ValueFlag)cc.Key[^1] == ValueFlag.Delete)
+                        ChangeIsFinished = ChangeSetCursor!.Next().ResultCode == ResultCode.NotFound;
+                }
+
+                return ResultCode.Success;
+            }
+
+            // Changeset-only entry -> remove it from changeset.
+            ChangeSetCursor!.Delete();
+            var after = ChangeSetCursor!.GetCurrent();
+            ChangeIsFinished = after.ResultCode == ResultCode.NotFound;
 
             return ResultCode.Success;
         }
 
         public CursorResult GetCurrent()
         {
+            while (true)
+            {
+                if (ChangeIsFinished && BaseIsFinished)
+                    return new CursorResult(ResultCode.NotFound, ReadOnlySpan<byte>.Empty, ReadOnlySpan<byte>.Empty);
+
+                if (ChangeIsFinished)
+                {
+                    var baseSet = LightningCursor.GetCurrent();
+                    return new CursorResult(ResultCode.Success, baseSet.key.AsSpan(), baseSet.value.AsSpan());
+                }
+
+                var changeCurrent = ChangeSetCursor!.GetCurrent();
+                if (changeCurrent.ResultCode != ResultCode.Success || changeCurrent.Key.Length == 0)
+                {
+                    ChangeIsFinished = true;
+                    continue;
+                }
+
+                var changeKey = changeCurrent.Key.Slice(0, changeCurrent.Key.Length - 1);
+                var changeFlag = (ValueFlag)changeCurrent.Key[^1];
+
+                if (BaseIsFinished)
+                {
+                    if (changeFlag == ValueFlag.Delete)
+                    {
+                        ChangeIsFinished = ChangeSetCursor!.Next().ResultCode == ResultCode.NotFound;
+                        continue;
+                    }
+
+                    return new CursorResult(ResultCode.Success, changeKey, changeCurrent.Value);
+                }
+
+                var baseCurrent = LightningCursor.GetCurrent();
+                var comp = BPlusTree.CompareLexicographic(baseCurrent.key.AsSpan(), changeKey);
+
+                if (changeFlag == ValueFlag.Delete)
+                {
+                    if (comp == 0)
+                    {
+                        BaseIsFinished = LightningCursor.Next().resultCode == MDBResultCode.NotFound;
+                        ChangeIsFinished = ChangeSetCursor!.Next().ResultCode == ResultCode.NotFound;
+                        continue;
+                    }
+
+                    if (comp > 0)
+                    {
+                        ChangeIsFinished = ChangeSetCursor!.Next().ResultCode == ResultCode.NotFound;
+                        continue;
+                    }
+
+                    return new CursorResult(ResultCode.Success, baseCurrent.key.AsSpan(), baseCurrent.value.AsSpan());
+                }
+
+                // Add/modify
+                if (comp < 0)
+                {
+                    return new CursorResult(ResultCode.Success, baseCurrent.key.AsSpan(), baseCurrent.value.AsSpan());
+                }
+
+                return new CursorResult(ResultCode.Success, changeKey, changeCurrent.Value);
+            }
+        }
+
+        public CursorResult Next()
+        {
             if (ChangeIsFinished && BaseIsFinished)
                 return new CursorResult(ResultCode.NotFound, ReadOnlySpan<byte>.Empty, ReadOnlySpan<byte>.Empty);
 
             if (ChangeIsFinished)
             {
-                var baseSet = LightningCursor.GetCurrent();
-                return new CursorResult(ResultCode.Success, baseSet.key.AsSpan(), baseSet.value.AsSpan());
+                BaseIsFinished = LightningCursor.Next().resultCode == MDBResultCode.NotFound;
+                return GetCurrent();
             }
 
             if (BaseIsFinished)
             {
-                var changeSet = ChangeSetCursor.GetCurrent();
-                Debug.Assert(changeSet.Key.Length > 0);
-                Debug.Assert((ValueFlag)changeSet.Key[^1] == ValueFlag.AddModify);
-
-                return new CursorResult(ResultCode.Success, changeSet.Key.Slice(0, changeSet.Key.Length - 1), changeSet.Value);
+                ChangeIsFinished = ChangeSetCursor!.Next().ResultCode == ResultCode.NotFound;
+                return GetCurrent();
             }
 
             var baseCurrent = LightningCursor.GetCurrent();
-            var changeCurrent = ChangeSetCursor.GetCurrent();
+            var changeCurrent = ChangeSetCursor!.GetCurrent();
 
-            var changeKey = changeCurrent.Key.Slice(0, changeCurrent.Key.Length - 1);
-            var changeFlag = (ValueFlag)changeCurrent.Key[^1];
-
-            var comp = BPlusTree.CompareLexicographic(baseCurrent.key.AsSpan(), changeKey);
-            if (comp < 0)
+            if (changeCurrent.ResultCode != ResultCode.Success || changeCurrent.Key.Length == 0)
             {
-                return new CursorResult(ResultCode.Success, baseCurrent.key.AsSpan(), baseCurrent.value.AsSpan());
-            }
-
-            if (changeFlag != ValueFlag.AddModify)
-            {
-                // This can happen when the current key is deleted.
+                ChangeIsFinished = true;
                 return Next();
             }
 
-            return new CursorResult(ResultCode.Success, changeKey, changeCurrent.Value);
-        }
-
-        public CursorResult Next()
-        {
-            // Unfortunately this logic is non-trivial.
-            next:
-            if (ChangeIsFinished && BaseIsFinished)
-                return new CursorResult(ResultCode.NotFound, ReadOnlySpan<byte>.Empty, ReadOnlySpan<byte>.Empty);
-
-            var a = LightningCursor.GetCurrent();
-            var b = ChangeSetCursor.GetCurrent();
-
-            var bKey = b.Key.Slice(0, b.Key.Length - 1);
-            var bFlag = (ValueFlag)b.Key[^1];
-
-            var comp = BPlusTree.CompareLexicographic(a.key.AsSpan(), bKey);
+            var changeKey = changeCurrent.Key.Slice(0, changeCurrent.Key.Length - 1);
+            var comp = BPlusTree.CompareLexicographic(baseCurrent.key.AsSpan(), changeKey);
 
             if (comp == 0)
             {
-                AdvanceBase();
-                if (AdvanceChangeSkipDeletes())
-                {
-                    goto next;
-                }
-            }
-            else
-            {
-                if (ChangeIsFinished || (!BaseIsFinished && comp < 0))
-                {
-                    AdvanceBase();
-                    if (!ChangeIsFinished)
-                    {
-                        if (bFlag == ValueFlag.Delete && !BaseIsFinished)
-                        {
-                            var newBaseCurrent = LightningCursor.GetCurrent();
-                            if (BPlusTree.CompareLexicographic(newBaseCurrent.key.AsSpan(), bKey) == 0)
-                                goto next;
-                        }
-                    }
-                }
-                else if (BaseIsFinished || (!ChangeIsFinished && comp > 0))
-                {
-                    if (AdvanceChangeSkipDeletes())
-                    {
-                        goto next;
-                    }
-                }
+                BaseIsFinished = LightningCursor.Next().resultCode == MDBResultCode.NotFound;
+                ChangeIsFinished = ChangeSetCursor!.Next().ResultCode == ResultCode.NotFound;
+                return GetCurrent();
             }
 
-            return GetCurrent();
-
-            void AdvanceBase()
+            if (comp < 0)
             {
                 BaseIsFinished = LightningCursor.Next().resultCode == MDBResultCode.NotFound;
+                return GetCurrent();
             }
 
-            bool AdvanceChangeSkipDeletes()
-            {
-                var nextChange = ChangeSetCursor.Next();
-                ChangeIsFinished = nextChange.ResultCode == ResultCode.NotFound;
-
-                if (nextChange.ResultCode == ResultCode.Success)
-                {
-                    if (nextChange.Key.Length > 0 && (ValueFlag)nextChange.Key[^1] == ValueFlag.Delete)
-                    {
-                        return true;
-                    }
-                }
-
-                return false;
-            }
+            ChangeIsFinished = ChangeSetCursor!.Next().ResultCode == ResultCode.NotFound;
+            return GetCurrent();
         }
 
         public void Dispose()
@@ -355,6 +457,6 @@ public sealed class TransactionalKvStore : IDisposable
     public void Dispose()
     {
         ReadTransaction.Dispose();
-        _arena.Dispose();
+        _arena?.Dispose();
     }
 }

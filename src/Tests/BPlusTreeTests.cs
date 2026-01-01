@@ -146,6 +146,50 @@ public class BPlusTreeTests
     }
 
     [Fact]
+    public void Cursor_DeleteCurrent_RemovesItem_And_Continues()
+    {
+        var tree = new BPlusTree(branchingFactor: 3);
+
+        for (byte i = 1; i <= 5; i++)
+            tree.Put(B(i), B((byte)(i * 10)));
+
+        var cursor = tree.CreateCursor();
+        Assert.Equal(ResultCode.Success, cursor.SetRange(B(2)));
+
+        AssertBytes.Equal(B(2), cursor.GetCurrent().Key);
+        Assert.Equal(ResultCode.Success, cursor.Delete());
+
+        Assert.Equal(ResultCode.NotFound, tree.Get(B(2)).ResultCode);
+
+        // After deleting current, cursor should point to the next key.
+        AssertBytes.Equal(B(3), cursor.GetCurrent().Key);
+        AssertBytes.Equal(B(30), cursor.GetCurrent().Value);
+    }
+
+    [Fact]
+    public void Cursor_DeleteCurrent_Can_Delete_All_Items_In_Order()
+    {
+        var tree = new BPlusTree(branchingFactor: 3);
+
+        for (byte i = 0; i < 50; i++)
+            tree.Put(B(i), B((byte)(i + 1)));
+
+        var cursor = tree.CreateCursor();
+        Assert.Equal(ResultCode.Success, cursor.SetRange(B(0)));
+
+        int deleted = 0;
+        while (cursor.GetCurrent().ResultCode == ResultCode.Success)
+        {
+            Assert.Equal(ResultCode.Success, cursor.Delete());
+            deleted++;
+        }
+
+        Assert.Equal(50, deleted);
+        Assert.Equal(ResultCode.NotFound, tree.Get(B(0)).ResultCode);
+        Assert.Equal(ResultCode.NotFound, cursor.GetCurrent().ResultCode);
+    }
+
+    [Fact]
     public void Delete()
     {
         var tree = new BPlusTree();

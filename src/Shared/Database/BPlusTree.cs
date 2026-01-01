@@ -86,6 +86,8 @@ public sealed class BPlusTree
     private abstract class Node
     {
         public List<ReadOnlyMemory<byte>> Keys = [];
+        public InternalNode? Parent;
+        public int ParentIndex;
         public abstract bool IsLeaf { get; }
     }
 
@@ -99,6 +101,7 @@ public sealed class BPlusTree
     {
         public List<ReadOnlyMemory<byte>> Values = [];
         public LeafNode? Next;
+        public LeafNode? Prev;
         public override bool IsLeaf => true;
     }
 
@@ -113,6 +116,7 @@ public sealed class BPlusTree
 
         _branchingFactor = branchingFactor;
         _compare = comparer ?? CompareLexicographic;
+
         _root = new LeafNode();
     }
 
@@ -135,6 +139,12 @@ public sealed class BPlusTree
             newRoot.Keys.Add(split.Separator);
             newRoot.Children.Add(split.Left);
             newRoot.Children.Add(split.Right);
+
+            split.Left.Parent = newRoot;
+            split.Left.ParentIndex = 0;
+            split.Right.Parent = newRoot;
+            split.Right.ParentIndex = 1;
+
             _root = newRoot;
         }
 
@@ -150,6 +160,8 @@ public sealed class BPlusTree
         if (_root is InternalNode internalRoot && internalRoot.Children.Count == 1)
         {
             _root = internalRoot.Children[0];
+            _root.Parent = null;
+            _root.ParentIndex = 0;
         }
 
         return removed ? ResultCode.Success : ResultCode.NotFound;
@@ -169,6 +181,15 @@ public sealed class BPlusTree
 
             leaf.Keys.RemoveAt(index);
             leaf.Values.RemoveAt(index);
+
+            if (leaf.Keys.Count == 0 && leaf.Parent != null)
+            {
+                // Keep leaf chain consistent.
+                if (leaf.Prev != null)
+                    leaf.Prev.Next = leaf.Next;
+                if (leaf.Next != null)
+                    leaf.Next.Prev = leaf.Prev;
+            }
 
             shouldDeleteNode = leaf.Keys.Count == 0;
             return true;
@@ -195,16 +216,14 @@ public sealed class BPlusTree
                 internalNode.Keys.RemoveAt(childIndex);
             else if (childIndex > 0)
                 internalNode.Keys.RemoveAt(childIndex - 1);
+
+            FixChildParentIndices(internalNode, childIndex);
         }
         else
         {
             if (childIndex > 0 && internalNode.Keys.Count > 0)
             {
-                var child = internalNode.Children[childIndex];
-                if (child.IsLeaf)
-                {
-                    internalNode.Keys[childIndex - 1] = ((LeafNode)child).Keys[0];
-                }
+                internalNode.Keys[childIndex - 1] = GetFirstKey(internalNode.Children[childIndex]);
             }
         }
 
@@ -238,7 +257,13 @@ public sealed class BPlusTree
             leaf.Values.Insert(pos, value);
 
             if (leaf.Keys.Count <= _branchingFactor)
+            {
+                // If the first key changed and this leaf is a right child, update ancestors.
+                if (pos == 0)
+                    UpdateAncestorsFirstKey(leaf);
+
                 return null;
+            }
 
             return SplitLeaf(leaf);
         }
@@ -258,6 +283,13 @@ public sealed class BPlusTree
         internalNode.Children[childIndex] = split.Left;
         internalNode.Children.Insert(childIndex + 1, split.Right);
 
+        split.Left.Parent = internalNode;
+        split.Left.ParentIndex = childIndex;
+        split.Right.Parent = internalNode;
+        split.Right.ParentIndex = childIndex + 1;
+
+        FixChildParentIndices(internalNode, childIndex + 2);
+
         if (internalNode.Keys.Count <= _branchingFactor)
             return null;
 
@@ -276,6 +308,10 @@ public sealed class BPlusTree
         leaf.Values.RemoveRange(mid, leaf.Values.Count - mid);
 
         right.Next = leaf.Next;
+        if (right.Next != null)
+            right.Next.Prev = right;
+
+        right.Prev = leaf;
         leaf.Next = right;
 
         return new SplitResult
@@ -298,6 +334,9 @@ public sealed class BPlusTree
 
         node.Keys.RemoveRange(mid, node.Keys.Count - mid);
         node.Children.RemoveRange(mid + 1, node.Children.Count - (mid + 1));
+
+        FixChildParentIndices(node, 0);
+        FixChildParentIndices(right, 0);
 
         return new SplitResult
         {
@@ -359,58 +398,40 @@ public sealed class BPlusTree
         return ~lo;
     }
 
-    private (ReadOnlyMemory<byte> key, ReadOnlyMemory<byte> value, bool didNotFindGreater) SearchGreaterOrEqualsThan(Node node, ReadOnlySpan<byte> key, bool onlyGreater)
+    private static ReadOnlyMemory<byte> GetFirstKey(Node node)
     {
-        if (node.IsLeaf)
+        while (!node.IsLeaf)
         {
-            var leaf = (LeafNode)node;
-            int pos = BinarySearch(leaf.Keys, key);
+            node = ((InternalNode)node).Children[0];
+        }
 
-            if (pos >= 0)
+        var leaf = (LeafNode)node;
+        return leaf.Keys[0];
+    }
+
+    private static void FixChildParentIndices(InternalNode node, int startIndex)
+    {
+        for (int i = startIndex; i < node.Children.Count; i++)
+        {
+            node.Children[i].Parent = node;
+            node.Children[i].ParentIndex = i;
+        }
+    }
+
+    private static void UpdateAncestorsFirstKey(Node node)
+    {
+        while (node.Parent != null)
+        {
+            var parent = node.Parent;
+            var idx = node.ParentIndex;
+
+            if (idx > 0)
             {
-                if (onlyGreater)
-                {
-                    pos++;
-                }
-
-                if (pos < leaf.Keys.Count)
-                    return (leaf.Keys[pos], leaf.Values[pos], false);
-
-                if (leaf.Next != null && leaf.Next.Keys.Count > 0)
-                    return (leaf.Next.Keys[0], leaf.Next.Values[0], false);
-
-                return (default, default, true);
+                parent.Keys[idx - 1] = GetFirstKey(node);
             }
 
-            pos = ~pos;
-
-            if (pos < leaf.Keys.Count)
-                return (leaf.Keys[pos], leaf.Values[pos], false);
-
-            if (leaf.Next != null && leaf.Next.Keys.Count > 0)
-                return (leaf.Next.Keys[0], leaf.Next.Values[0], false);
-
-            return (default, default, true);
+            node = parent;
         }
-
-        var internalNode = (InternalNode)node;
-        int childIndex = BinarySearch(internalNode.Keys, key);
-        if (childIndex >= 0)
-            childIndex++;
-        else
-            childIndex = ~childIndex;
-
-        var res = SearchGreaterOrEqualsThan(internalNode.Children[childIndex], key, onlyGreater);
-        if (!res.didNotFindGreater)
-            return res;
-
-        childIndex++;
-        if (internalNode.Children.Count > childIndex)
-        {
-            return SearchGreaterOrEqualsThan(internalNode.Children[childIndex], key, onlyGreater);
-        }
-
-        return (default, default, true);
     }
 
     public Cursor CreateCursor() => new(this);
@@ -418,8 +439,9 @@ public sealed class BPlusTree
     public sealed class Cursor
     {
         private readonly BPlusTree _tree;
-        private ReadOnlyMemory<byte> _key;
-        private ReadOnlyMemory<byte> _value;
+        private LeafNode? _leaf;
+        private int _index;
+        private bool _valid;
 
         public Cursor(BPlusTree tree)
         {
@@ -428,31 +450,215 @@ public sealed class BPlusTree
 
         public ResultCode SetRange(ReadOnlySpan<byte> inputKey)
         {
-            (_key, _value, var didNotFind) = _tree.SearchGreaterOrEqualsThan(_tree._root, inputKey, onlyGreater: false);
-            return didNotFind ? ResultCode.NotFound : ResultCode.Success;
+            (_leaf, _index, _valid) = _tree.FindFirstAtOrAfter(inputKey);
+            return _valid ? ResultCode.Success : ResultCode.NotFound;
         }
 
         public CursorResult GetCurrent()
         {
-            return new CursorResult(ResultCode.Success, _key.Span, _value.Span);
+            if (!_valid || _leaf == null)
+                return new CursorResult(ResultCode.NotFound, ReadOnlySpan<byte>.Empty, ReadOnlySpan<byte>.Empty);
+
+            return new CursorResult(ResultCode.Success, _leaf.Keys[_index].Span, _leaf.Values[_index].Span);
         }
 
         public CursorResult Next()
         {
-            var (k, v, didNotFind) = _tree.SearchGreaterOrEqualsThan(_tree._root, _key.Span, onlyGreater: true);
-
-            if (didNotFind)
+            if (!_valid || _leaf == null)
                 return new CursorResult(ResultCode.NotFound, ReadOnlySpan<byte>.Empty, ReadOnlySpan<byte>.Empty);
 
-            _key = k;
-            _value = v;
+            _index++;
+            if (_index < _leaf.Keys.Count)
+                return GetCurrent();
 
-            return new CursorResult(ResultCode.Success, _key.Span, _value.Span);
+            var nextLeaf = _leaf.Next;
+            while (nextLeaf != null && nextLeaf.Keys.Count == 0)
+            {
+                nextLeaf = nextLeaf.Next;
+            }
+
+            if (nextLeaf == null)
+            {
+                _valid = false;
+                _leaf = null;
+                _index = 0;
+                return new CursorResult(ResultCode.NotFound, ReadOnlySpan<byte>.Empty, ReadOnlySpan<byte>.Empty);
+            }
+
+            _leaf = nextLeaf;
+            _index = 0;
+            return GetCurrent();
         }
 
         public ResultCode Delete()
         {
-            return _tree.Delete(_key.Span);
+            if (!_valid || _leaf == null)
+                return ResultCode.NotFound;
+
+            var leaf = _leaf;
+
+            leaf.Keys.RemoveAt(_index);
+            leaf.Values.RemoveAt(_index);
+
+            if (leaf.Keys.Count == 0)
+            {
+                var next = leaf.Next;
+                while (next != null && next.Keys.Count == 0)
+                    next = next.Next;
+
+                _tree.RemoveEmptyLeaf(leaf);
+
+                if (next == null)
+                {
+                    _valid = false;
+                    _leaf = null;
+                    _index = 0;
+                    return ResultCode.Success;
+                }
+
+                _leaf = next;
+                _index = 0;
+                _valid = true;
+                return ResultCode.Success;
+            }
+
+            if (_index == 0)
+            {
+                UpdateAncestorsFirstKey(leaf);
+            }
+
+            if (_index >= leaf.Keys.Count)
+            {
+                var next = leaf.Next;
+                while (next != null && next.Keys.Count == 0)
+                    next = next.Next;
+
+                if (next == null)
+                {
+                    _valid = false;
+                    _leaf = null;
+                    _index = 0;
+                    return ResultCode.Success;
+                }
+
+                _leaf = next;
+                _index = 0;
+                _valid = true;
+                return ResultCode.Success;
+            }
+
+            _leaf = leaf;
+            _valid = true;
+            return ResultCode.Success;
         }
+    }
+
+    private (LeafNode? leaf, int index, bool found) FindFirstAtOrAfter(ReadOnlySpan<byte> key)
+    {
+        var node = _root;
+        while (!node.IsLeaf)
+        {
+            var internalNode = (InternalNode)node;
+            int childIndex = BinarySearch(internalNode.Keys, key);
+            if (childIndex >= 0)
+                childIndex++;
+            else
+                childIndex = ~childIndex;
+
+            node = internalNode.Children[childIndex];
+        }
+
+        var leaf = (LeafNode)node;
+
+        while (true)
+        {
+            int pos = BinarySearch(leaf.Keys, key);
+            if (pos < 0)
+                pos = ~pos;
+
+            if (pos < leaf.Keys.Count)
+                return (leaf, pos, true);
+
+            leaf = leaf.Next;
+            while (leaf != null && leaf.Keys.Count == 0)
+                leaf = leaf.Next;
+
+            if (leaf == null)
+                return (null, 0, false);
+        }
+    }
+
+    private void RemoveEmptyLeaf(LeafNode leaf)
+    {
+        if (leaf.Prev != null)
+            leaf.Prev.Next = leaf.Next;
+        if (leaf.Next != null)
+            leaf.Next.Prev = leaf.Prev;
+
+        var parent = leaf.Parent;
+        if (parent == null)
+        {
+            // Root leaf.
+            _root = new LeafNode();
+            return;
+        }
+
+        int childIndex = leaf.ParentIndex;
+
+        parent.Children.RemoveAt(childIndex);
+        if (childIndex < parent.Keys.Count)
+            parent.Keys.RemoveAt(childIndex);
+        else if (childIndex > 0)
+            parent.Keys.RemoveAt(childIndex - 1);
+
+        FixChildParentIndices(parent, childIndex);
+        RefreshInternalSeparators(parent, Math.Max(0, childIndex - 1));
+
+        RemoveEmptyInternalIfNeeded(parent);
+    }
+
+    private void RemoveEmptyInternalIfNeeded(InternalNode node)
+    {
+        if (node.Children.Count != 0)
+        {
+            if (node.Parent == null && node.Children.Count == 1)
+            {
+                _root = node.Children[0];
+                _root.Parent = null;
+                _root.ParentIndex = 0;
+            }
+
+            return;
+        }
+
+        var parent = node.Parent;
+        if (parent == null)
+        {
+            _root = new LeafNode();
+            return;
+        }
+
+        int idx = node.ParentIndex;
+        parent.Children.RemoveAt(idx);
+        if (idx < parent.Keys.Count)
+            parent.Keys.RemoveAt(idx);
+        else if (idx > 0)
+            parent.Keys.RemoveAt(idx - 1);
+
+        FixChildParentIndices(parent, idx);
+        RefreshInternalSeparators(parent, Math.Max(0, idx - 1));
+
+        RemoveEmptyInternalIfNeeded(parent);
+    }
+
+    private static void RefreshInternalSeparators(InternalNode node, int startKeyIndex)
+    {
+        // Invariant: node.Keys[i] == first key of node.Children[i+1]
+        for (int i = startKeyIndex; i < node.Keys.Count; i++)
+        {
+            node.Keys[i] = GetFirstKey(node.Children[i + 1]);
+        }
+
+        UpdateAncestorsFirstKey(node);
     }
 }
