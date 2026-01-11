@@ -1,10 +1,18 @@
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Shared.Database;
+using Shared.Utils;
 
 namespace Tests;
 
 public class BPlusTreeTests
 {
-    private static byte[] B(params byte[] x) => x;
+    private Arena _arena = new Arena(200);
+
+    private Slice<byte> B(params ReadOnlySpan<byte> x)
+    {
+        return _arena.AllocateSlice(x);
+    }
 
     [Fact]
     public void Insert_And_Search_Single_Key()
@@ -33,8 +41,8 @@ public class BPlusTreeTests
     {
         var tree = new BPlusTree(branchingFactor: 4);
 
-        for (int i = 0; i < 50; i++)
-            tree.Put([(byte)i], [(byte)(i + 1)]);
+        for (byte i = 0; i < 50; i++)
+            tree.Put(B(i), B((byte)(i + 1)));
 
         for (int i = 0; i < 50; i++)
             AssertBytes.Equal(new[] { (byte)(i + 1) }, tree.Get([(byte)i]).Value);
@@ -46,7 +54,7 @@ public class BPlusTreeTests
         var tree = new BPlusTree(branchingFactor: 4);
 
         for (int i = 50; i >= 0; i--)
-            tree.Put([(byte)i], [(byte)(i + 1)]);
+            tree.Put(B((byte)i), B((byte)(i + 1)));
 
         for (int i = 50; i >= 0; i--)
             AssertBytes.Equal(new[] { (byte)(i + 1) }, tree.Get([(byte)i]).Value);
@@ -58,7 +66,7 @@ public class BPlusTreeTests
         var tree = new BPlusTree(branchingFactor: 3);
 
         for (int i = 0; i < 200; i++)
-            tree.Put([(byte)i], [(byte)(i * 2)]);
+            tree.Put(B((byte)i), B((byte)(i * 2)));
 
         for (int i = 0; i < 200; i++)
             AssertBytes.Equal(new[] { (byte)(i * 2) }, tree.Get([(byte)i]).Value);

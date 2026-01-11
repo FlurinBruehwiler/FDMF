@@ -2,6 +2,7 @@ using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
+using Shared.Utils;
 
 
 namespace Shared.Database;
@@ -40,11 +41,13 @@ public sealed class DbSession : IDisposable
     public TransactionalKvStore.Cursor Cursor;
     public TransactionalKvStore Store;
     public Environment Environment;
+    public Arena Arena;
     public bool IsReadOnly { get; }
 
     public DbSession(Environment environment, bool readOnly = false)
     {
-        Store = new TransactionalKvStore(environment.LightningEnvironment, environment.ObjectDb, readOnly: readOnly);
+        Arena = new Arena(100_000);
+        Store = new TransactionalKvStore(environment.LightningEnvironment, environment.ObjectDb, Arena, readOnly: readOnly);
         Cursor = Store.CreateCursor();
         Environment = environment;
         IsReadOnly = readOnly;
@@ -61,25 +64,23 @@ public sealed class DbSession : IDisposable
 
         using (var writeTransaction = Environment.LightningEnvironment.BeginTransaction())
         {
-            var commitId = History.CreateCommitId();
             var userId = Guid.NewGuid();
             var timestampUtc = DateTime.UtcNow;
 
-            using var historyLease = History.WriteCommit(Environment, writeTransaction, Store.ChangeSet!, commitId, timestampUtc, userId);
+            History.WriteCommit(Arena, Environment, writeTransaction, Store.ChangeSet!, timestampUtc, userId);
 
             Searcher.UpdateSearchIndex(Environment, writeTransaction, Store.ChangeSet!);
  
             Store.Commit(writeTransaction);
  
             writeTransaction.Commit();
- 
         }
 
         Cursor.Dispose();
         Store.Dispose();
 
         // reset the store/cursor to a fresh read view
-        Store = new TransactionalKvStore(Environment.LightningEnvironment, Environment.ObjectDb);
+        Store = new TransactionalKvStore(Environment.LightningEnvironment, Environment.ObjectDb, Arena);
         Cursor = Store.CreateCursor();
     }
 

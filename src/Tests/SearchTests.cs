@@ -5,10 +5,9 @@ using Environment = Shared.Environment;
 
 namespace Tests;
 
-[CollectionDefinition(DatabaseCollection.DatabaseCollectionName)]
+[Collection(DatabaseCollection.DatabaseCollectionName)]
 public class SearchTests
 {
-
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

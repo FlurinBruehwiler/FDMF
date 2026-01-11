@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Buffers.Binary;
 using System.Runtime.InteropServices;
 using LightningDB;
+using Shared.Utils;
 
 namespace Shared.Database;
 
@@ -104,47 +105,88 @@ public static class History
     // Commit record layout (binary, no per-field serialization overhead):
     // [version:1][timestampUtcTicks:int64][userIdGuidLE:16][objectCount:int32]
     // repeated object blocks:
-    //   [objIdGuidLE:16][eventCount:int32][events...]
+    //   [objIdGuid:16][eventCount:int32][events...]
     // event formats:
-    //   ObjCreated: [type:1][typIdGuidLE:16]
-    //   ObjDeleted: [type:1]
-    //   AsoAdded/AsoRemoved: [type:1][fldAIdGuidLE:16][objBIdGuidLE:16][fldBIdGuidLE:16]
-    //   FldChanged: [type:1][fldIdGuidLE:16][oldOrigLen:int32][oldStoredLen:int32][oldBytes][newOrigLen:int32][newStoredLen:int32][newBytes]
+    //   ObjCreated/Deleted: [type:1][typIdGuidLE:16]
+    //   AsoAdded/AsoRemoved: [type:1][fldAIdGuid:16][objBIdGuid:16][fldBIdGuid:16]
+    //   FldChanged: [type:1][fldIdGuid:16][oldOrigLen:int32][oldStoredLen:int32][oldBytes][newOrigLen:int32][newStoredLen:int32][newBytes]
     //
     // Notes:
     // - HistoryDb commit keys are UUIDv7 bytes in big-endian (sortable).
     // - Payload GUIDs are written in little-endian to avoid conversions on little-endian machines.
     // - HistoryObjIndexDb values are commitId bytes (big-endian) so dupsort keeps them time-ordered.
 
-    public static Guid CreateCommitId() => Guid.CreateVersion7();
 
-    public static PooledLease WriteCommit(
+    unsafe struct CommitHeader
+    {
+        public byte Version;
+        public long UtcTimestamp;
+        public Guid UserId;
+
+        public ObjBlockHeader* First;
+    }
+
+    unsafe struct ObjBlockHeader
+    {
+        public Guid ObjId;
+
+        public CommitEvent* Event;
+
+        public ObjBlockHeader* Next;
+    }
+
+    unsafe struct CommitEvent
+    {
+        public HistoryEventType Type;
+        public void* Data;
+        public CommitEvent* Next;
+    }
+
+    unsafe struct FldCommitEvent
+    {
+        public Guid FldId;
+
+        public byte* OldData;
+        public int OldDataLen;
+
+        public byte* NewData;
+        public int NewDataLen;
+    }
+
+    struct ObjCommitEvent
+    {
+        public Guid TypId;
+    }
+
+    struct AsoCommitEvent
+    {
+        public Guid FldIdA;
+        public Guid FldIdB;
+        public Guid ObjIdB;
+    }
+
+    public static unsafe void WriteCommit(
+        Arena transactionArena,
         Environment environment,
         LightningTransaction writeTransaction,
         BPlusTree changeSet,
-        Guid commitId,
         DateTime timestampUtc,
-        Guid userId,
-        int maxStringBytes = 256)
+        Guid userId)
     {
-        Span<byte> commitKey = stackalloc byte[16];
-        WriteGuidBigEndian(commitId, commitKey);
+        var header = transactionArena.Allocate(new CommitHeader
+        {
+            Version = RecordVersion,
+            UtcTimestamp = timestampUtc.ToUniversalTime().Ticks,
+            UserId = userId,
+        });
 
-        Span<byte> guidScratch = stackalloc byte[16];
-        var writer = new PooledBufferWriter(initialCapacity: 16 * 1024, guidScratch);
-
-        // Header
-        writer.WriteByte(RecordVersion);
-        writer.WriteInt64(timestampUtc.ToUniversalTime().Ticks);
-        writer.WriteGuidLittleEndian(userId);
-        int objectCountOffset = writer.ReserveInt32();
-
-        int objectCount = 0;
+        var commitKey = Guid.CreateVersion7();
 
         Guid currentObjId = Guid.Empty;
         bool hasCurrentObj = false;
-        int currentObjEventCount = 0;
-        int currentObjEventCountOffset = 0;
+
+        ObjBlockHeader* currentObjBlockHeader = null;
+
         bool currentObjDeleted = false;
 
         var changeCursor = changeSet.CreateCursor();
@@ -152,10 +194,11 @@ public static class History
         startKey[0] = 0;
         startKey[1] = 0;
 
-        Span<byte> objKey = stackalloc byte[16];
+        
 
         if (changeCursor.SetRange(startKey) == ResultCode.Success)
         {
+            //loop over the changes, they are already grouped by obj
             do
             {
                 var (_, keyWithFlag, value) = changeCursor.GetCurrent();
@@ -170,26 +213,23 @@ public static class History
 
                 var objId = MemoryMarshal.Read<Guid>(key);
 
+                //write obj block header if needed
                 if (!hasCurrentObj || objId != currentObjId)
                 {
-                    if (hasCurrentObj)
-                    {
-                        writer.PatchInt32(currentObjEventCountOffset, currentObjEventCount);
-                        objectCount++;
-                    }
+                    header->ObjCount++;
 
                     currentObjId = objId;
                     hasCurrentObj = true;
-                    currentObjEventCount = 0;
                     currentObjDeleted = false;
 
                     // Object block header
-                    writer.WriteGuidLittleEndian(objId);
-                    currentObjEventCountOffset = writer.ReserveInt32();
+                    currentObjBlockHeader = transactionArena.Allocate(new ObjBlockHeader
+                    {
+                        ObjId = objId
+                    });
 
                     // objId -> commitId index
-                    WriteGuidLittleEndian(objId, objKey);
-                    writeTransaction.Put(environment.HistoryObjIndexDb, objKey, commitKey);
+                    writeTransaction.Put(environment.HistoryObjIndexDb, objId.AsSpan(), commitKey.AsSpan());
                 }
 
                 // OBJ
@@ -197,18 +237,23 @@ public static class History
                 {
                     if (flag == ValueFlag.AddModify)
                     {
-                        if (value.Length >= 1 + 16)
+                        transactionArena.Allocate(new CommitEvent
                         {
-                            writer.WriteByte((byte)HistoryEventType.ObjCreated);
-                            writer.WriteGuidLittleEndian(MemoryMarshal.Read<Guid>(value.Slice(1)));
-                            currentObjEventCount++;
-                        }
+                            Type = HistoryEventType.ObjCreated,
+                            Data = transactionArena.Allocate(new ObjCommitEvent
+                            {
+                                TypId = MemoryMarshal.Read<Guid>(value)
+                            })
+                        });
                     }
                     else if (flag == ValueFlag.Delete)
                     {
-                        writer.WriteByte((byte)HistoryEventType.ObjDeleted);
+                        transactionArena.Allocate(new CommitEvent
+                        {
+                            Type = HistoryEventType.ObjDeleted,
+                        });
+
                         currentObjDeleted = true;
-                        currentObjEventCount++;
                     }
 
                     continue;
@@ -227,10 +272,11 @@ public static class History
 
                     var fldId = MemoryMarshal.Read<Guid>(key.Slice(16));
 
-                    writer.WriteByte((byte)HistoryEventType.FldChanged);
-                    writer.WriteGuidLittleEndian(fldId);
-
-                    var dataType = environment.Model.FieldsById.TryGetValue(fldId, out var fldDef) ? fldDef.DataType : (FieldDataType?)null;
+                    var fldCommitEvent = transactionArena.Allocate(new FldCommitEvent
+                    {
+                        Type = HistoryEventType.FldChanged,
+                        FldId = fldId
+                    });
 
                     // Old payload
                     var (oldRes, _, oldVal) = writeTransaction.Get(environment.ObjectDb, key);
@@ -242,65 +288,50 @@ public static class History
                             oldPayload = s.Slice(1);
                     }
 
-                    WriteValueBlob(ref writer, oldPayload, dataType, maxStringBytes);
+                    fldCommitEvent->OldLen = oldPayload.Length;
+                    transactionArena.AllocateSlice(oldPayload);
 
                     // New payload
+                    ReadOnlySpan<byte> newValue = ReadOnlySpan<byte>.Empty;
                     if (flag == ValueFlag.AddModify)
                     {
                         // changeset value is [ValueTyp][payload]
-                        ReadOnlySpan<byte> newPayload = value.Length > 1 ? value.Slice(1) : ReadOnlySpan<byte>.Empty;
-                        WriteValueBlob(ref writer, newPayload, dataType, maxStringBytes);
-                    }
-                    else
-                    {
-                        // Delete => missing/default
-                        WriteValueBlob(ref writer, ReadOnlySpan<byte>.Empty, dataType, maxStringBytes);
+                        newValue = value.Length > 1 ? value.Slice(1) : ReadOnlySpan<byte>.Empty;
                     }
 
-                    currentObjEventCount++;
+                    fldCommitEvent->NewLen = newValue.Length;
+                    transactionArena.AllocateSlice(newValue);
+
+                    currentObjBlockHeader->EventCount++;
                     continue;
                 }
 
                 // ASO
                 if (key.Length == 64)
                 {
-                    var fldAId = MemoryMarshal.Read<Guid>(key.Slice(16));
-                    var objBId = MemoryMarshal.Read<Guid>(key.Slice(32));
-                    var fldBId = MemoryMarshal.Read<Guid>(key.Slice(48));
+                    transactionArena.Allocate(new AsoCommitEvent
+                    {
+                        Type = flag == ValueFlag.AddModify ? HistoryEventType.AsoAdded : HistoryEventType.AsoRemoved,
+                        FldIdA = MemoryMarshal.Read<Guid>(key.Slice(16)),
+                        FldIdB = MemoryMarshal.Read<Guid>(key.Slice(48)),
+                        ObjIdB = MemoryMarshal.Read<Guid>(key.Slice(32))
+                    });
 
-                    writer.WriteByte((byte)(flag == ValueFlag.AddModify ? HistoryEventType.AsoAdded : HistoryEventType.AsoRemoved));
-                    writer.WriteGuidLittleEndian(fldAId);
-                    writer.WriteGuidLittleEndian(objBId);
-                    writer.WriteGuidLittleEndian(fldBId);
-                    currentObjEventCount++;
+                    currentObjBlockHeader->EventCount++;
                 }
 
             } while (changeCursor.Next().ResultCode == ResultCode.Success);
         }
 
-        if (hasCurrentObj)
-        {
-            writer.PatchInt32(currentObjEventCountOffset, currentObjEventCount);
-            objectCount++;
-        }
-
-        writer.PatchInt32(objectCountOffset, objectCount);
-
         // Write commit record
-        writeTransaction.Put(environment.HistoryDb, commitKey, writer.Written);
-
-        // Keep the underlying buffer alive until the LMDB write transaction commits.
-        return writer.DetachLease();
+        writeTransaction.Put(environment.HistoryDb, commitKey.AsSpan(), transactionArena.GetRegion((byte*)header));
     }
 
     public static IEnumerable<Guid> GetCommitsForObject(Environment environment, LightningTransaction readTransaction, Guid objId)
     {
         using var cursor = readTransaction.CreateCursor(environment.HistoryObjIndexDb);
 
-        Span<byte> objKey = stackalloc byte[16];
-        WriteGuidLittleEndian(objId, objKey);
-
-        if (cursor.SetKey(objKey).resultCode != MDBResultCode.Success)
+        if (cursor.SetKey(objId.AsSpan()).resultCode != MDBResultCode.Success)
             yield break;
 
         do
@@ -312,10 +343,7 @@ public static class History
 
     public static HistoryCommit? TryGetCommit(Environment environment, LightningTransaction readTransaction, Guid commitId)
     {
-        Span<byte> commitKey = stackalloc byte[16];
-        WriteGuidBigEndian(commitId, commitKey);
-
-        var (rc, _, value) = readTransaction.Get(environment.HistoryDb, commitKey);
+        var (rc, _, value) = readTransaction.Get(environment.HistoryDb, commitId.AsSpan());
         if (rc != MDBResultCode.Success)
             return null;
 
@@ -347,40 +375,6 @@ public static class History
         } while (cursor.Next().resultCode == MDBResultCode.Success);
     }
 
-    private static void WriteValueBlob(ref PooledBufferWriter writer, ReadOnlySpan<byte> payload, FieldDataType? dataType, int maxStringBytes)
-    {
-        int originalLen = payload.Length;
-        int storedLen = originalLen;
-
-        if (dataType == FieldDataType.String && storedLen > maxStringBytes)
-        {
-            storedLen = maxStringBytes;
-            if ((storedLen & 1) == 1)
-                storedLen--;
-        }
-
-        writer.WriteInt32(originalLen);
-        writer.WriteInt32(storedLen);
-        if (storedLen > 0)
-        {
-            writer.WriteBytes(payload.Slice(0, storedLen));
-        }
-    }
-
-    private static void WriteGuidBigEndian(Guid guid, Span<byte> destination)
-    {
-        guid.TryWriteBytes(destination, bigEndian: true, out _);
-    }
-
-    private static void WriteGuidLittleEndian(Guid guid, Span<byte> destination)
-    {
-        guid.TryWriteBytes(destination, bigEndian: false, out _);
-    }
-
-    private static Guid ReadGuidBigEndian(ReadOnlySpan<byte> source) => new(source, bigEndian: true);
-
-    private static Guid ReadGuidLittleEndian(ReadOnlySpan<byte> source) => new(source);
-
     private static HistoryCommit DecodeCommitValue(Guid commitId, ReadOnlySpan<byte> data)
     {
         int offset = 0;
@@ -389,19 +383,15 @@ public static class History
         if (version != RecordVersion)
             throw new InvalidOperationException($"Unsupported history record version {version}");
 
-        long ticks = BinaryPrimitives.ReadInt64LittleEndian(data.Slice(offset, 8));
-        offset += 8;
+        var header = MemoryMarshal.Read<CommitHeader>(data);
 
-        var userId = ReadGuidLittleEndian(data.Slice(offset, 16));
-        offset += 16;
 
-        int objectCount = BinaryPrimitives.ReadInt32LittleEndian(data.Slice(offset, 4));
-        offset += 4;
+        Dictionary<Guid, List<HistoryEvent>> eventsByObj = new(header.ObjCount);
 
-        Dictionary<Guid, List<HistoryEvent>> eventsByObj = new(objectCount);
-
-        for (int i = 0; i < objectCount; i++)
+        for (int i = 0; i < header.ObjCount; i++)
         {
+
+
             var objId = ReadGuidLittleEndian(data.Slice(offset, 16));
             offset += 16;
 

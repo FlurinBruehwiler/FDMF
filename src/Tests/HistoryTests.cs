@@ -7,7 +7,7 @@ using Environment = Shared.Environment;
 
 namespace Tests;
 
-[CollectionDefinition(DatabaseCollection.DatabaseCollectionName)]
+[Collection(DatabaseCollection.DatabaseCollectionName)]
 public class HistoryTests
 {
     [Fact]

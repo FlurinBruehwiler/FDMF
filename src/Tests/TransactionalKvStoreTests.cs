@@ -1,9 +1,10 @@
 using LightningDB;
 using Shared.Database;
+using Shared.Utils;
 
 namespace Tests;
 
-[CollectionDefinition(DatabaseCollection.DatabaseCollectionName)]
+[Collection(DatabaseCollection.DatabaseCollectionName)]
 public class TransactionalKvStoreTests
 {
     [Fact]
@@ -22,7 +23,7 @@ public class TransactionalKvStoreTests
         }
 
         using var dbHandle = db;
-        using var store = new TransactionalKvStore(env, db, readOnly: true);
+        using var store = new TransactionalKvStore(env, db, new Arena(1000), readOnly: true);
 
         Assert.Equal(ResultCode.Success, store.Get([1], out var value));
         AssertBytes.Equal([(byte)2], value);
@@ -52,7 +53,7 @@ public class TransactionalKvStoreTests
         }
 
         using var dbHandle = db;
-        using var store = new TransactionalKvStore(env, db);
+        using var store = new TransactionalKvStore(env, db, new Arena(1000));
 
         Assert.Equal(ResultCode.Success, store.Get([1], out var value));
         AssertBytes.Equal([(byte)2], value);
@@ -73,7 +74,7 @@ public class TransactionalKvStoreTests
         }
 
         using var dbHandle = db;
-        using var store = new TransactionalKvStore(env, db);
+        using var store = new TransactionalKvStore(env, db, new Arena(1000));
 
         store.Put([3], [6]);
 
@@ -97,7 +98,7 @@ public class TransactionalKvStoreTests
         }
 
         using var dbHandle = db;
-        using var store = new TransactionalKvStore(env, db);
+        using var store = new TransactionalKvStore(env, db, new Arena(1000));
 
         store.Put([1], [3]);
 
@@ -121,7 +122,7 @@ public class TransactionalKvStoreTests
         }
 
         using var dbHandle = db;
-        using var store = new TransactionalKvStore(env, db);
+        using var store = new TransactionalKvStore(env, db, new Arena(1000));
 
         store.Delete([1]);
 
@@ -144,7 +145,7 @@ public class TransactionalKvStoreTests
         }
 
         using var dbHandle = db;
-        using var store = new TransactionalKvStore(env, db);
+        using var store = new TransactionalKvStore(env, db, new Arena(1000));
 
         store.Delete([1]);
 
@@ -172,7 +173,7 @@ public class TransactionalKvStoreTests
         }
 
         using var dbHandle = db;
-        using var store = new TransactionalKvStore(env, db);
+        using var store = new TransactionalKvStore(env, db, new Arena(1000));
 
         store.Put([1], [3]);
 
@@ -200,7 +201,7 @@ public class TransactionalKvStoreTests
         }
 
         using var dbHandle = db;
-        using var store = new TransactionalKvStore(env, db);
+        using var store = new TransactionalKvStore(env, db, new Arena(1000));
 
         store.Put([2], [3]);
 
@@ -228,7 +229,7 @@ public class TransactionalKvStoreTests
         }
 
         using var dbHandle = db;
-        using var store = new TransactionalKvStore(env, db);
+        using var store = new TransactionalKvStore(env, db, new Arena(1000));
 
         store.Put([1], [2]);
 
@@ -256,7 +257,7 @@ public class TransactionalKvStoreTests
         }
 
         using var dbHandle = db;
-        using var store = new TransactionalKvStore(env, db);
+        using var store = new TransactionalKvStore(env, db, new Arena(1000));
 
         store.Put([1], [3]);
 
@@ -287,7 +288,7 @@ public class TransactionalKvStoreTests
         }
 
         using var dbHandle = db;
-        using var store = new TransactionalKvStore(env, db);
+        using var store = new TransactionalKvStore(env, db, new Arena(1000));
 
         store.Put([4], [8]);
         store.Put([5], [10]);
@@ -324,7 +325,7 @@ public class TransactionalKvStoreTests
         }
 
         using var dbHandle = db;
-        using var store = new TransactionalKvStore(env, db);
+        using var store = new TransactionalKvStore(env, db, new Arena(1000));
 
         store.Put([1], [1]);
         store.Put([2], [2]);
@@ -362,7 +363,7 @@ public class TransactionalKvStoreTests
         }
 
         using var dbHandle = db;
-        using var store = new TransactionalKvStore(env, db);
+        using var store = new TransactionalKvStore(env, db, new Arena(1000));
 
         store.Delete([5]);
 
@@ -394,7 +395,7 @@ public class TransactionalKvStoreTests
         }
 
         using var dbHandle = db;
-        using var store = new TransactionalKvStore(env, db);
+        using var store = new TransactionalKvStore(env, db, new Arena(1000));
 
         store.Delete([6]);
 
@@ -426,7 +427,7 @@ public class TransactionalKvStoreTests
         }
 
         using var dbHandle = db;
-        using var store = new TransactionalKvStore(env, db);
+        using var store = new TransactionalKvStore(env, db, new Arena(1000));
 
         store.Delete([4]);
 
@@ -458,7 +459,7 @@ public class TransactionalKvStoreTests
         }
 
         using var dbHandle = db;
-        using var store = new TransactionalKvStore(env, db);
+        using var store = new TransactionalKvStore(env, db, new Arena(1000));
 
         store.Delete([4]);
         store.Delete([5]);
@@ -487,7 +488,7 @@ public class TransactionalKvStoreTests
         }
 
         using var dbHandle = db;
-        using var store = new TransactionalKvStore(env, db);
+        using var store = new TransactionalKvStore(env, db, new Arena(1000));
 
         using var cursor = store.CreateCursor();
         cursor.SetRange([1]);
@@ -515,7 +516,7 @@ public class TransactionalKvStoreTests
         }
 
         using var dbHandle = db;
-        using var store = new TransactionalKvStore(env, db);
+        using var store = new TransactionalKvStore(env, db, new Arena(1000));
         store.Put([1], [1]);
 
         using var cursor = store.CreateCursor();
@@ -543,7 +544,7 @@ public class TransactionalKvStoreTests
         }
 
         using var dbHandle = db;
-        using var store = new TransactionalKvStore(env, db);
+        using var store = new TransactionalKvStore(env, db, new Arena(1000));
         store.Put([1], [9]);
 
         using var cursor = store.CreateCursor();

@@ -1,3 +1,5 @@
+using Shared.Utils;
+
 namespace Shared.Database;
 
 // A simple B+Tree implementation.
@@ -85,7 +87,7 @@ public sealed class BPlusTree
 
     private abstract class Node
     {
-        public List<ReadOnlyMemory<byte>> Keys = [];
+        public List<Slice<byte>> Keys = [];
         public InternalNode? Parent;
         public int ParentIndex;
         public abstract bool IsLeaf { get; }
@@ -99,7 +101,7 @@ public sealed class BPlusTree
 
     private sealed class LeafNode : Node
     {
-        public List<ReadOnlyMemory<byte>> Values = [];
+        public List<Slice<byte>> Values = [];
         public LeafNode? Next;
         public LeafNode? Prev;
         public override bool IsLeaf => true;
@@ -125,12 +127,12 @@ public sealed class BPlusTree
         _root = new LeafNode();
     }
 
-    public ResultCode Put(byte[] key, byte[] value)
-    {
-        return Put((ReadOnlyMemory<byte>)key, (ReadOnlyMemory<byte>)value);
-    }
+    // public ResultCode Put(byte[] key, byte[] value)
+    // {
+    //     return Put((ReadOnlyMemory<byte>)key, (ReadOnlyMemory<byte>)value);
+    // }
 
-    public ResultCode Put(ReadOnlyMemory<byte> key, ReadOnlyMemory<byte> value)
+    public ResultCode Put(Slice<byte> key, Slice<byte> value)
     {
         var split = InsertInternal(_root, key, value);
         if (split != null)
@@ -233,12 +235,12 @@ public sealed class BPlusTree
 
     private sealed class SplitResult
     {
-        public required ReadOnlyMemory<byte> Separator;
+        public required Slice<byte> Separator;
         public required Node Left;
         public required Node Right;
     }
 
-    private SplitResult? InsertInternal(Node node, ReadOnlyMemory<byte> key, ReadOnlyMemory<byte> value)
+    private SplitResult? InsertInternal(Node node, Slice<byte> key, Slice<byte> value)
     {
         if (node.IsLeaf)
         {
@@ -373,7 +375,7 @@ public sealed class BPlusTree
         return SearchExactInternal(internalNode.Children[childIndex], key);
     }
 
-    private int BinarySearch(List<ReadOnlyMemory<byte>> array, ReadOnlySpan<byte> value)
+    private int BinarySearch(List<Slice<byte>> array, ReadOnlySpan<byte> value)
     {
         int lo = 0;
         int hi = array.Count - 1;
@@ -398,7 +400,7 @@ public sealed class BPlusTree
         return ~lo;
     }
 
-    private static ReadOnlyMemory<byte> GetFirstKey(Node node)
+    private static Slice<byte> GetFirstKey(Node node)
     {
         while (!node.IsLeaf)
         {

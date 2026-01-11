@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using LightningDB;
+using Shared.Utils;
 
 namespace Shared.Database;
 
@@ -8,6 +9,7 @@ public sealed class TransactionalKvStore : IDisposable
 {
     public readonly LightningTransaction ReadTransaction;
     public readonly LightningDatabase Database;
+    private readonly Arena _arena;
     public readonly LightningEnvironment Environment;
 
     public bool IsReadOnly { get; }
@@ -15,20 +17,19 @@ public sealed class TransactionalKvStore : IDisposable
     // Flag is stored in the last byte of the key. The changeset tree uses a comparer that ignores that byte.
     public readonly BPlusTree? ChangeSet;
 
-    private readonly ByteArena? _arena;
     private byte[] _searchKeyBuffer = new byte[64];
 
-    public TransactionalKvStore(LightningEnvironment env, LightningDatabase database, bool readOnly = false)
+    public TransactionalKvStore(LightningEnvironment env, LightningDatabase database, Arena arena, bool readOnly = false)
     {
         ReadTransaction = env.BeginTransaction(TransactionBeginFlags.ReadOnly);
         Database = database;
+        _arena = arena;
         Environment = env;
         IsReadOnly = readOnly;
 
         if (!readOnly)
         {
             ChangeSet = new BPlusTree(comparer: BPlusTree.CompareIgnoreLastByte);
-            _arena = new ByteArena();
         }
     }
 
@@ -74,7 +75,6 @@ public sealed class TransactionalKvStore : IDisposable
         }
 
         ChangeSet!.Clear();
-        _arena!.Reset();
     }
 
     public ResultCode Put(ReadOnlySpan<byte> key, ReadOnlySpan<byte> value)
@@ -83,7 +83,7 @@ public sealed class TransactionalKvStore : IDisposable
             throw new InvalidOperationException("TransactionalKvStore is read-only");
 
         var keySlice = CopyKeyWithFlag(key, ValueFlag.AddModify);
-        var valueSlice = _arena!.Copy(value);
+        var valueSlice = _arena.AllocateSlice(value);
 
         return ChangeSet!.Put(keySlice, valueSlice);
     }
@@ -135,7 +135,7 @@ public sealed class TransactionalKvStore : IDisposable
         if (ReadTransaction.Get(Database, key).resultCode == MDBResultCode.Success)
         {
             var keySlice = CopyKeyWithFlag(key, ValueFlag.Delete);
-            ChangeSet!.Put(keySlice, ReadOnlyMemory<byte>.Empty);
+            ChangeSet!.Put(keySlice, Slice<byte>.Empty);
         }
         else
         {
@@ -157,12 +157,12 @@ public sealed class TransactionalKvStore : IDisposable
         };
     }
 
-    private ReadOnlyMemory<byte> CopyKeyWithFlag(ReadOnlySpan<byte> key, ValueFlag flag)
+    private Slice<byte> CopyKeyWithFlag(ReadOnlySpan<byte> key, ValueFlag flag)
     {
-        var mem = _arena!.Allocate(key.Length + 1, out var slice);
-        key.CopyTo(mem.Span);
+        var mem = _arena.AllocateSlice<byte>(key.Length + 1);
+        key.CopyTo(mem.AsSpan());
         mem.Span[^1] = (byte)flag;
-        return slice;
+        return mem;
     }
 
     private ReadOnlySpan<byte> CreateSearchKey(ReadOnlySpan<byte> key)
@@ -285,7 +285,7 @@ public sealed class TransactionalKvStore : IDisposable
             if (!currentFromChange)
             {
                 // Current came from base, so it definitely exists in base.
-                _store.ChangeSet!.Put(_store.CopyKeyWithFlag(currentKey, ValueFlag.Delete), ReadOnlyMemory<byte>.Empty);
+                _store.ChangeSet!.Put(_store.CopyKeyWithFlag(currentKey, ValueFlag.Delete), Slice<byte>.Empty);
 
                 BaseIsFinished = LightningCursor.Next().resultCode == MDBResultCode.NotFound;
 
@@ -309,7 +309,7 @@ public sealed class TransactionalKvStore : IDisposable
             if (baseHasSameKey)
             {
                 // Changeset entry shadows a base key -> final state should be Delete.
-                _store.ChangeSet!.Put(_store.CopyKeyWithFlag(currentKey, ValueFlag.Delete), ReadOnlyMemory<byte>.Empty);
+                _store.ChangeSet!.Put(_store.CopyKeyWithFlag(currentKey, ValueFlag.Delete), Slice<byte>.Empty);
 
                 // Skip the base key as well.
                 BaseIsFinished = LightningCursor.Next().resultCode == MDBResultCode.NotFound;
