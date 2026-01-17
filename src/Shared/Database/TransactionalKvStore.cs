@@ -160,7 +160,7 @@ public sealed class TransactionalKvStore : IDisposable
     private Slice<byte> CopyKeyWithFlag(ReadOnlySpan<byte> key, ValueFlag flag)
     {
         var mem = _arena.AllocateSlice<byte>(key.Length + 1);
-        key.CopyTo(mem.AsSpan());
+        key.CopyTo(mem.Span);
         mem.Span[^1] = (byte)flag;
         return mem;
     }

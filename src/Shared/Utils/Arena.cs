@@ -5,38 +5,74 @@ using Shared.Database;
 
 namespace Shared.Utils;
 
+public struct RelativePtr<T> where T : unmanaged
+{
+    public nint Offset;
+}
+
 public struct ArenaScope : IDisposable
 {
     public required Arena Arena;
     public required int Pos;
 
+    public unsafe RelativePtr<T> GetRelativePtr<T>(T* ptr) where T : unmanaged
+    {
+        return new RelativePtr<T>
+        {
+            Offset = (nint)ptr - ((nint)Arena.BasePtr + (nint)Pos)
+        };
+    }
+
     public void Dispose()
     {
         Arena.PopTo(Pos);
     }
+
+    public unsafe Slice<byte> GetAsSlice()
+    {
+        var start = Arena.BasePtr + Pos;
+        return new Slice<byte>(start, (int)((nint)Arena.BasePtr + (nint)Arena.Pos - (nint)start));
+    }
 }
+
 public sealed unsafe class Arena : IDisposable
 {
-    private byte* BasePtr;
-    private int Pos;
+    public byte* BasePtr;
+    public int Pos;
     private int Size;
+    private int Committed;
 
     public Arena(int capacityInBytes)
     {
         capacityInBytes = AlignToUpper(capacityInBytes, System.Environment.SystemPageSize);
         BasePtr = (byte*)VirtualAlloc(IntPtr.Zero, (nuint)capacityInBytes, AllocationType.Reserve, MemoryProtection.ReadWrite);
+
+        if (BasePtr == null)
+            throw new OutOfMemoryException();
+
         Pos = 0;
         Size = capacityInBytes;
+        Committed = 0;
     }
 
-    public ReadOnlySpan<byte> GetRegion(byte* start)
+    public Slice<byte> GetRegion(byte* start)
     {
-        return new ReadOnlySpan<byte>(start, (int)(BasePtr + Pos - (int)start));
+        return new Slice<byte>(start, (int)(BasePtr + Pos - (nint)start));
     }
 
     public void Reset()
     {
-        PopTo(0);
+        if (Committed > 0)
+        {
+            VirtualFree(
+                (nint)BasePtr,
+                (nuint)Committed,
+                FreeType.Decommit
+            );
+            Committed = 0;
+        }
+
+        Pos = 0;
     }
 
     public ArenaScope Scope()
@@ -51,7 +87,7 @@ public sealed unsafe class Arena : IDisposable
     public Slice<byte> AllocateSlice(ReadOnlySpan<byte> data)
     {
         var slice = AllocateSlice<byte>(data.Length);
-        data.CopyTo(slice.AsSpan());
+        data.CopyTo(slice.Span);
 
         return slice;
     }
@@ -61,8 +97,7 @@ public sealed unsafe class Arena : IDisposable
         var posAligned = AlignUpPow2(Pos, sizeof(void*));
         var newPos = posAligned + size;
 
-        if (newPos > Size)
-            throw new Exception("arena is full :(");
+        EnsureCapacity(newPos);
 
         Pos = newPos;
 
@@ -80,7 +115,9 @@ public sealed unsafe class Arena : IDisposable
 
     public unsafe T* Allocate<T>(T value) where T : unmanaged
     {
-        return (T*) Push(sizeof(T));
+        var v = (T*) Push(sizeof(T));
+        *v = value;
+        return v;
     }
 
     public unsafe Slice<T> AllocateSlice<T>(int count) where T : unmanaged
@@ -94,6 +131,31 @@ public sealed unsafe class Arena : IDisposable
             Items = ptr,
             Length = count
         };
+    }
+
+    private void EnsureCapacity(int requestedOffset)
+    {
+        if (requestedOffset <= Committed)
+            return;
+
+        int pageSize = System.Environment.SystemPageSize;
+
+        int newCommitSize = AlignToUpper(requestedOffset - Committed, pageSize);
+
+        if (Committed + newCommitSize > Size)
+            throw new OutOfMemoryException("Arena exceeded reserved size");
+
+        nint result = VirtualAlloc(
+            (nint)(BasePtr + Committed),
+            (nuint)newCommitSize,
+            AllocationType.Commit,
+            MemoryProtection.ReadWrite
+        );
+
+        if (result == 0)
+            throw new OutOfMemoryException();
+
+        Committed += newCommitSize;
     }
 
     public void Dispose()
@@ -114,7 +176,7 @@ public sealed unsafe class Arena : IDisposable
 
     //Interop -- Windows
     [DllImport("kernel32", EntryPoint = nameof(VirtualAlloc), SetLastError = true)]
-    private static extern IntPtr VirtualAlloc(IntPtr lpAddress, nuint dwSize, AllocationType flAllocationType, MemoryProtection flProtect);
+    public static extern IntPtr VirtualAlloc(IntPtr lpAddress, UIntPtr dwSize, AllocationType flAllocationType, MemoryProtection flProtect);
 
     [DllImport("kernel32", EntryPoint = nameof(VirtualFree), SetLastError = true)]
     private static extern int VirtualFree(IntPtr lpAddress, nuint dwSize, FreeType dwFreeType);
@@ -123,7 +185,7 @@ public sealed unsafe class Arena : IDisposable
     private static extern int VirtualProtect(IntPtr lpAddress, nuint dwSize, MemoryProtection newProtect, out MemoryProtection oldProtect);
 
     [Flags]
-    private enum AllocationType
+    public enum AllocationType
     {
         Commit = 0x1000,
         Reserve = 0x2000,
@@ -137,7 +199,7 @@ public sealed unsafe class Arena : IDisposable
     }
 
     [Flags]
-    enum MemoryProtection
+    public enum MemoryProtection
     {
         Execute = 0x10,
         ExecuteRead = 0x20,

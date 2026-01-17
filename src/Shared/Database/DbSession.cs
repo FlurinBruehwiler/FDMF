@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using Shared.Utils;
 
@@ -557,19 +556,6 @@ public struct ObjValue
 
     [FieldOffset(1)]
     public Guid TypId;
-}
-
-//todo readd the history feature
-public struct Change
-{
-    public ChangeType ChangeType;
-    public DateTime DateTime;
-    public Guid UserId;
-
-    public Guid ObjAId;
-    public Guid FldAId;
-    public Guid ObjBId;
-    public Guid FldBId;
 }
 
 public enum ResultCode

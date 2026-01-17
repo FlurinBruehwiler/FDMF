@@ -44,4 +44,4 @@ The Model is modeled like this:
     - Code (List/Hierarchy of documents)
     - StaticEntities
 
-The idea is to have to database schema, as normal data in the database. I'm not yet sure if this is a good idea.
+The idea is to have to database schema, as normal data in the database. I'm not yet sure if this is a good idea. 

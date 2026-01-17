@@ -59,6 +59,7 @@ public class Environment : IDisposable
             Flags = DatabaseOpenFlags.Create | DatabaseOpenFlags.DuplicatesSort,
         };
         customComparer.CompareWith(new CustomIndexComparer());
+
         var nonStringSearchIndex = lightningTransaction.OpenDatabase(name: "NonStringIndexDb", customComparer);
  
         var fieldPresenceIndex = lightningTransaction.OpenDatabase(name: "FieldPresenceIndexDb", new DatabaseConfiguration

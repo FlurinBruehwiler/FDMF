@@ -74,95 +74,53 @@ public sealed class HistoryCommit
 /// History storage:
 /// - Commit record stored in <see cref="Shared.Environment.HistoryDb"/> with key = UUIDv7 (big-endian bytes), enabling linear scan of commits.
 /// - Object index stored in <see cref="Shared.Environment.HistoryObjIndexDb"/> as dupsort: objId -> commitId (also time-ordered by UUIDv7 bytes).
-///
-/// Performance:
-/// - Write path avoids managed allocations by using ArrayPool-backed buffers and streaming encoding.
 /// </summary>
 public static class History
 {
-    public readonly struct PooledLease : IDisposable
-    {
-        private readonly byte[] _buffer;
-        private readonly int _length;
-
-        public PooledLease(byte[] buffer, int length)
-        {
-            _buffer = buffer;
-            _length = length;
-        }
-
-        public ReadOnlySpan<byte> Span => _buffer.AsSpan(0, _length);
-
-        public void Dispose()
-        {
-            if (_buffer.Length != 0)
-                ArrayPool<byte>.Shared.Return(_buffer);
-        }
-    }
-
     private const byte RecordVersion = 1;
 
-    // Commit record layout (binary, no per-field serialization overhead):
-    // [version:1][timestampUtcTicks:int64][userIdGuidLE:16][objectCount:int32]
-    // repeated object blocks:
-    //   [objIdGuid:16][eventCount:int32][events...]
-    // event formats:
-    //   ObjCreated/Deleted: [type:1][typIdGuidLE:16]
-    //   AsoAdded/AsoRemoved: [type:1][fldAIdGuid:16][objBIdGuid:16][fldBIdGuid:16]
-    //   FldChanged: [type:1][fldIdGuid:16][oldOrigLen:int32][oldStoredLen:int32][oldBytes][newOrigLen:int32][newStoredLen:int32][newBytes]
-    //
-    // Notes:
-    // - HistoryDb commit keys are UUIDv7 bytes in big-endian (sortable).
-    // - Payload GUIDs are written in little-endian to avoid conversions on little-endian machines.
-    // - HistoryObjIndexDb values are commitId bytes (big-endian) so dupsort keeps them time-ordered.
-
-
-    unsafe struct CommitHeader
+    struct CommitHeader
     {
         public byte Version;
         public long UtcTimestamp;
         public Guid UserId;
 
-        public ObjBlockHeader* First;
+        public RelativePtr<ObjBlockHeader> First;
     }
 
-    unsafe struct ObjBlockHeader
+    struct ObjBlockHeader
     {
         public Guid ObjId;
 
-        public CommitEvent* Event;
+        public RelativePtr<CommitEvent> FirstEvent;
 
-        public ObjBlockHeader* Next;
+        public RelativePtr<ObjBlockHeader> Next;
     }
 
-    unsafe struct CommitEvent
+    //This struct is way larger than it needs to be, we could do a bunch of things, like split it into multiple structs depending on the type.
+    //It was originally designed to be this way, that's why we have a next ptr, so that the entries can have different sizes.
+    //This struct get stored directly in the db, that's why it is important to keep it small
+    struct CommitEvent
     {
         public HistoryEventType Type;
-        public void* Data;
-        public CommitEvent* Next;
-    }
 
-    unsafe struct FldCommitEvent
-    {
+        // For field + assoc events
         public Guid FldId;
 
-        public byte* OldData;
-        public int OldDataLen;
+        // For assoc events
+        public Guid ObjBId;
+        public Guid FldBId;
 
-        public byte* NewData;
-        public int NewDataLen;
-    }
+        // For field events (decoded)
+        public RelativePtr<byte> OldValue;
+        public int OldValueLength;
+        public RelativePtr<byte> NewValue;
+        public int NewValueLength;
 
-    struct ObjCommitEvent
-    {
+        // For ObjCreated
         public Guid TypId;
-    }
 
-    struct AsoCommitEvent
-    {
-        public Guid FldIdA;
-        public Guid FldIdB;
-        public Guid ObjIdB;
+        public RelativePtr<CommitEvent> Next;
     }
 
     public static unsafe void WriteCommit(
@@ -173,6 +131,8 @@ public static class History
         DateTime timestampUtc,
         Guid userId)
     {
+        using var scope = transactionArena.Scope();
+
         var header = transactionArena.Allocate(new CommitHeader
         {
             Version = RecordVersion,
@@ -185,7 +145,8 @@ public static class History
         Guid currentObjId = Guid.Empty;
         bool hasCurrentObj = false;
 
-        ObjBlockHeader* currentObjBlockHeader = null;
+        RelativePtr<ObjBlockHeader>* nextObjHeaderPtrLocation = &header->First;
+        RelativePtr<CommitEvent>* nextCommitEventPtrLocation = null;
 
         bool currentObjDeleted = false;
 
@@ -193,8 +154,6 @@ public static class History
         Span<byte> startKey = stackalloc byte[2];
         startKey[0] = 0;
         startKey[1] = 0;
-
-        
 
         if (changeCursor.SetRange(startKey) == ResultCode.Success)
         {
@@ -216,17 +175,19 @@ public static class History
                 //write obj block header if needed
                 if (!hasCurrentObj || objId != currentObjId)
                 {
-                    header->ObjCount++;
-
                     currentObjId = objId;
                     hasCurrentObj = true;
                     currentObjDeleted = false;
 
                     // Object block header
-                    currentObjBlockHeader = transactionArena.Allocate(new ObjBlockHeader
+                    var o = transactionArena.Allocate(new ObjBlockHeader
                     {
                         ObjId = objId
                     });
+                    *nextObjHeaderPtrLocation = scope.GetRelativePtr(o);
+                    nextObjHeaderPtrLocation = &o->Next;
+
+                    nextCommitEventPtrLocation = &o->FirstEvent;
 
                     // objId -> commitId index
                     writeTransaction.Put(environment.HistoryObjIndexDb, objId.AsSpan(), commitKey.AsSpan());
@@ -237,21 +198,24 @@ public static class History
                 {
                     if (flag == ValueFlag.AddModify)
                     {
-                        transactionArena.Allocate(new CommitEvent
+                        var e = transactionArena.Allocate(new CommitEvent
                         {
                             Type = HistoryEventType.ObjCreated,
-                            Data = transactionArena.Allocate(new ObjCommitEvent
-                            {
-                                TypId = MemoryMarshal.Read<Guid>(value)
-                            })
+                            TypId = MemoryMarshal.Read<Guid>(value),
                         });
+
+                        *nextCommitEventPtrLocation = scope.GetRelativePtr(e);
+                        nextCommitEventPtrLocation = &e->Next;
                     }
                     else if (flag == ValueFlag.Delete)
                     {
-                        transactionArena.Allocate(new CommitEvent
+                        var e = transactionArena.Allocate(new CommitEvent
                         {
                             Type = HistoryEventType.ObjDeleted,
                         });
+
+                        *nextCommitEventPtrLocation = scope.GetRelativePtr(e);
+                        nextCommitEventPtrLocation = &e->Next;
 
                         currentObjDeleted = true;
                     }
@@ -272,11 +236,14 @@ public static class History
 
                     var fldId = MemoryMarshal.Read<Guid>(key.Slice(16));
 
-                    var fldCommitEvent = transactionArena.Allocate(new FldCommitEvent
+                    var e = transactionArena.Allocate(new CommitEvent
                     {
                         Type = HistoryEventType.FldChanged,
                         FldId = fldId
                     });
+
+                    *nextCommitEventPtrLocation = scope.GetRelativePtr(e);
+                    nextCommitEventPtrLocation = &e->Next;
 
                     // Old payload
                     var (oldRes, _, oldVal) = writeTransaction.Get(environment.ObjectDb, key);
@@ -288,8 +255,8 @@ public static class History
                             oldPayload = s.Slice(1);
                     }
 
-                    fldCommitEvent->OldLen = oldPayload.Length;
-                    transactionArena.AllocateSlice(oldPayload);
+                    e->OldValueLength = oldPayload.Length;
+                    e->OldValue = scope.GetRelativePtr(transactionArena.AllocateSlice(oldPayload).Items);
 
                     // New payload
                     ReadOnlySpan<byte> newValue = ReadOnlySpan<byte>.Empty;
@@ -299,32 +266,35 @@ public static class History
                         newValue = value.Length > 1 ? value.Slice(1) : ReadOnlySpan<byte>.Empty;
                     }
 
-                    fldCommitEvent->NewLen = newValue.Length;
-                    transactionArena.AllocateSlice(newValue);
+                    e->NewValueLength = newValue.Length;
+                    e->NewValue = scope.GetRelativePtr(transactionArena.AllocateSlice(newValue).Items);
 
-                    currentObjBlockHeader->EventCount++;
                     continue;
                 }
 
                 // ASO
                 if (key.Length == 64)
                 {
-                    transactionArena.Allocate(new AsoCommitEvent
+                    var e = transactionArena.Allocate(new CommitEvent
                     {
                         Type = flag == ValueFlag.AddModify ? HistoryEventType.AsoAdded : HistoryEventType.AsoRemoved,
-                        FldIdA = MemoryMarshal.Read<Guid>(key.Slice(16)),
-                        FldIdB = MemoryMarshal.Read<Guid>(key.Slice(48)),
-                        ObjIdB = MemoryMarshal.Read<Guid>(key.Slice(32))
+                        FldId = MemoryMarshal.Read<Guid>(key.Slice(16)),
+                        FldBId = MemoryMarshal.Read<Guid>(key.Slice(48)),
+                        ObjBId = MemoryMarshal.Read<Guid>(key.Slice(32))
                     });
 
-                    currentObjBlockHeader->EventCount++;
+                    *nextCommitEventPtrLocation = scope.GetRelativePtr(e);
+                    nextCommitEventPtrLocation = &e->Next;
                 }
-
             } while (changeCursor.Next().ResultCode == ResultCode.Success);
         }
 
+        var commitData = transactionArena.GetRegion((byte*)header);
+
+        DecodeCommitValue(commitKey, commitData);
+
         // Write commit record
-        writeTransaction.Put(environment.HistoryDb, commitKey.AsSpan(), transactionArena.GetRegion((byte*)header));
+        writeTransaction.Put(environment.HistoryDb, commitKey.AsSpan(), commitData);
     }
 
     public static IEnumerable<Guid> GetCommitsForObject(Environment environment, LightningTransaction readTransaction, Guid objId)
@@ -337,7 +307,7 @@ public static class History
         do
         {
             var (_, _, value) = cursor.GetCurrent();
-            yield return ReadGuidBigEndian(value.AsSpan());
+            yield return MemoryMarshal.Read<Guid>(value.AsSpan());
         } while (cursor.NextDuplicate().resultCode == MDBResultCode.Success);
     }
 
@@ -347,7 +317,7 @@ public static class History
         if (rc != MDBResultCode.Success)
             return null;
 
-        return DecodeCommitValue(commitId, value.AsSpan());
+        return DecodeCommitValue(commitId, value.AsSlice());
     }
 
     public static IEnumerable<HistoryCommit> GetAllCommits(Environment environment, LightningTransaction readTransaction, int max = int.MaxValue)
@@ -365,120 +335,91 @@ public static class History
             if (keySpan.Length != 16)
                 continue;
 
-            var commitId = ReadGuidBigEndian(keySpan);
-            yield return DecodeCommitValue(commitId, value.AsSpan());
+            var commitId = MemoryMarshal.Read<Guid>(keySpan);
+            yield return DecodeCommitValue(commitId, value.AsSlice());
 
             count++;
             if (count >= max)
                 yield break;
-
         } while (cursor.Next().resultCode == MDBResultCode.Success);
     }
 
-    private static HistoryCommit DecodeCommitValue(Guid commitId, ReadOnlySpan<byte> data)
+    private static unsafe ReadOnlySpan<T> ReadSpan<T>(Slice<byte> data, nint location, int length) where T : unmanaged
     {
-        int offset = 0;
+        var d = data.Length - location;
+        if (d < sizeof(T) * length)
+            throw new Exception("Should never happen!!!!");
 
-        byte version = data[offset++];
-        if (version != RecordVersion)
-            throw new InvalidOperationException($"Unsupported history record version {version}");
+        return new ReadOnlySpan<T>((T*)(data.Items + location), length);
+    }
 
-        var header = MemoryMarshal.Read<CommitHeader>(data);
+    private static unsafe T* Read<T>(Slice<byte> data, nint location) where T : unmanaged
+    {
+        var d = data.Length - location;
+        if (d < sizeof(T))
+            throw new Exception("Should never happen!!!!");
 
+        return (T*)(data.Items + location);
+    }
 
-        Dictionary<Guid, List<HistoryEvent>> eventsByObj = new(header.ObjCount);
+    private static unsafe T* Read<T>(Slice<byte> data, RelativePtr<T> ptr) where T : unmanaged
+    {
+        return Read<T>(data, ptr.Offset);
+    }
 
-        for (int i = 0; i < header.ObjCount; i++)
+    private static unsafe HistoryCommit DecodeCommitValue(Guid commitId, Slice<byte> data)
+    {
+        var header = Read<CommitHeader>(data, 0);
+
+        if (header->Version != RecordVersion)
+            throw new InvalidOperationException($"Unsupported history record version {header->Version}");
+
+        Dictionary<Guid, List<HistoryEvent>> eventsByObj = new();
+
+        var nextObj = header->First;
+        while (nextObj.Offset != 0)
         {
+            var obj = Read(data, nextObj);
 
+            List<HistoryEvent> events = new();
 
-            var objId = ReadGuidLittleEndian(data.Slice(offset, 16));
-            offset += 16;
-
-            int eventCount = BinaryPrimitives.ReadInt32LittleEndian(data.Slice(offset, 4));
-            offset += 4;
-
-            List<HistoryEvent> events = new(eventCount);
-
-            for (int j = 0; j < eventCount; j++)
+            var nextEvent = obj->FirstEvent;
+            while (nextEvent.Offset != 0)
             {
-                var type = (HistoryEventType)data[offset++];
-
-                switch (type)
+                var e = Read(data, nextEvent);
+                switch (e->Type)
                 {
                     case HistoryEventType.ObjCreated:
-                    {
-                        var typId = ReadGuidLittleEndian(data.Slice(offset, 16));
-                        offset += 16;
-                        events.Add(HistoryEvent.ObjCreated(typId));
+                        events.Add(HistoryEvent.ObjCreated(e->TypId));
                         break;
-                    }
                     case HistoryEventType.ObjDeleted:
                         events.Add(HistoryEvent.ObjDeleted());
                         break;
-                    case HistoryEventType.AsoAdded:
-                    {
-                        var fldA = ReadGuidLittleEndian(data.Slice(offset, 16));
-                        offset += 16;
-                        var objB = ReadGuidLittleEndian(data.Slice(offset, 16));
-                        offset += 16;
-                        var fldB = ReadGuidLittleEndian(data.Slice(offset, 16));
-                        offset += 16;
-                        events.Add(HistoryEvent.AsoAdded(fldA, objB, fldB));
-                        break;
-                    }
-                    case HistoryEventType.AsoRemoved:
-                    {
-                        var fldA = ReadGuidLittleEndian(data.Slice(offset, 16));
-                        offset += 16;
-                        var objB = ReadGuidLittleEndian(data.Slice(offset, 16));
-                        offset += 16;
-                        var fldB = ReadGuidLittleEndian(data.Slice(offset, 16));
-                        offset += 16;
-                        events.Add(HistoryEvent.AsoRemoved(fldA, objB, fldB));
-                        break;
-                    }
                     case HistoryEventType.FldChanged:
-                    {
-                        var fldId = ReadGuidLittleEndian(data.Slice(offset, 16));
-                        offset += 16;
-
-                        var oldValue = ReadBlob(data, ref offset);
-                        var newValue = ReadBlob(data, ref offset);
-                        events.Add(HistoryEvent.FldChanged(fldId, oldValue, newValue));
+                        events.Add(HistoryEvent.FldChanged(e->FldId,
+                            ReadSpan<byte>(data, e->OldValue.Offset, e->OldValueLength).ToArray(),
+                            ReadSpan<byte>(data, e->NewValue.Offset, e->NewValueLength).ToArray()));
                         break;
-                    }
+                    case HistoryEventType.AsoAdded:
+                        events.Add(HistoryEvent.AsoAdded(e->FldId, e->ObjBId, e->FldBId));
+                        break;
+                    case HistoryEventType.AsoRemoved:
+                        events.Add(HistoryEvent.AsoRemoved(e->FldId, e->ObjBId, e->FldBId));
+                        break;
                     default:
                         throw new ArgumentOutOfRangeException();
                 }
             }
 
-            eventsByObj.Add(objId, events);
+            eventsByObj.Add(obj->ObjId, events);
         }
 
         return new HistoryCommit
         {
             CommitId = commitId,
-            TimestampUtc = new DateTime(ticks, DateTimeKind.Utc),
-            UserId = userId,
-            EventsByObject = eventsByObj,
+            TimestampUtc = new DateTime(header->UtcTimestamp, DateTimeKind.Utc),
+            UserId = header->UserId,
+            EventsByObject = eventsByObj
         };
-    }
-
-    private static byte[] ReadBlob(ReadOnlySpan<byte> data, ref int offset)
-    {
-        int originalLen = BinaryPrimitives.ReadInt32LittleEndian(data.Slice(offset, 4));
-        offset += 4;
-        int storedLen = BinaryPrimitives.ReadInt32LittleEndian(data.Slice(offset, 4));
-        offset += 4;
-
-        if (storedLen == 0)
-            return [];
-
-        var bytes = data.Slice(offset, storedLen).ToArray();
-        offset += storedLen;
-
-        _ = originalLen; // kept for future display
-        return bytes;
     }
 }
