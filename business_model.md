@@ -37,7 +37,11 @@ I'm not yet sure if we want a cli in the final product, but we probably do.
 
 The Model is modeled like this:
 
-Model
-    Fields
-    ReferenceFields
-    ImportedModels
+- Model
+    - Fields
+    - ReferenceFields
+    - ImportedModels
+    - Code (List/Hierarchy of documents)
+    - StaticEntities
+
+The idea is to have to database schema, as normal data in the database. I'm not yet sure if this is a good idea.
