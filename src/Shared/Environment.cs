@@ -16,13 +16,33 @@ public class Environment : IDisposable
     public required ProjectModel Model;
 
     public static Environment Create(ProjectModel model, string dbName = "database")
+
     {
-        //during testing we delete the old db
+        // NOTE: This is intentionally destructive and used by tests/dev.
         if (Directory.Exists(dbName))
         {
             Directory.Delete(dbName, recursive: true);
         }
 
+        return OpenInternal(model, dbName, create: true);
+    }
+
+    public static Environment Init(ProjectModel model, string dbName)
+    {
+        Directory.CreateDirectory(dbName);
+        return OpenInternal(model, dbName, create: true);
+    }
+
+    public static Environment Open(ProjectModel model, string dbName)
+    {
+        if (!Directory.Exists(dbName))
+            throw new DirectoryNotFoundException($"Database directory '{dbName}' does not exist");
+
+        return OpenInternal(model, dbName, create: false);
+    }
+
+    private static Environment OpenInternal(ProjectModel model, string dbName, bool create)
+    {
         var env = new LightningEnvironment(dbName, new EnvironmentConfiguration
         {
             MaxDatabases = 128
@@ -31,32 +51,32 @@ public class Environment : IDisposable
 
         using var lightningTransaction = env.BeginTransaction();
 
+        var createFlag = create ? DatabaseOpenFlags.Create : 0;
+
         var objDb = lightningTransaction.OpenDatabase(null, new DatabaseConfiguration
         {
-            Flags = DatabaseOpenFlags.Create
+            Flags = createFlag
         });
 
         var histDb = lightningTransaction.OpenDatabase(name: "HistoryDb", new DatabaseConfiguration
         {
-            Flags = DatabaseOpenFlags.Create
+            Flags = createFlag
         });
 
         var historyObjIndexDb = lightningTransaction.OpenDatabase(name: "HistoryObjIndexDb", new DatabaseConfiguration
         {
-            Flags = DatabaseOpenFlags.Create | DatabaseOpenFlags.DuplicatesSort
+            Flags = createFlag | DatabaseOpenFlags.DuplicatesSort
         });
 
         var stringSearchIndex = lightningTransaction.OpenDatabase(name: "StringIndexDb", new DatabaseConfiguration
         {
-            Flags = DatabaseOpenFlags.Create | DatabaseOpenFlags.DuplicatesSort
+            Flags = createFlag | DatabaseOpenFlags.DuplicatesSort
         });
 
-        //we could combine string and nonstring index dbs, the reason why they are separated for now,
-        //is that I'm not sure about the performance of custom comparers, they have to be slower because they involve dynamic dispatch,
-        //but I'm not sure if this actually makes a difference
+        // We could combine string and nonstring index dbs. They're separate for now since custom comparers may be slower.
         var customComparer = new DatabaseConfiguration
         {
-            Flags = DatabaseOpenFlags.Create | DatabaseOpenFlags.DuplicatesSort,
+            Flags = createFlag | DatabaseOpenFlags.DuplicatesSort,
         };
         customComparer.CompareWith(new CustomIndexComparer());
 
@@ -64,7 +84,7 @@ public class Environment : IDisposable
  
         var fieldPresenceIndex = lightningTransaction.OpenDatabase(name: "FieldPresenceIndexDb", new DatabaseConfiguration
         {
-            Flags = DatabaseOpenFlags.Create | DatabaseOpenFlags.DuplicatesSort
+            Flags = createFlag | DatabaseOpenFlags.DuplicatesSort
         });
 
         lightningTransaction.Commit();

@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Shared.Utils;
 
@@ -400,9 +401,12 @@ public sealed class DbSession : IDisposable
             {
                 var (_, currentKey, currentValue) = Cursor.GetCurrent();
 
-                if (currentValue.Length > 0 && currentValue[0] == (byte)ValueTyp.Obj)
+                if (currentKey.Length == 16 && currentValue.Length > 0 && currentValue[0] == (byte)ValueTyp.Obj)
                 {
-                    yield return (MemoryMarshal.Read<Guid>(currentKey), MemoryMarshal.Read<ObjValue>(currentValue).TypId);
+                    // Obj keys are exactly 16 bytes (ObjId). Field/assoc keys are longer.
+                    // Validate the value layout too: [ValueTyp][Guid TypId] => 17 bytes.
+                    if (currentValue.Length == Unsafe.SizeOf<ObjValue>())
+                        yield return (MemoryMarshal.Read<Guid>(currentKey), MemoryMarshal.Read<ObjValue>(currentValue).TypId);
                 }
             }
             while (Cursor.Next().ResultCode == ResultCode.Success);
