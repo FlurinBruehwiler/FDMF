@@ -172,6 +172,8 @@ public static class History
 
                 var objId = MemoryMarshal.Read<Guid>(key);
 
+                ObjBlockHeader* o;
+
                 //write obj block header if needed
                 if (!hasCurrentObj || objId != currentObjId)
                 {
@@ -180,11 +182,11 @@ public static class History
                     currentObjDeleted = false;
 
                     // Object block header
-                    var o = transactionArena.Allocate(new ObjBlockHeader
+                    o = transactionArena.Allocate(new ObjBlockHeader
                     {
                         ObjId = objId
                     });
-                    *nextObjHeaderPtrLocation = scope.GetRelativePtr(o);
+                    *nextObjHeaderPtrLocation = new RelativePtr<ObjBlockHeader>(header, o);
                     nextObjHeaderPtrLocation = &o->Next;
 
                     nextCommitEventPtrLocation = &o->FirstEvent;
@@ -204,7 +206,7 @@ public static class History
                             TypId = MemoryMarshal.Read<Guid>(value),
                         });
 
-                        *nextCommitEventPtrLocation = scope.GetRelativePtr(e);
+                        *nextCommitEventPtrLocation = new RelativePtr<CommitEvent>(header, e);
                         nextCommitEventPtrLocation = &e->Next;
                     }
                     else if (flag == ValueFlag.Delete)
@@ -214,7 +216,7 @@ public static class History
                             Type = HistoryEventType.ObjDeleted,
                         });
 
-                        *nextCommitEventPtrLocation = scope.GetRelativePtr(e);
+                        *nextCommitEventPtrLocation = new RelativePtr<CommitEvent>(header, e);
                         nextCommitEventPtrLocation = &e->Next;
 
                         currentObjDeleted = true;
@@ -242,7 +244,7 @@ public static class History
                         FldId = fldId
                     });
 
-                    *nextCommitEventPtrLocation = scope.GetRelativePtr(e);
+                    *nextCommitEventPtrLocation = new RelativePtr<CommitEvent>(header, e);
                     nextCommitEventPtrLocation = &e->Next;
 
                     // Old payload
@@ -256,7 +258,7 @@ public static class History
                     }
 
                     e->OldValueLength = oldPayload.Length;
-                    e->OldValue = scope.GetRelativePtr(transactionArena.AllocateSlice(oldPayload).Items);
+                    e->OldValue = new RelativePtr<byte>(header, transactionArena.AllocateSlice(oldPayload).Items);
 
                     // New payload
                     ReadOnlySpan<byte> newValue = ReadOnlySpan<byte>.Empty;
@@ -267,7 +269,7 @@ public static class History
                     }
 
                     e->NewValueLength = newValue.Length;
-                    e->NewValue = scope.GetRelativePtr(transactionArena.AllocateSlice(newValue).Items);
+                    e->NewValue = new RelativePtr<byte>(header, transactionArena.AllocateSlice(newValue).Items);
 
                     continue;
                 }
@@ -283,15 +285,13 @@ public static class History
                         ObjBId = MemoryMarshal.Read<Guid>(key.Slice(32))
                     });
 
-                    *nextCommitEventPtrLocation = scope.GetRelativePtr(e);
+                    *nextCommitEventPtrLocation = new RelativePtr<CommitEvent>(header, e);
                     nextCommitEventPtrLocation = &e->Next;
                 }
             } while (changeCursor.Next().ResultCode == ResultCode.Success);
         }
 
         var commitData = transactionArena.GetRegion((byte*)header);
-
-        DecodeCommitValue(commitKey, commitData);
 
         // Write commit record
         writeTransaction.Put(environment.HistoryDb, commitKey.AsSpan(), commitData);
@@ -380,6 +380,7 @@ public static class History
         while (nextObj.Offset != 0)
         {
             var obj = Read(data, nextObj);
+            nextObj = obj->Next;
 
             List<HistoryEvent> events = new();
 
@@ -387,6 +388,8 @@ public static class History
             while (nextEvent.Offset != 0)
             {
                 var e = Read(data, nextEvent);
+                nextEvent = e->Next;
+
                 switch (e->Type)
                 {
                     case HistoryEventType.ObjCreated:

@@ -8,6 +8,16 @@ namespace Shared.Utils;
 public struct RelativePtr<T> where T : unmanaged
 {
     public nint Offset;
+
+    public unsafe RelativePtr(void* @base, T* ptr)
+    {
+        Offset = (byte)ptr - (byte)@base;
+    }
+
+    public unsafe T* ToAbsolute(ArenaScope arenaScope)
+    {
+        return (T*)(arenaScope.Arena.BasePtr + arenaScope.Pos + Offset);
+    }
 }
 
 public struct ArenaScope : IDisposable
@@ -15,13 +25,13 @@ public struct ArenaScope : IDisposable
     public required Arena Arena;
     public required int Pos;
 
-    public unsafe RelativePtr<T> GetRelativePtr<T>(T* ptr) where T : unmanaged
-    {
-        return new RelativePtr<T>
-        {
-            Offset = (nint)ptr - ((nint)Arena.BasePtr + (nint)Pos)
-        };
-    }
+    // public unsafe RelativePtr<T> GetRelativePtr<T>(T* ptr) where T : unmanaged
+    // {
+    //     return new RelativePtr<T>
+    //     {
+    //         Offset = (nint)ptr - ((nint)Arena.BasePtr + (nint)Pos)
+    //     };
+    // }
 
     public void Dispose()
     {
