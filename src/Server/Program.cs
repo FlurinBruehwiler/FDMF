@@ -49,25 +49,8 @@ try
         };
 
         tsx.Commit();
-    }
 
-    {
-        using var t = new DbSession(env);
-
-        var result = Searcher.Search<Folder>(t, new AssocCriterion
-        {
-            FieldId = Folder.Fields.Subfolders,
-            Type = AssocCriterion.AssocCriterionType.Subquery,
-            SearchCriterion = new IdCriterion
-            {
-                Guid = childObjId
-            }
-        });
-
-        foreach (Folder folder in result)
-        {
-            Console.WriteLine(folder.Name);
-        }
+        Console.WriteLine(JsonDump.GetJsonDump(env, tsx));
     }
 }
 catch (Exception e)

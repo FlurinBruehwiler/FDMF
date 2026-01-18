@@ -457,6 +457,5 @@ public sealed class TransactionalKvStore : IDisposable
     public void Dispose()
     {
         ReadTransaction.Dispose();
-        _arena?.Dispose();
     }
 }

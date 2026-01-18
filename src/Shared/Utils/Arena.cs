@@ -1,9 +1,10 @@
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using Shared.Database;
+using Shared.PlatformLayer;
+
 #pragma warning disable CS9092 // This returns a member of local by reference but it is not a ref local
 
 namespace Shared.Utils;
+
 
 public struct RelativePtr<T> where T : unmanaged
 {
@@ -55,7 +56,7 @@ public sealed unsafe class Arena : IDisposable
     public Arena(int capacityInBytes)
     {
         capacityInBytes = AlignToUpper(capacityInBytes, System.Environment.SystemPageSize);
-        BasePtr = (byte*)VirtualAlloc(IntPtr.Zero, (nuint)capacityInBytes, AllocationType.Reserve, MemoryProtection.ReadWrite);
+        BasePtr = Platform.Reserve((nuint)capacityInBytes);
 
         if (BasePtr == null)
             throw new OutOfMemoryException();
@@ -74,11 +75,7 @@ public sealed unsafe class Arena : IDisposable
     {
         if (Committed > 0)
         {
-            VirtualFree(
-                (nint)BasePtr,
-                (nuint)Committed,
-                FreeType.Decommit
-            );
+            Platform.Decommit(BasePtr, (nuint)Committed);
             Committed = 0;
         }
 
@@ -155,22 +152,14 @@ public sealed unsafe class Arena : IDisposable
         if (Committed + newCommitSize > Size)
             throw new OutOfMemoryException("Arena exceeded reserved size");
 
-        nint result = VirtualAlloc(
-            (nint)(BasePtr + Committed),
-            (nuint)newCommitSize,
-            AllocationType.Commit,
-            MemoryProtection.ReadWrite
-        );
-
-        if (result == 0)
-            throw new OutOfMemoryException();
+        Platform.Commit(BasePtr + Committed, (nuint)newCommitSize);
 
         Committed += newCommitSize;
     }
 
     public void Dispose()
     {
-        VirtualFree((nint)BasePtr, (nuint)Size, FreeType.Release);
+        Platform.Release(BasePtr, (nuint)Size);
     }
 
     private static int AlignToUpper(int value, int align)
@@ -184,50 +173,4 @@ public sealed unsafe class Arena : IDisposable
         return (n + (p - 1)) & ~(p - 1);
     }
 
-    //Interop -- Windows
-    [DllImport("kernel32", EntryPoint = nameof(VirtualAlloc), SetLastError = true)]
-    public static extern IntPtr VirtualAlloc(IntPtr lpAddress, UIntPtr dwSize, AllocationType flAllocationType, MemoryProtection flProtect);
-
-    [DllImport("kernel32", EntryPoint = nameof(VirtualFree), SetLastError = true)]
-    private static extern int VirtualFree(IntPtr lpAddress, nuint dwSize, FreeType dwFreeType);
-
-    [DllImport("kernel32", EntryPoint = nameof(VirtualProtect), SetLastError = true)]
-    private static extern int VirtualProtect(IntPtr lpAddress, nuint dwSize, MemoryProtection newProtect, out MemoryProtection oldProtect);
-
-    [Flags]
-    public enum AllocationType
-    {
-        Commit = 0x1000,
-        Reserve = 0x2000,
-        Decommit = 0x4000,
-        Release = 0x8000,
-        Reset = 0x80000,
-        Physical = 0x400000,
-        TopDown = 0x100000,
-        WriteWatch = 0x200000,
-        LargePages = 0x20000000
-    }
-
-    [Flags]
-    public enum MemoryProtection
-    {
-        Execute = 0x10,
-        ExecuteRead = 0x20,
-        ExecuteReadWrite = 0x40,
-        ExecuteWriteCopy = 0x80,
-        NoAccess = 0x01,
-        ReadOnly = 0x02,
-        ReadWrite = 0x04,
-        WriteCopy = 0x08,
-        GuardModifierflag = 0x100,
-        NoCacheModifierflag = 0x200,
-        WriteCombineModifierflag = 0x400
-    }
-
-    [Flags]
-    enum FreeType
-    {
-        Decommit = 0x4000,
-        Release = 0x8000,
-    }
 }
