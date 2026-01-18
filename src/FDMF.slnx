@@ -1,0 +1,23 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/.SolutionItems/">
+    <File Path="../.gitignore" />
+    <File Path="../business_model.md" />
+    <File Path="../database.md" />
+    <File Path="../networking.md" />
+    <File Path="../README.md" />
+    <File Path="../todo.md" />
+  </Folder>
+  <Project Path="Cli/Cli.csproj" />
+  <Project Path="Client/Client.csproj" />
+  <Project Path="PerformanceTests/PerformanceTests.csproj" />
+  <Project Path="Playground/Playground.csproj" />
+  <Project Path="Server/Server.csproj" />
+  <Project Path="Shared/Shared.csproj" />
+  <Project Path="SourceGen/SourceGen.csproj" />
+  <Project Path="Tests/Tests.csproj" />
+</Solution>

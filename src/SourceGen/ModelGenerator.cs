@@ -105,8 +105,10 @@ public static class ModelGenerator
                     sourceBuilder.AppendLine("{");
                     sourceBuilder.AddIndent();
 
-                    sourceBuilder.AppendLine($"get => GeneratedCodeHelper.{getMethod}<{entity.Key}>(DbSession, ObjId, Fields.{refField.Key});");
-                    sourceBuilder.AppendLine($"set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.{refField.Key}, value?.ObjId ?? Guid.Empty, {refField.OtherReferenceField.OwningEntity.Key}.Fields.{refField.OtherReferenceField.Key});");
+                    var valueAccess = refField.RefType == RefType.SingleOptional ? "value?.ObjId ?? Guid.Empty" : "value.ObjId";
+
+                    sourceBuilder.AppendLine($"get => GeneratedCodeHelper.{getMethod}<{refField.OtherReferenceField.OwningEntity.Key}>(DbSession, ObjId, Fields.{refField.Key});");
+                    sourceBuilder.AppendLine($"set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.{refField.Key}, {valueAccess}, {refField.OtherReferenceField.OwningEntity.Key}.Fields.{refField.OtherReferenceField.Key});");
 
                     sourceBuilder.RemoveIndent();
                     sourceBuilder.AppendLine("}");

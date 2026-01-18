@@ -1,0 +1,65 @@
+{
+  "Id": "2147ed0f-b37d-4429-a3f8-8312c1620383",
+  "Key": "FieldDefinition",
+  "Name": {
+    "Default": null
+  },
+  "Fields": [
+    {
+      "Id": "450c77f2-73ff-4125-a879-b75840275c99",
+      "Key": "Key",
+      "Name": {
+        "Default": null
+      },
+      "DataType": "String",
+      "IsIndexed": false
+    },
+    {
+      "Id": "32734a0c-eba5-4b97-80de-081857b356cc",
+      "Key": "Name",
+      "Name": {
+        "Default": null
+      },
+      "DataType": "String",
+      "IsIndexed": false
+    },
+    {
+      "Id": "eff45530-7e4e-401f-a53e-094f0d815e8a",
+      "Key": "Id",
+      "Name": {
+        "Default": null
+      },
+      "DataType": "String",
+      "IsIndexed": false
+    },
+    {
+      "Id": "924ee396-a747-4790-a9da-051e3e8676a8",
+      "Key": "RefType",
+      "Name": {
+        "Default": null
+      },
+      "DataType": "String",
+      "IsIndexed": false
+    }
+  ],
+  "ReferenceFields": [
+    {
+      "Id": "500e3a9c-c469-4585-a7c4-e307dc295d88",
+      "Key": "OwningEntity",
+      "Name": {
+        "Default": null
+      },
+      "RefType": "SingleMandatory",
+      "OtherReferenceFielGuid": "06950fac-de4f-487e-aa78-7095909805e4"
+    },
+    {
+      "Id": "50ac96bd-7082-4821-95fa-57e9040246ab",
+      "Key": "OtherReferenceFields",
+      "Name": {
+        "Default": null
+      },
+      "RefType": "SingleMandatory",
+      "OtherReferenceFielGuid": "50ac96bd-7082-4821-95fa-57e9040246ab"
+    }
+  ]
+}

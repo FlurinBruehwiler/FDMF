@@ -1,13 +1,9 @@
-﻿{
-  "id": "E5184BBA-F470-4BAB-AEED-28FB907DA349",
-  "key": "TestingDocument",
-  "name": {
-    "en": "Document"
+{
+  "Id": "e5184bba-f470-4bab-aeed-28fb907da349",
+  "Key": "TestingDocument",
+  "Name": {
+    "Default": null
   },
-  "fields": [
-
-  ],
-  "referenceFields": [
-
-  ]
+  "Fields": [],
+  "ReferenceFields": []
 }

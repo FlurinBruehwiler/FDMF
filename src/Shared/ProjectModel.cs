@@ -14,14 +14,19 @@ public class ProjectModel
         var options = new JsonSerializerOptions
         {
             IncludeFields = true,
-            PropertyNameCaseInsensitive = true
+            PropertyNameCaseInsensitive = true,
+            WriteIndented = true
         };
         options.Converters.Add(new JsonStringEnumConverter());
+        options.Converters.Add(new GuidConverterWithEmptyString());
 
         List<EntityDefinition> entities = [];
         foreach (var entityJson in Directory.EnumerateFiles(dir))
         {
             var entity = JsonSerializer.Deserialize<EntityDefinition>(File.ReadAllText(entityJson), options);
+
+            File.WriteAllText(entityJson, JsonSerializer.Serialize(entity, options));
+
             entities.Add(entity!);
         }
 
@@ -55,6 +60,26 @@ public class ProjectModel
         AsoFieldsById = EntityDefinitions.SelectMany(x => x.ReferenceFields).ToDictionary(x => x.Id, x => x);
 
         return this;
+    }
+}
+
+public class GuidConverterWithEmptyString : JsonConverter<Guid>
+{
+    public override Guid Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.String)
+        {
+            var s = reader.GetString();
+            if (string.IsNullOrEmpty(s))
+                return Guid.NewGuid(); // generate a new Guid for empty strings
+            return Guid.Parse(s);
+        }
+        throw new JsonException($"Unexpected token {reader.TokenType} when parsing a Guid.");
+    }
+
+    public override void Write(Utf8JsonWriter writer, Guid value, JsonSerializerOptions options)
+    {
+        writer.WriteStringValue(value.ToString());
     }
 }
 

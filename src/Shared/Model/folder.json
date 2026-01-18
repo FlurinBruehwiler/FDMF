@@ -1,56 +1,56 @@
-﻿{
-  "id": "A3CCBD8B-2256-414B-A402-1A091CB407A5",
-  "key": "Folder",
-  "name": {
-    "en": "Folder"
+{
+  "Id": "a3ccbd8b-2256-414b-a402-1a091cb407a5",
+  "Key": "Folder",
+  "Name": {
+    "Default": null
   },
-  "fields": [
+  "Fields": [
     {
-      "id": "18696C7B-0B5D-406A-9F4C-F2E830CC0F55",
-      "key": "Name",
-      "name": {
-        "en": "Name"
+      "Id": "18696c7b-0b5d-406a-9f4c-f2e830cc0f55",
+      "Key": "Name",
+      "Name": {
+        "Default": null
       },
-      "datatype": "String",
-      "isIndexed": true
+      "DataType": "String",
+      "IsIndexed": true
     },
     {
-      "id": "19AFB14D-E6E6-4FFA-947B-B4B861D0118E",
-      "key": "TestDateField",
-      "name": {
-        "en": "A Date field used for testing"
+      "Id": "19afb14d-e6e6-4ffa-947b-b4b861d0118e",
+      "Key": "TestDateField",
+      "Name": {
+        "Default": null
       },
-      "datatype": "DateTime",
-      "isIndexed": true
+      "DataType": "DateTime",
+      "IsIndexed": true
     },
     {
-      "id": "25B2926A-E77D-4A1F-BA75-9D3C76AC7DD7",
-      "key": "TestDecimalField",
-      "name": {
-        "en": "A Decimal field used for testing"
+      "Id": "25b2926a-e77d-4a1f-ba75-9d3c76ac7dd7",
+      "Key": "TestDecimalField",
+      "Name": {
+        "Default": null
       },
-      "datatype": "Decimal",
-      "isIndexed": true
+      "DataType": "Decimal",
+      "IsIndexed": true
     }
   ],
-  "referenceFields": [
+  "ReferenceFields": [
     {
-      "id": "B40BD476-D9A3-4554-A2F6-4F7760C0FFE4",
-      "key": "Subfolders",
-      "name": {
-        "en": "Subfolders"
+      "Id": "b40bd476-d9a3-4554-a2f6-4f7760c0ffe4",
+      "Key": "Subfolders",
+      "Name": {
+        "Default": null
       },
-      "refType": "Multiple",
-      "otherReferenceFielGuid": "83A0ADA7-BA53-4877-8262-BD47520EEAC7"
+      "RefType": "Multiple",
+      "OtherReferenceFielGuid": "83a0ada7-ba53-4877-8262-bd47520eeac7"
     },
     {
-      "id": "83A0ADA7-BA53-4877-8262-BD47520EEAC7",
-      "key": "Parent",
-      "name": {
-        "en": "Parent"
+      "Id": "83a0ada7-ba53-4877-8262-bd47520eeac7",
+      "Key": "Parent",
+      "Name": {
+        "Default": null
       },
-      "refType": "SingleOptional",
-      "otherReferenceFielGuid": "B40BD476-D9A3-4554-A2F6-4F7760C0FFE4"
+      "RefType": "SingleOptional",
+      "OtherReferenceFielGuid": "b40bd476-d9a3-4554-a2f6-4f7760c0ffe4"
     }
   ]
 }

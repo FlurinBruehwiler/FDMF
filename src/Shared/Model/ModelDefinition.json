@@ -1,0 +1,29 @@
+{
+  "Id": "5270c4a5-71e0-4474-9f94-50745b29b404",
+  "Key": "Model",
+  "Name": {
+    "Default": null
+  },
+  "Fields": [
+    {
+      "Id": "efe4fee5-bbca-4b19-8c26-c96ba8b2c008",
+      "Key": "Name",
+      "Name": {
+        "Default": null
+      },
+      "DataType": "String",
+      "IsIndexed": false
+    }
+  ],
+  "ReferenceFields": [
+    {
+      "Id": "06e78b99-4b0d-45d7-b0c8-cf57c73fc3e8",
+      "Key": "EntityDefinitions",
+      "Name": {
+        "Default": null
+      },
+      "RefType": "Multiple",
+      "OtherReferenceFielGuid": "d2b98e24-5786-4502-b2cf-5dea14097765"
+    }
+  ]
+}
