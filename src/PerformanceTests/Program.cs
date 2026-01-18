@@ -1,7 +1,4 @@
 ﻿using System.Diagnostics;
-using System.Runtime.InteropServices;
-using LightningDB;
-using Shared.Database;
 
 namespace PerformanceTests;
 

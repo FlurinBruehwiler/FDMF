@@ -60,6 +60,24 @@
       },
       "RefType": "Multiple",
       "OtherReferenceFielGuid": "500e3a9c-c469-4585-a7c4-e307dc295d88"
+    },
+    {
+      "Id": "15928c28-398d-4caa-97d1-7c01e9020d9f",
+      "Key": "Parents",
+      "Name": {
+        "Default": "Parents"
+      },
+      "RefType": "Multiple",
+      "OtherReferenceFielGuid": "232c2342-682d-4526-a5fd-f943830d7bef"
+    },
+    {
+      "Id": "232c2342-682d-4526-a5fd-f943830d7bef",
+      "Key": "Children",
+      "Name": {
+        "Default": "Children"
+      },
+      "RefType": "Multiple",
+      "OtherReferenceFielGuid": "15928c28-398d-4caa-97d1-7c01e9020d9f"
     }
   ]
 }

@@ -1,12 +1,8 @@
-﻿using System;
-using System.Text;
-using LightningDB;
-using Shared.Database;
-using Shared.Utils;
+﻿using Shared.Database;
 
 class Program
 {
-    static unsafe void Main()
+    static void Main()
     {
         var before = Guid.CreateVersion7(DateTimeOffset.UtcNow);
         var after = Guid.CreateVersion7(DateTimeOffset.UtcNow.AddMilliseconds(1));

@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using Shared.PlatformLayer;
 
 #pragma warning disable CS9092 // This returns a member of local by reference but it is not a ref local
 
@@ -120,14 +119,14 @@ public sealed unsafe class Arena : IDisposable
         Pos = pos;
     }
 
-    public unsafe T* Allocate<T>(T value) where T : unmanaged
+    public T* Allocate<T>(T value) where T : unmanaged
     {
         var v = (T*) Push(sizeof(T));
         *v = value;
         return v;
     }
 
-    public unsafe Slice<T> AllocateSlice<T>(int count) where T : unmanaged
+    public Slice<T> AllocateSlice<T>(int count) where T : unmanaged
     {
         if (count == 0)
             return new Slice<T>(null, 0);

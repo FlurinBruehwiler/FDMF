@@ -50,6 +50,10 @@ public partial struct EntityDefinition : ITransactionObject, IEquatable<EntityDe
     public AssocCollection<FieldDefinition> FieldDefinitions => new(DbSession, ObjId, Fields.FieldDefinitions, FieldDefinition.Fields.OwningEntity);
     [MemoryPackIgnore]
     public AssocCollection<FieldDefinition> ReferenceFieldDefinitions => new(DbSession, ObjId, Fields.ReferenceFieldDefinitions, FieldDefinition.Fields.OwningEntity);
+    [MemoryPackIgnore]
+    public AssocCollection<EntityDefinition> Parents => new(DbSession, ObjId, Fields.Parents, EntityDefinition.Fields.Children);
+    [MemoryPackIgnore]
+    public AssocCollection<EntityDefinition> Children => new(DbSession, ObjId, Fields.Children, EntityDefinition.Fields.Parents);
 
     public static bool operator ==(EntityDefinition a, EntityDefinition b) => a.DbSession == b.DbSession && a.ObjId == b.ObjId;
     public static bool operator !=(EntityDefinition a, EntityDefinition b) => a.DbSession != b.DbSession || a.ObjId != b.ObjId;
@@ -68,5 +72,7 @@ public partial struct EntityDefinition : ITransactionObject, IEquatable<EntityDe
         public static readonly Guid Model = new Guid([36, 142, 185, 210, 134, 87, 2, 69, 178, 207, 93, 234, 20, 9, 119, 101]);
         public static readonly Guid FieldDefinitions = new Guid([228, 66, 198, 141, 88, 175, 58, 64, 190, 210, 206, 65, 186, 169, 91, 33]);
         public static readonly Guid ReferenceFieldDefinitions = new Guid([172, 15, 149, 6, 79, 222, 126, 72, 170, 120, 112, 149, 144, 152, 5, 228]);
+        public static readonly Guid Parents = new Guid([40, 140, 146, 21, 141, 57, 170, 76, 151, 209, 124, 1, 233, 2, 13, 159]);
+        public static readonly Guid Children = new Guid([66, 35, 44, 35, 45, 104, 38, 69, 165, 253, 249, 67, 131, 13, 123, 239]);
     }
 }

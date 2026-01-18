@@ -25,6 +25,10 @@ The Database consists of:
 - Cached Values?
 - The Documents (Blob storage)
 
+## Model
+Missing features:
+- mixins
+
 ## Logical Database Format
 
 We need a logical database format, that can be used to export/import parts of the database. This has many usecases:
