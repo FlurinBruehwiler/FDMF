@@ -5,6 +5,7 @@
     <Platform Name="x86" />
   </Configurations>
   <Folder Name="/.SolutionItems/">
+    <File Path="../.github/workflows/ci.yml" />
     <File Path="../.gitignore" />
     <File Path="../business_model.md" />
     <File Path="../database.md" />
