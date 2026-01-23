@@ -144,12 +144,12 @@ public sealed class DbSession : IDisposable
     /// <summary>
     /// Creates an Obj with a given TypId and returns the ObjId of the newly created obj
     /// </summary>
-    public Guid CreateObj(Guid typId)
+    public Guid CreateObj(Guid typId, Guid fixedId = default)
     {
         EnsureWritable();
 
         //The idea here is to have the objects ordered by creation time in the db, in an attempt to have frequently used objects closer together,
-        var id = Guid.CreateVersion7();
+        var id = fixedId == Guid.Empty ? Guid.CreateVersion7() : fixedId;
 
         var val = new ObjValue
         {

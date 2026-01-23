@@ -1,0 +1,17 @@
+﻿{
+  "modelGuid": "77AF865C-5498-4938-BB2C-2530B158C0C0",
+  "referencedDumps": [
+    "TestModelDump.json"
+  ],
+  "entities": {
+    "48E16BEA-D2C8-485F-8D48-2C6C4C3B5739": {
+      "$type": "a3ccbd8b-2256-414b-a402-1a091cb407a5",
+      "Name": "Parent"
+    },
+    "A7F4C113-F630-48B9-BAF4-7640C414EE6A": {
+      "$type": "a3ccbd8b-2256-414b-a402-1a091cb407a5",
+      "Name": "Child",
+      "Parent": "48E16BEA-D2C8-485F-8D48-2C6C4C3B5739"
+    }
+  }
+}

@@ -31,7 +31,7 @@ public static class DbLoadJsonCommand
             using var session = new DbSession(env);
 
             var json = File.ReadAllText(file.FullName);
-            JsonDump.FromJson(json, env, session);
+            JsonDump.FromJson(json, session);
 
             session.Commit();
             Console.WriteLine($"Imported JSON from '{file.FullName}'.");

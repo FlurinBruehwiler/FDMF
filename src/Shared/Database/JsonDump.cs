@@ -89,7 +89,7 @@ public static class JsonDump
         return Encoding.UTF8.GetString(stream.ToArray());
     }
 
-    public static void FromJson(string json, Environment env, DbSession dbSession)
+    public static void FromJson(string json, DbSession dbSession)
     {
         if (dbSession.IsReadOnly)
             throw new InvalidOperationException("DbSession is read-only");
@@ -97,7 +97,7 @@ public static class JsonDump
         using var doc = JsonDocument.Parse(json);
 
         var modelGuid = doc.RootElement.GetProperty("modelGuid").GetGuid();
-        env.ModelGuid = modelGuid;
+        dbSession.Environment.ModelGuid = modelGuid; //todo, is this good?
 
         if (!doc.RootElement.TryGetProperty("entities", out var entities) || entities.ValueKind != JsonValueKind.Object)
             return;
@@ -130,7 +130,7 @@ public static class JsonDump
         }
 
 
-        var model = dbSession.GetObjFromGuid<Model.Generated.Model>(env.ModelGuid);
+        var model = dbSession.GetObjFromGuid<Model.Generated.Model>(dbSession.Environment.ModelGuid);
         var entityById = model!.Value.GetAllEntityDefinitions().ToDictionary(x => Guid.Parse(x.Id), x => x);
 
 

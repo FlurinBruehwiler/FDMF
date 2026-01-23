@@ -1,6 +1,6 @@
 ﻿{
+  "modelGuid": "5270c4a5-71e0-4474-9f94-50745b29b404",
   "entities": {
-
     "5270c4a5-71e0-4474-9f94-50745b29b404": {
       "$type": "c15f876f-4f74-4034-9acb-03bc3b521e81",
       "Key": "Model",
@@ -50,7 +50,7 @@
 
     "2147ed0f-b37d-4429-a3f8-8312c1620383": {
       "$type": "c15f876f-4f74-4034-9acb-03bc3b521e81",
-      "Key": "FieldDefinition",
+      "Key": "ReferenceFieldDefinition",
       "Model": "5270c4a5-71e0-4474-9f94-50745b29b404",
       "FieldDefinitions": [
         "450c77f2-73ff-4125-a879-b75840275c99",
@@ -61,21 +61,6 @@
       "ReferenceFieldDefinitions": [
         "500e3a9c-c469-4585-a7c4-e307dc295d88",
         "50ac96bd-7082-4821-95fa-57e9040246ab"
-      ]
-    },
-
-    "a3ccbd8b-2256-414b-a402-1a091cb407a5": {
-      "$type": "c15f876f-4f74-4034-9acb-03bc3b521e81",
-      "Key": "Folder",
-      "Model": "5270c4a5-71e0-4474-9f94-50745b29b404",
-      "FieldDefinitions": [
-        "18696c7b-0b5d-406a-9f4c-f2e830cc0f55",
-        "19afb14d-e6e6-4ffa-947b-b4b861d0118e",
-        "25b2926a-e77d-4a1f-ba75-9d3c76ac7dd7"
-      ],
-      "ReferenceFieldDefinitions": [
-        "b40bd476-d9a3-4554-a2f6-4f7760c0ffe4",
-        "83a0ada7-ba53-4877-8262-bd47520eeac7"
       ]
     },
 
@@ -171,28 +156,6 @@
       "OwningEntity": "2147ed0f-b37d-4429-a3f8-8312c1620383"
     },
 
-    "18696c7b-0b5d-406a-9f4c-f2e830cc0f55": {
-      "$type": "42a6f33d-a938-4ad8-9682-aabdc92a53d2",
-      "Key": "Name",
-      "DataType": "String",
-      "IsIndexed": true,
-      "OwningEntity": "a3ccbd8b-2256-414b-a402-1a091cb407a5"
-    },
-    "19afb14d-e6e6-4ffa-947b-b4b861d0118e": {
-      "$type": "42a6f33d-a938-4ad8-9682-aabdc92a53d2",
-      "Key": "TestDateField",
-      "DataType": "DateTime",
-      "IsIndexed": true,
-      "OwningEntity": "a3ccbd8b-2256-414b-a402-1a091cb407a5"
-    },
-    "25b2926a-e77d-4a1f-ba75-9d3c76ac7dd7": {
-      "$type": "42a6f33d-a938-4ad8-9682-aabdc92a53d2",
-      "Key": "TestDecimalField",
-      "DataType": "Decimal",
-      "IsIndexed": true,
-      "OwningEntity": "a3ccbd8b-2256-414b-a402-1a091cb407a5"
-    },
-
     "06e78b99-4b0d-45d7-b0c8-cf57c73fc3e8": {
       "$type": "2147ed0f-b37d-4429-a3f8-8312c1620383",
       "Key": "EntityDefinitions",
@@ -276,21 +239,6 @@
       "RefType": "SingleMandatory",
       "OwningEntity": "2147ed0f-b37d-4429-a3f8-8312c1620383",
       "OtherReferenceFields": "50ac96bd-7082-4821-95fa-57e9040246ab"
-    },
-
-    "b40bd476-d9a3-4554-a2f6-4f7760c0ffe4": {
-      "$type": "2147ed0f-b37d-4429-a3f8-8312c1620383",
-      "Key": "Subfolders",
-      "RefType": "Multiple",
-      "OwningEntity": "a3ccbd8b-2256-414b-a402-1a091cb407a5",
-      "OtherReferenceFields": "83a0ada7-ba53-4877-8262-bd47520eeac7"
-    },
-    "83a0ada7-ba53-4877-8262-bd47520eeac7": {
-      "$type": "2147ed0f-b37d-4429-a3f8-8312c1620383",
-      "Key": "Parent",
-      "RefType": "SingleOptional",
-      "OwningEntity": "a3ccbd8b-2256-414b-a402-1a091cb407a5",
-      "OtherReferenceFields": "b40bd476-d9a3-4554-a2f6-4f7760c0ffe4"
     }
   }
 }

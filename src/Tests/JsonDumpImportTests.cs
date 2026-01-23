@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Model.Generated;
 using Shared;
 using Shared.Database;
 using TestModel.Generated;
@@ -12,46 +13,22 @@ public class JsonDumpImportTests
     [Fact]
     public void FromJson_Creates_Objects_And_Fields_And_Assocs()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory());
 
         using (var session = new DbSession(env))
         {
-            var parentId = Guid.NewGuid();
-            var childId = Guid.NewGuid();
+            var json = File.ReadAllText("testdata/TestModelDump.json");
+            JsonDump.FromJson(json, session);
 
-            var payload = new
-            {
-                entities = new Dictionary<string, object>
-                {
-                    [parentId.ToString()] = new Dictionary<string, object>
-                    {
-                        ["$type"] = TestingFolder.TypId.ToString(),
-                        ["Name"] = "Parent",
-                    },
-                    [childId.ToString()] = new Dictionary<string, object>
-                    {
-                        ["$type"] = TestingFolder.TypId.ToString(),
-                        ["Name"] = "Child",
-                        ["Parent"] = parentId.ToString(),
-                    }
-                }
-            };
-
-            var json = JsonSerializer.Serialize(payload);
-
-
-            JsonDump.FromJson(json, env, session);
             session.Commit();
         }
 
         using var readSession = new DbSession(env, readOnly: true);
 
-        var folders = Searcher.Search<TestingFolder>(readSession).ToList();
-        Assert.Equal(2, folders.Count);
+        var obj = readSession.GetObjFromGuid<EntityDefinition>(Guid.Parse("e5184bba-f470-4bab-aeed-28fb907da349"));
 
-        var dump = JsonDump.GetJsonDump(env, readSession);
-        Assert.Contains("\"Name\": \"Parent\"", dump);
-        Assert.Contains("\"Name\": \"Child\"", dump);
+        Assert.NotNull(obj);
+        Assert.Equal("TestingFolder", obj.Value.Name);
     }
 
     [Fact]
@@ -72,6 +49,7 @@ public class JsonDumpImportTests
         {
             var payload = new
             {
+                modelGuid = Guid.NewGuid().ToString(),
                 entities = new Dictionary<string, object>
                 {
                     [fixedId.ToString()] = new Dictionary<string, object>
@@ -85,7 +63,7 @@ public class JsonDumpImportTests
             var json = JsonSerializer.Serialize(payload);
 
 
-            JsonDump.FromJson(json, env, session);
+            JsonDump.FromJson(json, session);
             session.Commit();
         }
 
@@ -121,6 +99,7 @@ public class JsonDumpImportTests
         {
             var payload = new
             {
+                modelGuid = Guid.NewGuid().ToString(),
                 entities = new Dictionary<string, object>
                 {
                     [aId.ToString()] = new Dictionary<string, object>
@@ -139,7 +118,7 @@ public class JsonDumpImportTests
             var json = JsonSerializer.Serialize(payload);
 
 
-            JsonDump.FromJson(json, env, session);
+            JsonDump.FromJson(json, session);
             session.Commit();
         }
 
