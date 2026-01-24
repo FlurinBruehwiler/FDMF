@@ -1,13 +1,9 @@
-﻿using Shared.Database;
-using Environment = Shared.Environment;
+﻿namespace Playground;
 
 class Program
 {
     static void Main()
     {
-        var env = Environment.CreateDatabase("temp");
-
-        using var session = new DbSession(env);
-        Console.WriteLine(JsonDump.GetJsonDump(session));
+        Console.WriteLine(new Guid([47, 123, 244, 149, 158, 163, 49, 64, 177, 47, 243, 14, 7, 98, 214, 113]));
     }
 }

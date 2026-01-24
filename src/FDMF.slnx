@@ -13,12 +13,12 @@
     <File Path="../README.md" />
     <File Path="../todo.md" />
   </Folder>
-  <Project Path="Cli/Cli.csproj" />
-  <Project Path="Client/Client.csproj" />
+  <Project Path="FDMF.Cli/FDMF.Cli.csproj" />
+  <Project Path="FDMF.Client/FDMF.Client.csproj" />
+  <Project Path="FDMF.Core/FDMF.Core.csproj" />
+  <Project Path="FDMF.SourceGen/FDMF.SourceGen.csproj" />
+  <Project Path="FDMF.Tests/FDMF.Tests.csproj" />
+  <Project Path="FMDF.Server/FMDF.Server.csproj" />
   <Project Path="PerformanceTests/PerformanceTests.csproj" />
   <Project Path="Playground/Playground.csproj" />
-  <Project Path="Server/Server.csproj" />
-  <Project Path="Shared/Shared.csproj" />
-  <Project Path="SourceGen/SourceGen.csproj" />
-  <Project Path="Tests/Tests.csproj" />
 </Solution>
