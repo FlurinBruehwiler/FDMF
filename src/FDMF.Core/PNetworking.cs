@@ -22,7 +22,7 @@ public enum MessageType : byte
     Notification = 3,
 }
 
-public class PNetworking
+public sealed class PNetworking
 {
     public static ValueTask SendMessage(WebSocket webSocket, Memory<byte> input)
     {

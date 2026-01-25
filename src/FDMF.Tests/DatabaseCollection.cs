@@ -1,7 +1,7 @@
 namespace FDMF.Tests;
 
 [CollectionDefinition(DatabaseCollectionName)]
-public class DatabaseCollection : IClassFixture<DatabaseCollection>
+public sealed class DatabaseCollection : IClassFixture<DatabaseCollection>
 {
     public const string TestDirectory = "TestDbs";
 

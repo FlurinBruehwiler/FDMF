@@ -129,11 +129,20 @@ public sealed class DbSession : IDisposable
 
                 if (v.Length > 0 && v[0] == (byte)ValueTyp.Aso)
                 {
-                    //flip to get other assoc
-                    k.Slice(0, 2 * 16).CopyTo(tempBuf.Slice(2 * 16, 2 * 16));
-                    k.Slice(16 * 2, 2 * 16).CopyTo(tempBuf.Slice(0, 2 * 16));
-                    var r = Store.Delete(tempBuf);
-                    Debug.Assert(r == ResultCode.Success);
+                    if (k.Length < 4 * 16)
+                    {
+                        Debug.Assert(false);
+                        // Malformed association key (should be 4 GUIDs). Skip the opposite-delete,
+                        // but still delete this entry so we can complete object deletion.
+                    }
+                    else
+                    {
+                        //flip to get other assoc
+                        k.Slice(0, 2 * 16).CopyTo(tempBuf.Slice(2 * 16, 2 * 16));
+                        k.Slice(16 * 2, 2 * 16).CopyTo(tempBuf.Slice(0, 2 * 16));
+                        var r = Store.Delete(tempBuf);
+                        Debug.Assert(r == ResultCode.Success);
+                    }
                 }
 
                 var r2 = Cursor.Delete();

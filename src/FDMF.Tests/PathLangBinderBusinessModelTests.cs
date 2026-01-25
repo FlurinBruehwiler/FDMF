@@ -10,7 +10,7 @@ using Environment = FDMF.Core.Environment;
 namespace FDMF.Tests;
 
 [Collection(DatabaseCollection.DatabaseCollectionName)]
-public class PathLangBinderBusinessModelTests
+public sealed class PathLangBinderBusinessModelTests
 {
     private static Model LoadBusinessModel(Environment env, DbSession session)
     {

@@ -7,7 +7,7 @@ using Environment = FDMF.Core.Environment;
 namespace FDMF.Tests;
 
 [Collection(DatabaseCollection.DatabaseCollectionName)]
-public class PathLangBinderTests
+public sealed class PathLangBinderTests
 {
     [Fact]
     public void Bind_Resolves_Field_And_Association_Ids_From_Model()

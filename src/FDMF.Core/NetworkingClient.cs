@@ -13,7 +13,7 @@ public struct PendingRequest
     public Type ResponseType;
 }
 
-public class ServiceProvider : IServiceProvider
+public sealed class ServiceProvider : IServiceProvider
 {
     public object? GetService(Type serviceType)
     {

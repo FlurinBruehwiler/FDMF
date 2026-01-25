@@ -2,7 +2,7 @@ using FDMF.Core.PathLayer;
 
 namespace FDMF.Tests;
 
-public class PathLangTokenizerTests
+public sealed class PathLangTokenizerTests
 {
     [Fact]
     public void Tokenizer_Basic_Path_And_Filter()

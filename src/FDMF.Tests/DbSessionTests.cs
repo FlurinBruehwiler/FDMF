@@ -1,11 +1,12 @@
 using System.Text;
+using System.Runtime.InteropServices;
 using FDMF.Core.Database;
 using Environment = FDMF.Core.Environment;
 
 namespace FDMF.Tests;
 
 [Collection(DatabaseCollection.DatabaseCollectionName)]
-public class DbSessionTests
+public sealed class DbSessionTests
 {
     [Fact]
     public void DeleteObj_Removes_Obj_And_All_Values()

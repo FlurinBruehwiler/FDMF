@@ -10,7 +10,7 @@ using FieldDefinition = BaseModel.Generated.FieldDefinition;
 namespace FDMF.Tests;
 
 [Collection(DatabaseCollection.DatabaseCollectionName)]
-public class SearchTests
+public sealed class SearchTests
 {
     private static void SetFldIndexed(DbSession session, Guid fldId, bool isIndexed)
     {

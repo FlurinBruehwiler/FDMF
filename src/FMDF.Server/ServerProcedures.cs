@@ -2,7 +2,7 @@
 
 namespace FDMF.Server;
 
-public class ServerProceduresImpl(ConnectedClient connectedClient) : IServerProcedures
+public sealed class ServerProceduresImpl(ConnectedClient connectedClient) : IServerProcedures
 {
     public Task<ServerStatus> GetStatus(int a, int b)
     {

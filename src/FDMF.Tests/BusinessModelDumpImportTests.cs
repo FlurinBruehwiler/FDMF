@@ -5,7 +5,7 @@ using FDMF.Core.Database;
 namespace FDMF.Tests;
 
 [Collection(DatabaseCollection.DatabaseCollectionName)]
-public class BusinessModelDumpImportTests
+public sealed class BusinessModelDumpImportTests
 {
     [Fact]
     public void Create_Db_From_BusinessModel_Dump()

@@ -2,7 +2,7 @@
 
 namespace FDMF.SourceGen;
 
-public class Helper
+public sealed class Helper
 {
     public static string GetRootDir([CallerFilePath] string str = "")
     {

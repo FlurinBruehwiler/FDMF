@@ -6,7 +6,7 @@ using FDMF.Core.Generated;
 
 namespace FDMF.Client;
 
-public class ClientState
+public sealed class ClientState
 {
     public required Channel<Stream> MessagesToSend;
     public required Dictionary<Guid, PendingRequest> PendingRequests;
@@ -89,7 +89,7 @@ public static class Connection
     }
 }
 
-public class WebSocketWrapper
+public sealed class WebSocketWrapper
 {
     public WebSocket? CurrentWebSocket;
 }

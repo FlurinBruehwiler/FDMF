@@ -6,7 +6,7 @@ using Environment = FDMF.Core.Environment;
 namespace FDMF.Tests;
 
 [Collection(DatabaseCollection.DatabaseCollectionName)]
-public class JsonDumpTests
+public sealed class JsonDumpTests
 {
     [Fact]
     public void JsonDump_Dumps_Scalar_Fields()

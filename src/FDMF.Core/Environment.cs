@@ -5,7 +5,7 @@ using LightningDB;
 
 namespace FDMF.Core;
 
-public class Environment : IDisposable
+public sealed class Environment : IDisposable
 {
     public required LightningEnvironment LightningEnvironment;
     public required LightningDatabase ObjectDb;
@@ -304,7 +304,7 @@ public class Environment : IDisposable
     }
 }
 
-public class CustomIndexComparer : IComparer<MDBValue>
+public sealed class CustomIndexComparer : IComparer<MDBValue>
 {
     public enum Comparison : byte
     {
@@ -359,7 +359,7 @@ public class CustomIndexComparer : IComparer<MDBValue>
     }
 }
 
-public class GuidComparer : IComparer<Guid>
+public sealed class GuidComparer : IComparer<Guid>
 {
     public int Compare(Guid x, Guid y)
     {

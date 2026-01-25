@@ -3,7 +3,7 @@ using FDMF.Core.Utils;
 
 namespace FDMF.Tests;
 
-public class BPlusTreeTests
+public sealed class BPlusTreeTests
 {
     private Arena _arena = new Arena(200);
 

@@ -5,7 +5,7 @@ using Environment = FDMF.Core.Environment;
 namespace FDMF.Tests;
 
 [Collection(DatabaseCollection.DatabaseCollectionName)]
-public class JsonDumpImportTests
+public sealed class JsonDumpImportTests
 {
     [Fact]
     public void Create_EmptyDb_And_Import_From_Dump()

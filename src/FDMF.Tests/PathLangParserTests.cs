@@ -2,7 +2,7 @@ using FDMF.Core.PathLayer;
 
 namespace FDMF.Tests;
 
-public class PathLangParserTests
+public sealed class PathLangParserTests
 {
     [Fact]
     public void ParsePredicate_SimpleTraversalWithFieldGuard()

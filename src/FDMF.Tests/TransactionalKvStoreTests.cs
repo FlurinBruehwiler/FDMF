@@ -5,7 +5,7 @@ using LightningDB;
 namespace FDMF.Tests;
 
 [Collection(DatabaseCollection.DatabaseCollectionName)]
-public class TransactionalKvStoreTests
+public sealed class TransactionalKvStoreTests
 {
     [Fact]
     public void ReadOnly_Forwards_Reads_And_Blocks_Writes()

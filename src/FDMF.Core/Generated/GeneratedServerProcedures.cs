@@ -2,7 +2,7 @@ using System.Threading.Channels;
 
 namespace FDMF.Core.Generated;
 
-public class GeneratedServerProcedures(Channel<Stream> sendMessage, Dictionary<Guid, PendingRequest> callbacks) : IServerProcedures
+public sealed class GeneratedServerProcedures(Channel<Stream> sendMessage, Dictionary<Guid, PendingRequest> callbacks) : IServerProcedures
 {
     public Task<ServerStatus> GetStatus(int a, int b)
     {

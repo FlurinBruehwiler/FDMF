@@ -1,6 +1,6 @@
 ﻿namespace FDMF.Client;
 
-public class TestClass
+public sealed class TestClass
 {
     public void Test()
     {

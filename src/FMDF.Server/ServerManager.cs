@@ -8,12 +8,12 @@ using FDMF.Core.Generated;
 
 namespace FDMF.Server;
 
-public class ConnectedClient
+public sealed class ConnectedClient
 {
     public required IClientProcedures ClientProcedures;
 }
 
-public class ServerManager
+public sealed class ServerManager
 {
     public List<ConnectedClient> ConnectedClients = [];
     public Dictionary<Guid, PendingRequest> Callbacks = [];

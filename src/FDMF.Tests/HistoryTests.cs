@@ -6,7 +6,7 @@ using Environment = FDMF.Core.Environment;
 namespace FDMF.Tests;
 
 [Collection(DatabaseCollection.DatabaseCollectionName)]
-public class HistoryTests
+public sealed class HistoryTests
 {
     [Fact]
     public void History_Commits_Can_Be_Enumerated()

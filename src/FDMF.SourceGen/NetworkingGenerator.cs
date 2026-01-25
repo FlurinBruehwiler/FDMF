@@ -42,7 +42,7 @@ public static class NetworkingGenerator
 
         var className = "Generated" + interfaceName.Substring(1);
 
-        sb.AppendLine($"public class {className}(Channel<Stream> sendMessage, Dictionary<Guid, PendingRequest> callbacks) : {interfaceName}");
+        sb.AppendLine($"public sealed class {className}(Channel<Stream> sendMessage, Dictionary<Guid, PendingRequest> callbacks) : {interfaceName}");
         sb.AppendLine("{");
         sb.AddIndent();
 
@@ -113,7 +113,7 @@ public static class NetworkingGenerator
     }
 }
 
-public class InterfaceMemberFinder(List<InterfaceDeclarationSyntax> interfaces) : CSharpSyntaxWalker
+public sealed class InterfaceMemberFinder(List<InterfaceDeclarationSyntax> interfaces) : CSharpSyntaxWalker
 {
     public override void VisitInterfaceDeclaration(InterfaceDeclarationSyntax node)
     {
