@@ -132,6 +132,7 @@ public static class ModelGenerator
 
             sourceBuilder.AppendLine();
 
+            sourceBuilder.AppendLine($"//{entity.Id}");
             sourceBuilder.AppendLine($"public static Guid TypId {{ get; }} = {GetGuidLiteral(entity.Id)};");
             sourceBuilder.AppendLine();
 

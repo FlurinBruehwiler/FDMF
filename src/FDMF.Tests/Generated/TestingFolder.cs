@@ -68,6 +68,7 @@ public partial struct TestingFolder : ITransactionObject, IEquatable<TestingFold
     public override int GetHashCode() => HashCode.Combine(DbSession, ObjId);
     public override string ToString() => ObjId.ToString();
 
+    //a3ccbd8b-2256-414b-a402-1a091cb407a5
     public static Guid TypId { get; } = new Guid([139, 189, 204, 163, 86, 34, 75, 65, 164, 2, 26, 9, 28, 180, 7, 165]);
 
     public static class Fields

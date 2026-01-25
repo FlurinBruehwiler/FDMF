@@ -42,6 +42,7 @@ public partial struct Model : ITransactionObject, IEquatable<Model>
     public override int GetHashCode() => HashCode.Combine(DbSession, ObjId);
     public override string ToString() => ObjId.ToString();
 
+    //5739ae0d-e179-4d46-bae2-081f99d699da
     public static Guid TypId { get; } = new Guid([13, 174, 57, 87, 121, 225, 70, 77, 186, 226, 8, 31, 153, 214, 153, 218]);
 
     public static class Fields

@@ -62,6 +62,7 @@ public partial struct EntityDefinition : ITransactionObject, IEquatable<EntityDe
     public override int GetHashCode() => HashCode.Combine(DbSession, ObjId);
     public override string ToString() => ObjId.ToString();
 
+    //c15f876f-4f74-4034-9acb-03bc3b521e81
     public static Guid TypId { get; } = new Guid([111, 135, 95, 193, 116, 79, 52, 64, 154, 203, 3, 188, 59, 82, 30, 129]);
 
     public static class Fields

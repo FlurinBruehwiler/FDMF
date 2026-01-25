@@ -66,6 +66,7 @@ public partial struct ReferenceFieldDefinition : ITransactionObject, IEquatable<
     public override int GetHashCode() => HashCode.Combine(DbSession, ObjId);
     public override string ToString() => ObjId.ToString();
 
+    //2147ed0f-b37d-4429-a3f8-8312c1620383
     public static Guid TypId { get; } = new Guid([15, 237, 71, 33, 125, 179, 41, 68, 163, 248, 131, 18, 193, 98, 3, 131]);
 
     public static class Fields

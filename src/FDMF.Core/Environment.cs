@@ -316,16 +316,24 @@ public class CustomIndexComparer : IComparer<MDBValue>
 
     public static int CompareStatic(ReadOnlySpan<byte> a, ReadOnlySpan<byte> b)
     {
+        // Key layout for NonStringIndexDb:
+        // [0]   = Comparison
+        // [1..] = 16-byte discriminator (fieldId for most indices, typId for type index)
+        // [17..] = data payload (typed value / assoc bytes / empty for type index)
         if (a[0] != b[0])
-        {
             return a[0].CompareTo(b[0]);
-        }
+
+        // Always include the 16-byte discriminator in ordering.
+        var aDisc = a.Slice(1, 16);
+        var bDisc = b.Slice(1, 16);
+        var discCmp = BPlusTree.CompareLexicographic(aDisc, bDisc);
+        if (discCmp != 0)
+            return discCmp;
 
         var aData = a.Slice(1 + 16);
         var bData = b.Slice(1 + 16);
 
         var comparison = (Comparison)a[0];
-
         return comparison switch
         {
             Comparison.SignedLong => CompareGeneric<long>(aData, bData),
