@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\FDMF.Core\FDMF.Core.csproj" />
   </ItemGroup>
 
 </Project>

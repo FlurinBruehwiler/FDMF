@@ -8,8 +8,7 @@ public sealed class PathLangParserTests
     public void ParsePredicate_SimpleTraversalWithFieldGuard()
     {
         var src = "OwnerCanView(Document): this->Business->Owners[$(Person).CurrentUser=true]";
-        var p = new PathLangParser(src);
-        var result = p.ParsePredicateDef();
+        var result = PathLangParser.Parse(src);
         Assert.DoesNotContain(result.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
         var pred = Assert.Single(result.Predicates);
 
@@ -37,8 +36,7 @@ public sealed class PathLangParserTests
     public void ParsePredicate_LogicalAndOr_And_PredicateCallCompare()
     {
         var src = "CanEdit(Document): (Viewable(this)=true AND Editable(this)=true) OR OwnerCanView(this)=true";
-        var p = new PathLangParser(src);
-        var result = p.ParsePredicateDef();
+        var result = PathLangParser.Parse(src);
         Assert.DoesNotContain(result.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
         var pred = Assert.Single(result.Predicates);
 
@@ -57,8 +55,7 @@ public sealed class PathLangParserTests
     public void ParsePredicate_FilterPredicateCall()
     {
         var src = "TaskViewable(Task): this->Document[Viewable($)=true]";
-        var p = new PathLangParser(src);
-        var result = p.ParsePredicateDef();
+        var result = PathLangParser.Parse(src);
         Assert.DoesNotContain(result.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
         var pred = Assert.Single(result.Predicates);
 
@@ -84,10 +81,10 @@ public sealed class PathLangParserTests
     public void ParsePredicate_MissingRParen_ReportsError_DoesNotThrow()
     {
         var src = "P(Document: this->A";
-        var ex = Record.Exception(() => new PathLangParser(src).ParsePredicateDef());
+        var ex = Record.Exception(() => PathLangParser.Parse(src));
         Assert.Null(ex);
 
-        var result = new PathLangParser(src).ParsePredicateDef();
+        var result = PathLangParser.Parse(src);
         Assert.Contains(result.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
         Assert.Single(result.Predicates);
         Assert.Equal("P", result.Predicates[0].Name.Text.ToString());
@@ -97,7 +94,7 @@ public sealed class PathLangParserTests
     public void ParsePredicate_BadArgExpr_ReportsError_Continues()
     {
         var src = "P(Document): Visible(123)=true";
-        var result = new PathLangParser(src).ParsePredicateDef();
+        var result = PathLangParser.Parse(src);
         Assert.Contains(result.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
 
         var pred = Assert.Single(result.Predicates);
@@ -110,7 +107,7 @@ public sealed class PathLangParserTests
     public void ParseProgram_RecoversAndParsesFollowingPredicate()
     {
         var src = "Bad(Document): this->A[$.X=]\nGood(Document): this[$.Ok=true]";
-        var result = new PathLangParser(src).ParseProgram();
+        var result = PathLangParser.Parse(src);
 
         Assert.Contains(result.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
         Assert.Equal(2, result.Predicates.Count);
@@ -122,10 +119,10 @@ public sealed class PathLangParserTests
     public void ParsePredicate_UnclosedFilterBracket_ReportsError_DoesNotThrow()
     {
         var src = "P(Document): this[$.Ok=true";
-        var ex = Record.Exception(() => new PathLangParser(src).ParsePredicateDef());
+        var ex = Record.Exception(() => PathLangParser.Parse(src));
         Assert.Null(ex);
 
-        var result = new PathLangParser(src).ParsePredicateDef();
+        var result = PathLangParser.Parse(src);
         Assert.Contains(result.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
     }
 }

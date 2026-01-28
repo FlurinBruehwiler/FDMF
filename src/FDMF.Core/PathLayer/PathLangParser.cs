@@ -8,8 +8,12 @@ public sealed class PathLangParser
 
     public List<PathLangDiagnostic> Diagnostics { get; } = new();
 
+    public static PathLangParseResult Parse(string source)
+    {
+        return new PathLangParser(source).ParseProgram();
+    }
 
-    public PathLangParser(string source)
+    internal PathLangParser(string source)
     {
         _tokenizer = new PathLangTokenizer(source);
         _current = _tokenizer.GetNextToken();

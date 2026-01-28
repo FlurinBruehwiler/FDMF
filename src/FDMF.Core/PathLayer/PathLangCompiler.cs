@@ -1,8 +1,5 @@
 namespace FDMF.Core.PathLayer;
 
-// NOTE: This file contains the AST for PathLang.
-// Nodes intentionally store TextView (source slices) instead of allocating strings.
-
 public abstract record AstNode;
 
 public readonly record struct AstIdent(TextView Text)

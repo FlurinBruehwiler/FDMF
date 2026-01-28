@@ -19,10 +19,10 @@ public sealed class PathLangBinderTests
         Assert.NotNull(model);
 
         var src = "P(TestingFolder): this->Parent[$.Name=\"Parent\"]";
-        var parse = new PathLangParser(src).ParsePredicateDef();
+        var parse = PathLangParser.Parse(src);
         Assert.DoesNotContain(parse.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
 
-        var bind = PathLangBinder.Bind(model!.Value, parse.Predicates);
+        var bind = PathLangBinder.Bind(model.Value, parse.Predicates);
         Assert.DoesNotContain(bind.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
 
         var pred = Assert.Single(parse.Predicates);
@@ -45,8 +45,8 @@ public sealed class PathLangBinderTests
         Assert.NotNull(model);
 
         var src = "P(TestingFolder): this[$.DoesNotExist=\"x\"]";
-        var parse = new PathLangParser(src).ParsePredicateDef();
-        var bind = PathLangBinder.Bind(model!.Value, parse.Predicates);
+        var parse = PathLangParser.Parse(src);
+        var bind = PathLangBinder.Bind(model.Value, parse.Predicates);
 
         Assert.Contains(bind.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
     }

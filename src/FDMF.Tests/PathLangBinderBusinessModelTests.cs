@@ -69,7 +69,7 @@ public sealed class PathLangBinderBusinessModelTests
         var src =
             "CanEdit(Document): this->BusinessCase[$.Locked=false] AND (this->OwnerUnit->Members[$(User).CurrentUser=true] OR this->ExplicitViewers[$.CurrentUser=true])";
 
-        var parse = new PathLangParser(src).ParsePredicateDef();
+        var parse = PathLangParser.Parse(src);
         Assert.DoesNotContain(parse.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
 
         var bind = PathLangBinder.Bind(model, parse.Predicates);
@@ -112,7 +112,7 @@ public sealed class PathLangBinderBusinessModelTests
         var model = LoadBusinessModel(env, session);
 
         var src = "Bad(Document): this->DoesNotExist->Members[$.CurrentUser=true]";
-        var parse = new PathLangParser(src).ParsePredicateDef();
+        var parse = PathLangParser.Parse(src);
         var bind = PathLangBinder.Bind(model, parse.Predicates);
 
         Assert.Contains(bind.Diagnostics, d =>
@@ -128,7 +128,7 @@ public sealed class PathLangBinderBusinessModelTests
         var model = LoadBusinessModel(env, session);
 
         var src = "Bad(Document): this->OwnerUnit[$.DoesNotExist=true]";
-        var parse = new PathLangParser(src).ParsePredicateDef();
+        var parse = PathLangParser.Parse(src);
         var bind = PathLangBinder.Bind(model, parse.Predicates);
 
         Assert.Contains(bind.Diagnostics, d =>
@@ -144,7 +144,7 @@ public sealed class PathLangBinderBusinessModelTests
         var model = LoadBusinessModel(env, session);
 
         var src = "Bad(DoesNotExist): this";
-        var parse = new PathLangParser(src).ParsePredicateDef();
+        var parse = PathLangParser.Parse(src);
         var bind = PathLangBinder.Bind(model, parse.Predicates);
 
         Assert.Contains(bind.Diagnostics, d =>
