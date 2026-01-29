@@ -1,5 +1,6 @@
 using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
+using BaseModel.Generated;
 using FDMF.Core;
 using FDMF.Core.Database;
 using LightningDB;
@@ -745,6 +746,25 @@ public sealed class SearchTests
         });
 
         AssertEqual([folderA, folderC], result);
+    }
+
+    [Fact]
+    public void EntityDefinitionSearch()
+    {
+        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+
+        using var tsx = new DbSession(env);
+
+        var result = Searcher.Search<EntityDefinition>(tsx, new StringCriterion
+        {
+            FieldId = EntityDefinition.Fields.Key,
+            Type = StringCriterion.MatchType.Exact,
+            Value = "TestingFolder"
+        });
+
+        var testingFolder = tsx.GetObjFromGuid<EntityDefinition>(Guid.Parse("a3ccbd8b-2256-414b-a402-1a091cb407a5"))!.Value;
+
+        AssertEqual([testingFolder], result);
     }
 
     private void AssertEqual<T>(IEnumerable<T> expected, IEnumerable<T> actual) where T : ITransactionObject

@@ -31,7 +31,7 @@ public static class PathLangBinder
 
         foreach (var p in predicates)
         {
-            var inputTypId = predicateInputTypIdByName[p.InputType.Text.Span];
+            var inputTypId = predicateInputTypIdByName[p.Name.Text.Span];
             if (inputTypId == null)
                 Report(PathLangDiagnosticSeverity.Error, $"Unknown type '{p.InputType.Text}'", p.InputType.Text);
 
@@ -57,7 +57,7 @@ public static class PathLangBinder
                 Value = typeName.ToString()
             });
 
-            if (r.Count != 0)
+            if (r.Count != 1)
                 return null;
 
             return r[0].ObjId;
