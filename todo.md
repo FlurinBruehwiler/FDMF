@@ -13,6 +13,12 @@ In Phase 1 we want to implement a database. This includes the following points.
 - Transactions
 - Indexes/Searching
 
+- Add more FLD data types (guid! / enum) / think about how we are going to handle custom data types
+- implement access management (path lang)
+- add a user to the base model / have the concept of the current user
+- add inheritance (multi?)
+- add unions
+
 ## Phase 2 (Networking Layer)
 
 In Phase 2 we implement the communication between the client and the server

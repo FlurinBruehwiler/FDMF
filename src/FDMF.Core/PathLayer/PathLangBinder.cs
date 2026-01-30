@@ -125,6 +125,7 @@ public static class PathLangBinder
                             break;
                         }
 
+                        semantic.AssocByPathStep[step] = assoc.ObjId;
                         type = assoc.OtherReferenceFields.OwningEntity.ObjId;
 
                         if (step.Filter is not null)
@@ -204,7 +205,7 @@ public static class PathLangBinder
                         {
                             ValidateLiteralType(fld.DataType, fc.Value, fc.FieldName.Text);
 
-                            semantic.FieldByCompare[fc] = new PathLangResolvedField(fld.ObjId, fld.DataType);;
+                            semantic.FieldByCompare[fc] = fld.ObjId;
                         }
                     }
 

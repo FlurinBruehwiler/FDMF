@@ -25,16 +25,12 @@ public sealed class PathLangSemanticModel
 
     public Dictionary<AstPredicate, Guid?> InputTypIdByPredicate { get; } = new();
 
-    // public Dictionary<AstPathStep, PathLangResolvedAssoc> AssocByPathStep { get; } = new();
+    public Dictionary<AstPathStep, Guid> AssocByPathStep { get; } = new();
 
-    public Dictionary<AstFieldCompareCondition, PathLangResolvedField> FieldByCompare { get; } = new();
+    public Dictionary<AstFieldCompareCondition, Guid> FieldByCompare { get; } = new();
 
     public Dictionary<AstFieldCompareCondition, Guid?> TypeGuardTypIdByCompare { get; } = new();
 
     public Dictionary<AstPredicateCallExpr, Guid?> TargetInputTypIdByPredicateCall { get; } = new();
     public Dictionary<AstPredicateCompareCondition, Guid?> TargetInputTypIdByPredicateCompare { get; } = new();
 }
-
-public readonly record struct PathLangResolvedAssoc(Guid AssocFldId, Guid TargetTypId);
-
-public readonly record struct PathLangResolvedField(Guid FldId, string DataType);

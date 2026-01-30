@@ -12,6 +12,7 @@
     <File Path="../networking.md" />
     <File Path="../README.md" />
     <File Path="../todo.md" />
+    <File Path="PathLangSpec.md" />
   </Folder>
   <Project Path="FDMF.Cli/FDMF.Cli.csproj" />
   <Project Path="FDMF.Client/FDMF.Client.csproj" />
