@@ -10,9 +10,8 @@ public sealed record PathLangSemanticResult(
 
 public static class PathLangBinder
 {
-    public static PathLangSemanticResult Bind(Model model, IReadOnlyList<AstPredicate> predicates)
+    public static PathLangSemanticResult Bind(Model model, DbSession dbSession, IReadOnlyList<AstPredicate> predicates)
     {
-        PathLangModelIndex index = PathLangModelIndex.Create(model);
         List<PathLangDiagnostic> diagnostics = new();
 
         //do we even need this if we already have the semanticModel?
@@ -37,12 +36,10 @@ public static class PathLangBinder
 
             semantic.InputTypIdByPredicate[p] = inputTypId;
 
-            var rootTypes = new HashSet<Guid>();
-            if (inputTypId.HasValue && inputTypId.Value != Guid.Empty)
-                rootTypes.Add(inputTypId.Value);
+            inputTypId ??= Guid.Empty;
 
-            // At the start of evaluation, '$' refers to the same node as 'this'.
-            BindExpr(p.Body, rootTypes, rootTypes);
+            //todo $ doesn't really exist yet, maybe we should unify both concepts
+            BindExpr(p.Body, inputTypId.Value, inputTypId.Value);
         }
 
         return new PathLangSemanticResult(semantic, new List<PathLangDiagnostic>(diagnostics));
@@ -63,7 +60,7 @@ public static class PathLangBinder
             return r[0].ObjId;
         }
 
-        void BindExpr(AstExpr expr, HashSet<Guid> thisTypes, HashSet<Guid> currentTypes)
+        void BindExpr(AstExpr expr, Guid thisTypes, Guid currentTypes)
         {
             switch (expr)
             {
@@ -85,7 +82,7 @@ public static class PathLangBinder
                     return;
                 }
 
-                case AstThisExpr or AstCurrentExpr or AstTraverseExpr or AstFilterExpr or AstRepeatExpr:
+                case AstThisExpr or AstCurrentExpr or AstPathExpr or AstFilterExpr or AstRepeatExpr:
                     BindNodeSetExpr(expr, thisTypes, currentTypes);
                     return;
 
@@ -98,97 +95,82 @@ public static class PathLangBinder
             }
         }
 
-        HashSet<Guid> BindNodeSetExpr(AstExpr expr, HashSet<Guid> thisTypes, HashSet<Guid> currentTypes)
+        Guid BindNodeSetExpr(AstExpr expr, Guid thisType, Guid currentType)
         {
             switch (expr)
             {
                 case AstThisExpr t:
                 {
-                    var types = new HashSet<Guid>(thisTypes);
-                    semantic.PossibleTypesByExpr[t] = types;
-                    return types;
+                    semantic.PossibleTypesByExpr[t] = thisType;
+                    return thisType;
                 }
 
                 case AstCurrentExpr c:
                 {
-                    var types = new HashSet<Guid>(currentTypes);
-                    semantic.PossibleTypesByExpr[c] = types;
-                    return types;
+                    semantic.PossibleTypesByExpr[c] = currentType;
+                    return currentType;
                 }
 
-                case AstTraverseExpr tr:
+                case AstPathExpr path:
                 {
-                    var srcTypes = BindNodeSetExpr(tr.Source, thisTypes, currentTypes);
-                    var assocKey = tr.AssocName.Text.ToString();
+                    var type = BindNodeSetExpr(path.Source, thisType, currentType);
 
-                    var assocByType = new Dictionary<Guid, PathLangResolvedAssoc>();
-                    var outTypes = new HashSet<Guid>();
-                    foreach (var typ in srcTypes)
+                    foreach (var step in path.Steps)
                     {
-                        if (!index.TryResolveAssoc(typ, assocKey, out var assoc))
+                        var assocKey = step.AssocName.Text.ToString();
+
+                        if (GetAso(type, assocKey) is not {} assoc)
                         {
-                            Report(PathLangDiagnosticSeverity.Error, $"Unknown association '{assocKey}' on type {FormatType(typ)}", tr.AssocName.Text);
-                            continue;
+                            Report(PathLangDiagnosticSeverity.Error, $"Unknown association '{assocKey}' on type {FormatType(type)}", step.AssocName.Text);
+                            break;
                         }
 
-                        assocByType[typ] = new PathLangResolvedAssoc(assoc.FldId, assoc.TargetTypId);
-                        if (assoc.TargetTypId != Guid.Empty)
-                            outTypes.Add(assoc.TargetTypId);
+                        type = assoc.OtherReferenceFields.OwningEntity.ObjId;
+
+                        if (step.Filter is not null)
+                            BindFilter(step.Filter, thisType, type);
                     }
 
-                    semantic.AssocByTraverse[tr] = assocByType;
-
-                    if (tr.Filter is not null)
-                        BindFilter(tr.Filter, thisTypes, outTypes);
-
-                    semantic.PossibleTypesByExpr[tr] = outTypes;
-                    return outTypes;
+                    semantic.PossibleTypesByExpr[path] = type;
+                    return type;
                 }
 
                 case AstFilterExpr fe:
                 {
-                    var srcTypes = BindNodeSetExpr(fe.Source, thisTypes, currentTypes);
-                    BindFilter(fe.Filter, thisTypes, new HashSet<Guid>(srcTypes));
-                    var outTypes = new HashSet<Guid>(srcTypes);
-                    semantic.PossibleTypesByExpr[fe] = outTypes;
-                    return outTypes;
+                    var srcTypes = BindNodeSetExpr(fe.Source, thisType, currentType);
+                    BindFilter(fe.Filter, thisType, srcTypes);
+
+                    semantic.PossibleTypesByExpr[fe] = srcTypes;
+                    return srcTypes;
                 }
 
                 case AstRepeatExpr re:
                 {
                     ValidateRepeatShape(re);
-                    var innerTypes = BindNodeSetExpr(re.Expr, thisTypes, currentTypes);
+                    var innerTypes = BindNodeSetExpr(re.Expr, thisType, currentType);
 
-                    // Type-wise approximation: 0+ repetitions includes the starting nodes.
-                    var types = new HashSet<Guid>(innerTypes);
-                    foreach (var t in currentTypes)
-                        types.Add(t);
-                    foreach (var t in thisTypes)
-                        types.Add(t);
-
-                    semantic.PossibleTypesByExpr[re] = types;
-                    return types;
+                    semantic.PossibleTypesByExpr[re] = innerTypes;
+                    return innerTypes;
                 }
 
                 case AstErrorExpr e:
                 {
-                    var types = new HashSet<Guid>();
-                    semantic.PossibleTypesByExpr[e] = types;
-                    return types;
+                    semantic.PossibleTypesByExpr[e] = Guid.Empty;
+                    return Guid.Empty;
                 }
 
                 default:
                     Report(PathLangDiagnosticSeverity.Error, $"Expected path expression, got '{expr.GetType().Name}'", TextView.Empty(string.Empty));
-                    return new HashSet<Guid>();
+                    return Guid.Empty;
             }
         }
 
-        void BindFilter(AstFilter filter, HashSet<Guid> thisTypes, HashSet<Guid> currentTypes)
+        void BindFilter(AstFilter filter, Guid thisTypes, Guid currentTypes)
         {
             BindCondition(filter.Condition, thisTypes, currentTypes);
         }
 
-        void BindCondition(AstCondition condition, HashSet<Guid> thisTypes, HashSet<Guid> currentTypes)
+        void BindCondition(AstCondition condition, Guid thisTypes, Guid currentTypes)
         {
             switch (condition)
             {
@@ -210,25 +192,22 @@ public static class PathLangBinder
                     semantic.TypeGuardTypIdByCompare[fc] = guardTypId;
 
                     var fieldKey = fc.FieldName.Text.ToString();
-                    IEnumerable<Guid> typesToCheck = guardTypId.HasValue ? new[] { guardTypId.Value } : currentTypes;
+                    Guid typesToCheck = guardTypId ?? currentTypes;
 
-                    var fieldByTyp = new Dictionary<Guid, PathLangResolvedField>();
-                    foreach (var typ in typesToCheck)
+                    if (typesToCheck != Guid.Empty)
                     {
-                        if (typ == Guid.Empty)
-                            continue;
-
-                        if (!index.TryResolveScalar(typ, fieldKey, out var fld))
+                        if (GetFld(typesToCheck, fieldKey) is not {} fld)
                         {
-                            Report(PathLangDiagnosticSeverity.Error, $"Unknown field '{fieldKey}' on type {FormatType(typ)}", fc.FieldName.Text);
-                            continue;
+                            Report(PathLangDiagnosticSeverity.Error, $"Unknown field '{fieldKey}' on type {FormatType(typesToCheck)}", fc.FieldName.Text);
                         }
+                        else
+                        {
+                            ValidateLiteralType(fld.DataType, fc.Value, fc.FieldName.Text);
 
-                        fieldByTyp[typ] = new PathLangResolvedField(fld.FldId, fld.DataType);
-                        ValidateLiteralType(fld.DataType, fc.Value, fc.FieldName.Text);
+                            semantic.FieldByCompare[fc] = new PathLangResolvedField(fld.ObjId, fld.DataType);;
+                        }
                     }
 
-                    semantic.FieldByCompare[fc] = fieldByTyp;
                     return;
                 }
 
@@ -255,30 +234,57 @@ public static class PathLangBinder
             }
         }
 
+        ReferenceFieldDefinition? GetAso(Guid ed, ReadOnlySpan<char> key)
+        {
+            if (dbSession.GetObjFromGuid<EntityDefinition>(ed) is {} entityDefinition)
+            {
+                foreach (var fld in entityDefinition.ReferenceFieldDefinitions)
+                {
+                    if (fld.Key.AsSpan().SequenceEqual(key))
+                    {
+                        return fld;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        FieldDefinition? GetFld(Guid ed, ReadOnlySpan<char> key)
+        {
+            if (dbSession.GetObjFromGuid<EntityDefinition>(ed) is {} entityDefinition)
+            {
+                foreach (var fld in entityDefinition.FieldDefinitions)
+                {
+                    if (fld.Key.AsSpan().SequenceEqual(key))
+                    {
+                        return fld;
+                    }
+                }
+            }
+
+            return null;
+        }
+
         void ValidateRepeatShape(AstRepeatExpr re)
         {
             // v1 restriction: repeat must contain a path expression whose last step yields a single association traversal.
             // Enforce: repeat(<single traversal>) where inner is exactly: (this|$) -> Ident [no filter]
-            if (re.Expr is AstTraverseExpr tr && tr.Source is (AstThisExpr or AstCurrentExpr) && tr.Filter is null && tr.Source is not AstTraverseExpr)
+            if (re.Expr is AstPathExpr p && p.Source is (AstThisExpr or AstCurrentExpr) && p.Steps.Count == 1 && p.Steps[0].Filter is null)
                 return;
 
             Report(PathLangDiagnosticSeverity.Error, "repeat(...) must contain a single traversal like repeat(this->Parent)", GetSpan(re.Expr));
         }
 
-        void ValidatePredicateArgType(string predName, Guid? targetInputTypId, IReadOnlySet<Guid> argTypes, TextView at)
+        void ValidatePredicateArgType(string predName, Guid? targetInputTypId, Guid argTypes, TextView at)
         {
             if (!targetInputTypId.HasValue || targetInputTypId.Value == Guid.Empty)
                 return;
-            if (argTypes.Count == 0)
+
+            if (argTypes == targetInputTypId.Value)
                 return;
 
-            foreach (var t in argTypes)
-            {
-                if (t == targetInputTypId.Value)
-                    return;
-            }
-
-            Report(PathLangDiagnosticSeverity.Warning, $"Predicate '{predName}' expects {FormatType(targetInputTypId.Value)} but argument may be {FormatTypes(argTypes)}", at);
+            Report(PathLangDiagnosticSeverity.Warning, $"Predicate '{predName}' expects {FormatType(targetInputTypId.Value)} but argument may be {FormatType(argTypes)}", at);
         }
 
         void ValidateLiteralType(string dataType, AstLiteral lit, TextView at)
@@ -335,7 +341,7 @@ public static class PathLangBinder
             return node switch
             {
                 AstPredicate p => p.Name.Text,
-                AstTraverseExpr t => t.AssocName.Text,
+                AstPathExpr p when p.Steps.Count > 0 => p.Steps[0].AssocName.Text,
                 AstPredicateCallExpr c => c.PredicateName.Text,
                 AstLogicalExpr l => GetSpan(l.Left),
                 AstFilterExpr f => GetSpan(f.Source),
@@ -352,14 +358,15 @@ public static class PathLangBinder
 
         string FormatType(Guid typId)
         {
-            return index.TryGetEntityByTypId(typId, out var info) ? $"'{info.Key}'" : $"'{typId}'";
-        }
-
-        string FormatTypes(IReadOnlySet<Guid> typIds)
-        {
-            if (typIds.Count == 0)
+            if (typId == Guid.Empty)
                 return "<unknown>";
-            return string.Join(" | ", typIds.Select(FormatType));
+
+            if (dbSession.GetObjFromGuid<EntityDefinition>(typId) is {} entityDefinition)
+            {
+                return $"'{entityDefinition.Key}'";
+            }
+
+            return $"'{typId}'";
         }
     }
 }

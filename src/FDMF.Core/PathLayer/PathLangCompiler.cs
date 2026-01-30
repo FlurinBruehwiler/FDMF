@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace FDMF.Core.PathLayer;
 
 public abstract record AstNode;
@@ -25,10 +27,16 @@ public sealed record AstCurrentExpr : AstExpr;
 
 // ---- Core path operations ----
 
-public sealed record AstTraverseExpr(
-    AstExpr Source,
+public sealed record AstPathStep(
     AstIdent AssocName,
     AstFilter? Filter = null
+) : AstNode;
+
+// Represents a sequence of traversals starting from a source expression:
+//   this->A->B[...]
+public sealed record AstPathExpr(
+    AstExpr Source,
+    IReadOnlyList<AstPathStep> Steps
 ) : AstExpr;
 
 public sealed record AstFilterExpr(AstExpr Source, AstFilter Filter) : AstExpr;

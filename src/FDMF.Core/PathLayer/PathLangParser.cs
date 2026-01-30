@@ -204,6 +204,8 @@ public sealed class PathLangParser
     {
         var source = ParseSourceExpr();
 
+        var steps = new List<AstPathStep>();
+
         // 0+ -> steps
         while (_current.Kind == TokenKind.Arrow)
         {
@@ -213,8 +215,11 @@ public sealed class PathLangParser
             if (_current.Kind == TokenKind.LBracket)
                 filter = ParseFilter();
 
-            source = new AstTraverseExpr(source, new AstIdent(assoc.Text), filter);
+            steps.Add(new AstPathStep(new AstIdent(assoc.Text), filter));
         }
+
+        if (steps.Count > 0)
+            source = new AstPathExpr(source, steps);
 
         // optional trailing filter (this[cond])
         if (_current.Kind == TokenKind.LBracket)

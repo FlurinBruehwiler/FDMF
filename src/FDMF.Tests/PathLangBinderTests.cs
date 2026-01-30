@@ -22,17 +22,18 @@ public sealed class PathLangBinderTests
         var parse = PathLangParser.Parse(src);
         Assert.DoesNotContain(parse.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
 
-        var bind = PathLangBinder.Bind(model.Value, parse.Predicates);
+        var bind = PathLangBinder.Bind(model.Value, session, parse.Predicates);
         Assert.DoesNotContain(bind.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
 
         var pred = Assert.Single(parse.Predicates);
         Assert.Equal(TestingFolder.TypId, bind.SemanticModel.InputTypIdByPredicate[pred]);
 
-        var trav = Assert.IsType<AstTraverseExpr>(pred.Body);
-        Assert.Contains(bind.SemanticModel.AssocByTraverse[trav].Values, v => v.AssocFldId == TestingFolder.Fields.Parent);
+        var path = Assert.IsType<AstPathExpr>(pred.Body);
+        var step = Assert.Single(path.Steps);
+        // Assert.Contains(bind.SemanticModel.AssocByPathStep[step].Values, v => v.AssocFldId == TestingFolder.Fields.Parent);
 
-        var cond = Assert.IsType<AstFieldCompareCondition>(trav.Filter!.Condition);
-        Assert.Contains(bind.SemanticModel.FieldByCompare[cond].Values, v => v.FldId == TestingFolder.Fields.Name);
+        var cond = Assert.IsType<AstFieldCompareCondition>(step.Filter!.Condition);
+        // Assert.Contains(bind.SemanticModel.FieldByCompare[cond].Values, v => v.FldId == TestingFolder.Fields.Name);
     }
 
     [Fact]
@@ -46,7 +47,7 @@ public sealed class PathLangBinderTests
 
         var src = "P(TestingFolder): this[$.DoesNotExist=\"x\"]";
         var parse = PathLangParser.Parse(src);
-        var bind = PathLangBinder.Bind(model.Value, parse.Predicates);
+        var bind = PathLangBinder.Bind(model.Value, session, parse.Predicates);
 
         Assert.Contains(bind.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
     }

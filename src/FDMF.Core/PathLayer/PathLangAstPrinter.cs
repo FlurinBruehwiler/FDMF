@@ -82,14 +82,20 @@ public static class PathLangAstPrinter
                 Line(sb, indent, "<error expr>");
                 return;
 
-            case AstTraverseExpr tr:
-                Line(sb, indent, $"Traverse -> {FormatIdent(tr.AssocName, includeSpans)}");
+            case AstPathExpr p:
+                Line(sb, indent, "PathExpr");
                 Line(sb, indent + 1, "Source:");
-                WriteExpr(sb, tr.Source, indent + 2, includeSpans);
-                if (tr.Filter is not null)
+                WriteExpr(sb, p.Source, indent + 2, includeSpans);
+                Line(sb, indent + 1, "Steps:");
+                for (int i = 0; i < p.Steps.Count; i++)
                 {
-                    Line(sb, indent + 1, "Filter:");
-                    WriteFilter(sb, tr.Filter, indent + 2, includeSpans);
+                    var step = p.Steps[i];
+                    Line(sb, indent + 2, $"-> {FormatIdent(step.AssocName, includeSpans)}");
+                    if (step.Filter is not null)
+                    {
+                        Line(sb, indent + 3, "Filter:");
+                        WriteFilter(sb, step.Filter, indent + 4, includeSpans);
+                    }
                 }
                 return;
 

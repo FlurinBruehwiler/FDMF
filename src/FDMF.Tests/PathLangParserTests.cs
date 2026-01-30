@@ -16,14 +16,14 @@ public sealed class PathLangParserTests
         Assert.Equal("Document", pred.InputType.Text.ToString());
 
         // this->Business->Owners[...]
-        var t2 = Assert.IsType<AstTraverseExpr>(pred.Body);
-        Assert.Equal("Owners", t2.AssocName.Text.ToString());
+        var path = Assert.IsType<AstPathExpr>(pred.Body);
+        Assert.IsType<AstThisExpr>(path.Source);
+        Assert.Equal(2, path.Steps.Count);
+        Assert.Equal("Business", path.Steps[0].AssocName.Text.ToString());
+        Assert.Null(path.Steps[0].Filter);
+        Assert.Equal("Owners", path.Steps[1].AssocName.Text.ToString());
 
-        var t1 = Assert.IsType<AstTraverseExpr>(t2.Source);
-        Assert.Equal("Business", t1.AssocName.Text.ToString());
-        Assert.IsType<AstThisExpr>(t1.Source);
-
-        var filter = t2.Filter;
+        var filter = path.Steps[1].Filter;
         Assert.NotNull(filter);
         var cond = Assert.IsType<AstFieldCompareCondition>(filter!.Condition);
         Assert.Equal("Person", cond.TypeGuard!.Value.Text.ToString());
@@ -59,11 +59,12 @@ public sealed class PathLangParserTests
         Assert.DoesNotContain(result.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
         var pred = Assert.Single(result.Predicates);
 
-        var trav = Assert.IsType<AstTraverseExpr>(pred.Body);
-        Assert.Equal("Document", trav.AssocName.Text.ToString());
-        Assert.IsType<AstThisExpr>(trav.Source);
+        var path = Assert.IsType<AstPathExpr>(pred.Body);
+        Assert.IsType<AstThisExpr>(path.Source);
+        var step = Assert.Single(path.Steps);
+        Assert.Equal("Document", step.AssocName.Text.ToString());
 
-        var cond = Assert.IsType<AstPredicateCompareCondition>(trav.Filter!.Condition);
+        var cond = Assert.IsType<AstPredicateCompareCondition>(step.Filter!.Condition);
         Assert.Equal("Viewable", cond.PredicateName.Text.ToString());
         Assert.IsType<AstCurrentExpr>(cond.Argument);
         Assert.Equal(AstCompareOp.Equals, cond.Op);
