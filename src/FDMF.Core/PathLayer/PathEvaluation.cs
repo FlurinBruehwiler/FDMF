@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Runtime.InteropServices;
 using BaseModel.Generated;
 using FDMF.Core.Database;
 
@@ -66,13 +67,25 @@ public static class PathEvaluation
                     break;
                 case AstFieldCompareCondition astFieldCompareCondition:
                     var fld = type.FieldDefinitions.First(x => astFieldCompareCondition.FieldName.Text.Span.SequenceEqual(x.Key));
-                    session.GetFldValue(obj, fld.ObjId);
+                    var actualValue = session.GetFldValue(obj, fld.ObjId);
+
+                    bool r = true;
                     switch (astFieldCompareCondition.Value)
                     {
-
+                        case AstBoolLiteral astBoolLiteral:
+                            r = MemoryMarshal.Read<bool>(actualValue) == astBoolLiteral.Value;
+                            break;
+                        case AstErrorLiteral astErrorLiteral:
+                            break;
+                        case AstNumberLiteral astNumberLiteral:
+                            break;
+                        case AstStringLiteral astStringLiteral:
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException();
                     }
 
-                    break;
+                    return astFieldCompareCondition.Op == AstCompareOp.Equals ? r : !r;
                 case AstPredicateCompareCondition astPredicateCompareCondition:
                     break;
                 default:

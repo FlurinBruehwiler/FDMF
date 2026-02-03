@@ -340,7 +340,8 @@ public sealed class DbSession : IDisposable
         if (value[0] != (byte)ValueTyp.Val)
             return [];
 
-        return value.Slice(1);
+        //hmm, maybe we can avoid this copy, but maybe not
+        return Arena.AllocateSlice(value.Slice(1));
     }
 
     /// <summary>
