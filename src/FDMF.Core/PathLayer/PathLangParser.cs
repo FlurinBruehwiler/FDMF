@@ -120,15 +120,6 @@ public sealed class PathLangParser
             return inner;
         }
 
-        if (_current.Kind == TokenKind.KeywordRepeat)
-        {
-            Next();
-            Expect(TokenKind.LParen, TokenKind.KeywordThis, TokenKind.Dollar, TokenKind.RParen);
-            var expr = ParsePathExpr();
-            Expect(TokenKind.RParen, TokenKind.KeywordAnd, TokenKind.KeywordOr, TokenKind.RBracket, TokenKind.EndOfFile);
-            return new AstRepeatExpr(expr);
-        }
-
         // In v1 grammar, a pathExpr must start with this or $.
         // If we see an identifier here, it must be a predicate call.
         if (_current.Kind == TokenKind.Identifier)
@@ -243,6 +234,18 @@ public sealed class PathLangParser
         {
             Next();
             return new AstCurrentExpr();
+        }
+
+        // Allow repeat(...) to be used as a node-set source so it can be chained:
+        //   repeat(this->Parent)->Children
+        //   repeat(this->Parent)[$.Name="Root"]
+        if (_current.Kind == TokenKind.KeywordRepeat)
+        {
+            Next();
+            Expect(TokenKind.LParen, TokenKind.KeywordThis, TokenKind.Dollar, TokenKind.KeywordRepeat, TokenKind.RParen);
+            var inner = ParsePathExpr();
+            Expect(TokenKind.RParen, TokenKind.Arrow, TokenKind.LBracket, TokenKind.KeywordAnd, TokenKind.KeywordOr, TokenKind.EndOfFile);
+            return new AstRepeatExpr(inner);
         }
 
         Report(PathLangDiagnosticSeverity.Error, $"Expected 'this' or '$' but got {_current.Kind}", _current);
