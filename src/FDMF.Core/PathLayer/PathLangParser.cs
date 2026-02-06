@@ -381,7 +381,7 @@ public sealed class PathLangParser
         {
             var tv = _current.Text;
             Next();
-            return new AstStringLiteral(tv);
+            return new AstStringLiteral(new TextView(tv.Source, tv.Start + 1, tv.Length - 2)); //removing start and end quotes
         }
 
         Report(PathLangDiagnosticSeverity.Error, $"Expected literal but got {_current.Kind}", _current);

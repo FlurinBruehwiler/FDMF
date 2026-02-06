@@ -127,6 +127,7 @@ public static class PathLangBinder
 
                         semantic.AssocByPathStep[step] = assoc.ObjId;
                         type = assoc.OtherReferenceFields.OwningEntity.ObjId;
+                        semantic.PossibleTypesByExpr[step] = type;
 
                         if (step.Filter is not null)
                             BindFilter(step.Filter, thisType, type);

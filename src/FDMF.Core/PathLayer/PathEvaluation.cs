@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text;
 using BaseModel.Generated;
 using FDMF.Core.Database;
 
@@ -22,7 +23,7 @@ public static class PathEvaluation
 
             var steps = astPathExpr.Steps.ToArray();
 
-            EvalSteps(steps, thisObj);
+            return EvalSteps(steps, thisObj);
         }
 
         return false;
@@ -80,6 +81,7 @@ public static class PathEvaluation
                         case AstNumberLiteral astNumberLiteral:
                             break;
                         case AstStringLiteral astStringLiteral:
+                            r = Encoding.Unicode.GetString(actualValue).SequenceEqual(astStringLiteral.Raw.Span);
                             break;
                         default:
                             throw new ArgumentOutOfRangeException();
