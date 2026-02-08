@@ -23,6 +23,7 @@ public static class ModelGenerator
             sourceBuilder.AppendLine("using MemoryPack;");
             sourceBuilder.AppendLine("using FDMF.Core;");
             sourceBuilder.AppendLine("using FDMF.Core.DatabaseLayer;");
+            sourceBuilder.AppendLine();
 
             sourceBuilder.AppendLine($"namespace {@namespace};");
             sourceBuilder.AppendLine();
@@ -94,6 +95,7 @@ public static class ModelGenerator
                 sourceBuilder.AppendLine($"set => DbSession.SetFldValue(ObjId, Fields.{field.Key}, {fromFunction});");
                 sourceBuilder.RemoveIndent();
                 sourceBuilder.AppendLine("}");
+                sourceBuilder.AppendLine();
             }
 
             foreach (var refField in entity.ReferenceFieldDefinitions)
@@ -121,9 +123,9 @@ public static class ModelGenerator
                     sourceBuilder.AppendLine("[MemoryPackIgnore]");
                     sourceBuilder.AppendLine($"public AssocCollection<{refField.OtherReferenceFields.OwningEntity.Key}> {refField.Key} => new(DbSession, ObjId, Fields.{refField.Key}, {refField.OtherReferenceFields.OwningEntity.Key}.Fields.{refField.OtherReferenceFields.Key});");
                 }
-            }
 
-            sourceBuilder.AppendLine();
+                sourceBuilder.AppendLine();
+            }
 
             sourceBuilder.AppendLine($"public static bool operator ==({entity.Key} a, {entity.Key} b) => a.DbSession == b.DbSession && a.ObjId == b.ObjId;");
             sourceBuilder.AppendLine($"public static bool operator !=({entity.Key} a, {entity.Key} b) => a.DbSession != b.DbSession || a.ObjId != b.ObjId;");
@@ -135,23 +137,23 @@ public static class ModelGenerator
 
             sourceBuilder.AppendLine();
 
-            sourceBuilder.AppendLine($"//{entity.Id}");
+            sourceBuilder.AppendLine($"///{entity.Id}");
             sourceBuilder.AppendLine($"public static Guid TypId {{ get; }} = {GetGuidLiteral(entity.Id)};");
             sourceBuilder.AppendLine();
 
-            sourceBuilder.AppendLine($"public static class Fields");
+            sourceBuilder.AppendLine("public static class Fields");
             sourceBuilder.AppendLine("{");
             sourceBuilder.AddIndent();
 
             foreach (var fieldDefinition in entity.FieldDefinitions)
             {
-                sourceBuilder.AppendLine($"//{fieldDefinition.Id}");
+                sourceBuilder.AppendLine($"///{fieldDefinition.Id}");
                 sourceBuilder.AppendLine($"public static readonly Guid {fieldDefinition.Key} = {GetGuidLiteral(fieldDefinition.Id)};");
             }
 
             foreach (var fieldDefinition in entity.ReferenceFieldDefinitions)
             {
-                sourceBuilder.AppendLine($"//{fieldDefinition.Id}");
+                sourceBuilder.AppendLine($"///{fieldDefinition.Id}");
                 sourceBuilder.AppendLine($"public static readonly Guid {fieldDefinition.Key} = {GetGuidLiteral(fieldDefinition.Id)};");
             }
 
