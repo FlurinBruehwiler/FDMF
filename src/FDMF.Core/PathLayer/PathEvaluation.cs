@@ -23,34 +23,70 @@ public static class PathEvaluation
 
             var steps = astPathExpr.Steps.ToArray();
 
-            return EvalSteps(steps, thisObj);
+            return EvalSteps(steps, thisObj, out _);
         }
 
         return false;
 
-        bool EvalSteps(Span<AstPathStep> steps, Guid obj)
+        bool EvalSteps(Span<AstPathStep> steps, Guid obj, out Guid targetObj)
         {
             if (steps.Length == 0)
+            {
+                targetObj = obj;
                 return true;
+            }
 
             var thisStep = steps[0];
 
-            var otherType = session.GetObjFromGuid<EntityDefinition>(semanticModel.PossibleTypesByExpr[thisStep])!.Value;
-            foreach (var asoObj in session.EnumerateAso(obj, semanticModel.AssocByPathStep[thisStep]))
+            if (thisStep is AstAsoStep asoStep)
             {
-                //check condition
-                if (thisStep.Filter != null)
-                {
-                    if(!CheckCondition(thisStep.Filter.Condition, asoObj.ObjId, otherType))
-                        continue;
-                }
+                var otherType = session.GetObjFromGuid<EntityDefinition>(semanticModel.PossibleTypesByExpr[asoStep])!.Value;
 
-                if (EvalSteps(steps.Slice(1), asoObj.ObjId))
+                //depth first
+                foreach (var asoObj in session.EnumerateAso(obj, semanticModel.AssocByPathStep[asoStep]))
                 {
-                    return true;
+                    //check condition
+                    if (asoStep.Filter != null)
+                    {
+                        if(!CheckCondition(asoStep.Filter.Condition, asoObj.ObjId, otherType))
+                            continue;
+                    }
+
+                    if (EvalSteps(steps.Slice(1), asoObj.ObjId, out targetObj))
+                    {
+                        return true;
+                    }
+                }
+            }
+            else if (thisStep is AstRepeatStep repeatStep)
+            {
+                //we do the repeat n times until the repeat doesn't match anymore
+                //after each step, we evaluate what comes after the repeat
+                while (true)
+                {
+                    //check if the repeat step matches
+                    if (EvalSteps(repeatStep.Steps, obj, out obj))
+                    {
+                        //check exit condition (can only exit the loop if the exit condition matches)
+                        if (repeatStep.Filter != null && !CheckCondition(repeatStep.Filter.Condition, obj, default)) //todo what entity?
+                        {
+                            continue;
+                        }
+
+                        //try to exit the loop
+                        if (EvalSteps(steps.Slice(1), obj, out targetObj))
+                        {
+                            return true;
+                        }
+                    }
+                    else
+                    {
+                        break;
+                    }
                 }
             }
 
+            targetObj = Guid.Empty;
             return false;
         }
 
