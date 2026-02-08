@@ -173,7 +173,10 @@ Operator precedence:
 
 ### Repeat
 
-`repeat(this->Parent)` is intended for recursive traversal.
+`this->repeat(->Parent)->SomeAssoc` is intended for recursive traversal.
+
+Repeat is a kind of path segment:
+- The input needs to be the same as the output. 
 
 - Semantics: repeatedly apply the inner path expression zero or more times.
 - v1 restriction: `repeat` must contain a path expression whose last step yields a single association traversal.

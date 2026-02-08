@@ -23,7 +23,7 @@ public static class PathLangAstPrinter
             WritePredicate(sb, predicates[i], 0, includeSpans);
         }
 
-        return sb.ToString();
+        return sb.ToString().ReplaceLineEndings("\n").TrimEnd();
     }
 
     public static string Print(AstNode node, bool includeSpans = false)
@@ -86,17 +86,7 @@ public static class PathLangAstPrinter
                 Line(sb, indent, "PathExpr");
                 Line(sb, indent + 1, "Source:");
                 WriteExpr(sb, p.Source, indent + 2, includeSpans);
-                Line(sb, indent + 1, "Steps:");
-                for (int i = 0; i < p.Steps.Count; i++)
-                {
-                    var step = p.Steps[i];
-                    Line(sb, indent + 2, $"-> {FormatIdent(step.AssocName, includeSpans)}");
-                    if (step.Filter is not null)
-                    {
-                        Line(sb, indent + 3, "Filter:");
-                        WriteFilter(sb, step.Filter, indent + 4, includeSpans);
-                    }
-                }
+                WriteSteps(sb, indent, includeSpans, p.Steps);
                 return;
 
             case AstFilterExpr fe:
@@ -105,11 +95,6 @@ public static class PathLangAstPrinter
                 WriteExpr(sb, fe.Source, indent + 2, includeSpans);
                 Line(sb, indent + 1, "Filter:");
                 WriteFilter(sb, fe.Filter, indent + 2, includeSpans);
-                return;
-
-            case AstRepeatExpr re:
-                Line(sb, indent, "Repeat");
-                WriteExpr(sb, re.Expr, indent + 1, includeSpans);
                 return;
 
             case AstLogicalExpr log:
@@ -129,6 +114,31 @@ public static class PathLangAstPrinter
             default:
                 Line(sb, indent, e.GetType().Name);
                 return;
+        }
+    }
+
+    private static void WriteSteps(StringBuilder sb, int indent, bool includeSpans,  IReadOnlyList<AstPathStep> steps)
+    {
+        Line(sb, indent + 1, "Steps:");
+        for (int i = 0; i < steps.Count; i++)
+        {
+            var step = steps[i];
+
+            if (step is AstAsoStep asoStep)
+            {
+                Line(sb, indent + 2, $"-> {FormatIdent(asoStep.AssocName, includeSpans)}");
+            }
+            else if (step is AstRepeatStep repeatStep)
+            {
+                Line(sb, indent + 2, $"-> Repeat");
+                WriteSteps(sb, indent + 4, includeSpans, repeatStep.Steps);
+            }
+
+            if (step.Filter is not null)
+            {
+                Line(sb, indent + 3, "Filter:");
+                WriteFilter(sb, step.Filter, indent + 4, includeSpans);
+            }
         }
     }
 

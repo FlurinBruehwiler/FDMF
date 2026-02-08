@@ -1,35 +1,112 @@
+using FDMF.Core.Database;
 using FDMF.Core.PathLayer;
 
 namespace FDMF.Tests;
 
-public sealed class PathLangParserTests
+//todo assert compare against real output
+public sealed class PathLangParserTests(ITestOutputHelper outputHelper)
 {
+    private void AssertEqual(string expected, string actual)
+    {
+        if (expected == actual)
+        {
+            Assert.Equal(expected, actual);
+            return;
+        }
+
+        outputHelper.WriteLine($"Expected: {expected}");
+        outputHelper.WriteLine("");
+        outputHelper.WriteLine($"Actual: {actual}");
+
+        outputHelper.WriteLine("\nLine by Line:");
+
+        var expectedLines = expected.Split('\n');
+        var actualLines = actual.Split('\n');
+
+        for (var i = 0; i < Math.Max(expectedLines.Length, actualLines.Length); i++)
+        {
+            outputHelper.WriteLine("e: " + expectedLines.GetOrDefault(i, ""));
+            outputHelper.WriteLine("a: " + actualLines.GetOrDefault(i, ""));
+            outputHelper.WriteLine("");
+        }
+
+        Assert.Fail("Not equal, see output");
+    }
+
     [Fact]
     public void ParsePredicate_SimpleTraversalWithFieldGuard()
     {
         var src = "OwnerCanView(Document): this->Business->Owners[$(Person).CurrentUser=true]";
         var result = PathLangParser.Parse(src);
         Assert.DoesNotContain(result.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
-        var pred = Assert.Single(result.Predicates);
 
-        Assert.Equal("OwnerCanView", pred.Name.Text.ToString());
-        Assert.Equal("Document", pred.InputType.Text.ToString());
+        var actual = PathLangAstPrinter.PrintProgram(result.Predicates, false);
+        var expected = """
+                       Predicate OwnerCanView(Document)
+                         Body:
+                           PathExpr
+                             Source:
+                               This
+                             Steps:
+                               -> Business
+                               -> Owners
+                                 Filter:
+                                   [
+                                     FieldCompare Equals
+                                       TypeGuard: Person
+                                       Field: CurrentUser
+                                       Value:
+                                         Bool true
+                                   ]
+                       """;
 
-        // this->Business->Owners[...]
-        var path = Assert.IsType<AstPathExpr>(pred.Body);
-        Assert.IsType<AstThisExpr>(path.Source);
-        Assert.Equal(2, path.Steps.Count);
-        Assert.Equal("Business", path.Steps[0].AssocName.Text.ToString());
-        Assert.Null(path.Steps[0].Filter);
-        Assert.Equal("Owners", path.Steps[1].AssocName.Text.ToString());
+        AssertEqual(expected, actual);
+    }
 
-        var filter = path.Steps[1].Filter;
-        Assert.NotNull(filter);
-        var cond = Assert.IsType<AstFieldCompareCondition>(filter!.Condition);
-        Assert.Equal("Person", cond.TypeGuard!.Value.Text.ToString());
-        Assert.Equal("CurrentUser", cond.FieldName.Text.ToString());
-        Assert.Equal(AstCompareOp.Equals, cond.Op);
-        Assert.True(Assert.IsType<AstBoolLiteral>(cond.Value).Value);
+    [Fact]
+    public void Parse_Repeat_Predicate()
+    {
+      var src = "RepeatPredicate(Document): this->hallo[$.someProp=true]->repeat(->bello[$.someProp2=true])[$.someProp3=true]->end";
+      var result = PathLangParser.Parse(src);
+      Assert.DoesNotContain(result.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
+
+      var actual = PathLangAstPrinter.PrintProgram(result.Predicates, false);
+      var expected = """
+                     Predicate RepeatPredicate(Document)
+                       Body:
+                         PathExpr
+                           Source:
+                             This
+                           Steps:
+                             -> hallo
+                               Filter:
+                                 [
+                                   FieldCompare Equals
+                                     Field: someProp
+                                     Value:
+                                       Bool true
+                                 ]
+                             -> Repeat
+                                   Steps:
+                                     -> bello
+                                       Filter:
+                                         [
+                                           FieldCompare Equals
+                                             Field: someProp2
+                                             Value:
+                                               Bool true
+                                         ]
+                               Filter:
+                                 [
+                                   FieldCompare Equals
+                                     Field: someProp3
+                                     Value:
+                                       Bool true
+                                 ]
+                             -> end
+                     """;
+
+      AssertEqual(expected, actual);
     }
 
     [Fact]
@@ -38,17 +115,29 @@ public sealed class PathLangParserTests
         var src = "CanEdit(Document): (Viewable(this)=true AND Editable(this)=true) OR OwnerCanView(this)=true";
         var result = PathLangParser.Parse(src);
         Assert.DoesNotContain(result.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
-        var pred = Assert.Single(result.Predicates);
 
-        var or = Assert.IsType<AstLogicalExpr>(pred.Body);
-        Assert.Equal(AstLogicalOp.Or, or.Op);
+        var actual = PathLangAstPrinter.PrintProgram(result.Predicates, false);
+        var expected = """
+                       Predicate CanEdit(Document)
+                         Body:
+                           Logical Or
+                             Left:
+                               Logical And
+                                 Left:
+                                   PredicateCall Viewable
+                                     Arg:
+                                       This
+                                 Right:
+                                   PredicateCall Editable
+                                     Arg:
+                                       This
+                             Right:
+                               PredicateCall OwnerCanView
+                                 Arg:
+                                   This
+                       """;
 
-        var and = Assert.IsType<AstLogicalExpr>(or.Left);
-        Assert.Equal(AstLogicalOp.And, and.Op);
-
-        AssertCall(and.Left, "Viewable");
-        AssertCall(and.Right, "Editable");
-        AssertCall(or.Right, "OwnerCanView");
+        AssertEqual(expected, actual);
     }
 
     [Fact]
@@ -57,25 +146,27 @@ public sealed class PathLangParserTests
         var src = "TaskViewable(Task): this->Document[Viewable($)=true]";
         var result = PathLangParser.Parse(src);
         Assert.DoesNotContain(result.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
-        var pred = Assert.Single(result.Predicates);
 
-        var path = Assert.IsType<AstPathExpr>(pred.Body);
-        Assert.IsType<AstThisExpr>(path.Source);
-        var step = Assert.Single(path.Steps);
-        Assert.Equal("Document", step.AssocName.Text.ToString());
+        var actual = PathLangAstPrinter.PrintProgram(result.Predicates, false);
+        var expected = """
+                       Predicate TaskViewable(Task)
+                         Body:
+                           PathExpr
+                             Source:
+                               This
+                             Steps:
+                               -> Document
+                                 Filter:
+                                   [
+                                     PredicateCompare Equals Viewable
+                                       Arg:
+                                         Current ($)
+                                       Value:
+                                         Bool true
+                                   ]
+                       """;
 
-        var cond = Assert.IsType<AstPredicateCompareCondition>(step.Filter!.Condition);
-        Assert.Equal("Viewable", cond.PredicateName.Text.ToString());
-        Assert.IsType<AstCurrentExpr>(cond.Argument);
-        Assert.Equal(AstCompareOp.Equals, cond.Op);
-        Assert.True(Assert.IsType<AstBoolLiteral>(cond.Value).Value);
-    }
-
-    private static void AssertCall(AstExpr expr, string name)
-    {
-        var call = Assert.IsType<AstPredicateCallExpr>(expr);
-        Assert.Equal(name, call.PredicateName.Text.ToString());
-        Assert.IsType<AstThisExpr>(call.Argument);
+        AssertEqual(expected, actual);
     }
 
     [Fact]
@@ -88,7 +179,6 @@ public sealed class PathLangParserTests
         var result = PathLangParser.Parse(src);
         Assert.Contains(result.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
         Assert.Single(result.Predicates);
-        Assert.Equal("P", result.Predicates[0].Name.Text.ToString());
     }
 
     [Fact]

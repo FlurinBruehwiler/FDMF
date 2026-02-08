@@ -7,6 +7,16 @@ namespace FDMF.Core.Database;
 
 public static class Extensions
 {
+    public static T GetOrDefault<T>(this T[] arr, int index, T @default)
+    {
+        if (arr.Length > index)
+        {
+            return arr[index];
+        }
+
+        return @default;
+    }
+
     public static unsafe Slice<byte> AsSlice(this MDBValue value)
     {
         var span = value.AsSpan();

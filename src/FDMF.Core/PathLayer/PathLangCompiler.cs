@@ -27,10 +27,12 @@ public sealed record AstCurrentExpr : AstExpr;
 
 // ---- Core path operations ----
 
-public sealed record AstPathStep(
-    AstIdent AssocName,
+public record AstPathStep(
     AstFilter? Filter = null
 ) : AstNode;
+
+public record AstRepeatStep(AstPathStep[] Steps, AstFilter? Filter = null) : AstPathStep(Filter);
+public record AstAsoStep(AstIdent AssocName, AstFilter? Filter = null) : AstPathStep(Filter);
 
 // Represents a sequence of traversals starting from a source expression:
 //   this->A->B[...]
@@ -40,8 +42,6 @@ public sealed record AstPathExpr(
 ) : AstExpr;
 
 public sealed record AstFilterExpr(AstExpr Source, AstFilter Filter) : AstExpr;
-
-public sealed record AstRepeatExpr(AstExpr Expr) : AstExpr;
 
 // ---- Composition ----
 

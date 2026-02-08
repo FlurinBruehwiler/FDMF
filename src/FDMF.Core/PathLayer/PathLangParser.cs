@@ -110,6 +110,7 @@ public sealed class PathLangParser
         return left;
     }
 
+
     private AstExpr ParseTerm()
     {
         if (_current.Kind == TokenKind.LParen)
@@ -120,63 +121,62 @@ public sealed class PathLangParser
             return inner;
         }
 
-        if (_current.Kind == TokenKind.KeywordRepeat)
-        {
-            Next();
-            Expect(TokenKind.LParen, TokenKind.KeywordThis, TokenKind.Dollar, TokenKind.RParen);
-            var expr = ParsePathExpr();
-            Expect(TokenKind.RParen, TokenKind.KeywordAnd, TokenKind.KeywordOr, TokenKind.RBracket, TokenKind.EndOfFile);
-            return new AstRepeatExpr(expr);
-        }
-
         // In v1 grammar, a pathExpr must start with this or $.
         // If we see an identifier here, it must be a predicate call.
         if (_current.Kind == TokenKind.Identifier)
         {
-            var pred = Expect(TokenKind.Identifier);
-            Expect(TokenKind.LParen, TokenKind.KeywordThis, TokenKind.Dollar, TokenKind.RParen);
-            var arg = ParseArgExpr();
-            Expect(TokenKind.RParen, TokenKind.Equals, TokenKind.NotEquals, TokenKind.KeywordAnd, TokenKind.KeywordOr, TokenKind.EndOfFile);
-
-            var call = (AstExpr)new AstPredicateCallExpr(new AstIdent(pred.Text), arg);
-
-            // Allow the common (redundant) boolean compare syntax at expression level:
-            //   Visible(this)=true
-            //   Visible(this)!=false
-            // We normalize these to just the call.
-            if (_current.Kind == TokenKind.Equals || _current.Kind == TokenKind.NotEquals)
-            {
-                var opToken = _current;
-                var op = ParseCompareOp();
-
-                var lit = ParseLiteral();
-
-                if (lit is not AstBoolLiteral b)
-                {
-                    Report(PathLangDiagnosticSeverity.Error, "Only boolean literals are allowed after predicate calls at expression level", opToken);
-                    return call;
-                }
-
-                // Normalize: call = true OR call != false
-                if (op == AstCompareOp.Equals && b.Value)
-                {
-                    Report(PathLangDiagnosticSeverity.Warning, "Redundant '=true' after predicate call is ignored", opToken);
-                    return call;
-                }
-                if (op == AstCompareOp.NotEquals && !b.Value)
-                {
-                    Report(PathLangDiagnosticSeverity.Warning, "Redundant '!=false' after predicate call is ignored", opToken);
-                    return call;
-                }
-
-                Report(PathLangDiagnosticSeverity.Error, "Only '=true' and '!=false' are supported after predicate calls (v1)", opToken);
+            if (ParsePredicateCall(out var call))
                 return call;
-            }
 
             return call;
         }
 
         return ParsePathExpr();
+    }
+
+    private bool ParsePredicateCall(out AstExpr call)
+    {
+        var pred = Expect(TokenKind.Identifier);
+        Expect(TokenKind.LParen, TokenKind.KeywordThis, TokenKind.Dollar, TokenKind.RParen);
+        var arg = ParseArgExpr();
+        Expect(TokenKind.RParen, TokenKind.Equals, TokenKind.NotEquals, TokenKind.KeywordAnd, TokenKind.KeywordOr, TokenKind.EndOfFile);
+
+        call = (AstExpr)new AstPredicateCallExpr(new AstIdent(pred.Text), arg);
+
+        // Allow the common (redundant) boolean compare syntax at expression level:
+        //   Visible(this)=true
+        //   Visible(this)!=false
+        // We normalize these to just the call.
+        if (_current.Kind == TokenKind.Equals || _current.Kind == TokenKind.NotEquals)
+        {
+            var opToken = _current;
+            var op = ParseCompareOp();
+
+            var lit = ParseLiteral();
+
+            if (lit is not AstBoolLiteral b)
+            {
+                Report(PathLangDiagnosticSeverity.Error, "Only boolean literals are allowed after predicate calls at expression level", opToken);
+                return true;
+            }
+
+            // Normalize: call = true OR call != false
+            if (op == AstCompareOp.Equals && b.Value)
+            {
+                Report(PathLangDiagnosticSeverity.Warning, "Redundant '=true' after predicate call is ignored", opToken);
+                return true;
+            }
+            if (op == AstCompareOp.NotEquals && !b.Value)
+            {
+                Report(PathLangDiagnosticSeverity.Warning, "Redundant '!=false' after predicate call is ignored", opToken);
+                return true;
+            }
+
+            Report(PathLangDiagnosticSeverity.Error, "Only '=true' and '!=false' are supported after predicate calls (v1)", opToken);
+            return true;
+        }
+
+        return false;
     }
 
     private AstExpr ParseArgExpr()
@@ -200,9 +200,10 @@ public sealed class PathLangParser
     }
 
     // pathExpr = sourceExpr, { "->", step } , [ filter ] ;
+    //eg this->hallo[condition]->repeat(->bello[condition])[condition2]->end
     private AstExpr ParsePathExpr()
     {
-        var source = ParseSourceExpr();
+        var source = ParseSourceExpr(); //this or $
 
         var steps = new List<AstPathStep>();
 
@@ -210,12 +211,8 @@ public sealed class PathLangParser
         while (_current.Kind == TokenKind.Arrow)
         {
             Next();
-            var assoc = Expect(TokenKind.Identifier, TokenKind.LBracket, TokenKind.Arrow, TokenKind.KeywordAnd, TokenKind.KeywordOr, TokenKind.RParen, TokenKind.RBracket, TokenKind.EndOfFile);
-            AstFilter? filter = null;
-            if (_current.Kind == TokenKind.LBracket)
-                filter = ParseFilter();
 
-            steps.Add(new AstPathStep(new AstIdent(assoc.Text), filter));
+            steps.Add(ParseStep());
         }
 
         if (steps.Count > 0)
@@ -229,6 +226,41 @@ public sealed class PathLangParser
         }
 
         return source;
+    }
+
+    private AstPathStep ParseStep()
+    {
+        if (_current.Kind == TokenKind.KeywordRepeat)
+        {
+            Next();
+            Expect(TokenKind.LParen);
+
+            var steps = new List<AstPathStep>();
+            while (_current.Kind == TokenKind.Arrow)
+            {
+                Next();
+
+                steps.Add(ParseStep());
+            }
+
+            Expect(TokenKind.RParen);
+
+            AstFilter? filter = null;
+            if (_current.Kind == TokenKind.LBracket)
+                filter = ParseFilter();
+
+            return new AstRepeatStep(steps.ToArray(), filter);
+        }
+        else
+        {
+            var assoc = Expect(TokenKind.Identifier, TokenKind.LBracket, TokenKind.Arrow, TokenKind.KeywordAnd, TokenKind.KeywordOr, TokenKind.RParen, TokenKind.RBracket, TokenKind.EndOfFile);
+
+            AstFilter? filter = null;
+            if (_current.Kind == TokenKind.LBracket)
+                filter = ParseFilter();
+
+            return new AstAsoStep(new AstIdent(assoc.Text), filter);
+        }
     }
 
     private AstExpr ParseSourceExpr()
@@ -390,7 +422,7 @@ public sealed class PathLangParser
         return new AstErrorLiteral();
     }
 
-    private Token Expect(TokenKind kind, params TokenKind[] recoveryStop)
+    private Token Expect(TokenKind kind, params ReadOnlySpan<TokenKind> recoveryStop)
     {
         if (_current.Kind == kind)
         {
@@ -440,7 +472,7 @@ public sealed class PathLangParser
         Diagnostics.Add(new PathLangDiagnostic(severity, message, at.Line, at.Column, at.Text));
     }
 
-    private static bool IsRecoveryStop(TokenKind kind, TokenKind[] extra)
+    private static bool IsRecoveryStop(TokenKind kind, ReadOnlySpan<TokenKind> extra)
     {
         if (kind is TokenKind.EndOfFile or TokenKind.RParen or TokenKind.RBracket or TokenKind.Colon or TokenKind.Comma)
             return true;
