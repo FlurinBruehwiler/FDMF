@@ -3,8 +3,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using MemoryPack;
 using FDMF.Core;
-using FDMF.Core.Database;
-namespace TestModel.Generated;
+using FDMF.Core.DatabaseLayer;
+namespace FDMF.Tests.TestModelModel;
 
 [MemoryPackable]
 public partial struct TestingFolder : ITransactionObject, IEquatable<TestingFolder>
@@ -58,7 +58,7 @@ public partial struct TestingFolder : ITransactionObject, IEquatable<TestingFold
     public TestingFolder? Parent
     {
         get => GeneratedCodeHelper.GetNullableAssoc<TestingFolder>(DbSession, ObjId, Fields.Parent);
-        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Parent, value?.ObjId ?? Guid.Empty, TestModel.Generated.TestingFolder.Fields.Subfolders);
+        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Parent, value?.ObjId ?? Guid.Empty, FDMF.Tests.TestModelModel.TestingFolder.Fields.Subfolders);
     }
 
     public static bool operator ==(TestingFolder a, TestingFolder b) => a.DbSession == b.DbSession && a.ObjId == b.ObjId;

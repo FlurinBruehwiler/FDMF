@@ -1,6 +1,6 @@
 using System.Text;
-using System.Runtime.InteropServices;
-using FDMF.Core.Database;
+using FDMF.Core.DatabaseLayer;
+using FDMF.Tests.TestModelModel;
 using Environment = FDMF.Core.Environment;
 
 namespace FDMF.Tests;
@@ -14,16 +14,16 @@ public sealed class DbSessionTests
         using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
         using var session = new DbSession(env);
 
-        var objId = session.CreateObj(TestModel.Generated.TestingFolder.TypId);
-        session.SetFldValue(objId, TestModel.Generated.TestingFolder.Fields.Name, Encoding.Unicode.GetBytes("abc"));
+        var objId = session.CreateObj(TestingFolder.TypId);
+        session.SetFldValue(objId, TestingFolder.Fields.Name, Encoding.Unicode.GetBytes("abc"));
         long i = 123;
-        session.SetFldValue(objId, TestModel.Generated.TestingFolder.Fields.TestIntegerField, i.AsSpan());
+        session.SetFldValue(objId, TestingFolder.Fields.TestIntegerField, i.AsSpan());
 
         session.DeleteObj(objId);
 
         Assert.Equal(Guid.Empty, session.GetTypId(objId));
-        Assert.Equal(0, session.GetFldValue(objId, TestModel.Generated.TestingFolder.Fields.Name).Length);
-        Assert.Equal(0, session.GetFldValue(objId, TestModel.Generated.TestingFolder.Fields.TestIntegerField).Length);
+        Assert.Equal(0, session.GetFldValue(objId, TestingFolder.Fields.Name).Length);
+        Assert.Equal(0, session.GetFldValue(objId, TestingFolder.Fields.TestIntegerField).Length);
     }
 
     [Fact]
@@ -32,18 +32,18 @@ public sealed class DbSessionTests
         using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
         using var session = new DbSession(env);
 
-        var a = session.CreateObj(TestModel.Generated.TestingFolder.TypId);
-        var b = session.CreateObj(TestModel.Generated.TestingFolder.TypId);
+        var a = session.CreateObj(TestingFolder.TypId);
+        var b = session.CreateObj(TestingFolder.TypId);
 
         // a.Parent -> b (and therefore b.Subfolders contains a)
-        session.CreateAso(a, TestModel.Generated.TestingFolder.Fields.Parent, b, TestModel.Generated.TestingFolder.Fields.Subfolders);
+        session.CreateAso(a, TestingFolder.Fields.Parent, b, TestingFolder.Fields.Subfolders);
 
-        Assert.Equal(1, session.GetAsoCount(a, TestModel.Generated.TestingFolder.Fields.Parent));
-        Assert.Equal(1, session.GetAsoCount(b, TestModel.Generated.TestingFolder.Fields.Subfolders));
+        Assert.Equal(1, session.GetAsoCount(a, TestingFolder.Fields.Parent));
+        Assert.Equal(1, session.GetAsoCount(b, TestingFolder.Fields.Subfolders));
 
         session.DeleteObj(a);
 
-        Assert.Equal(0, session.GetAsoCount(b, TestModel.Generated.TestingFolder.Fields.Subfolders));
+        Assert.Equal(0, session.GetAsoCount(b, TestingFolder.Fields.Subfolders));
         Assert.Equal(Guid.Empty, session.GetTypId(a));
     }
 
@@ -53,20 +53,20 @@ public sealed class DbSessionTests
         using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
         using var session = new DbSession(env);
 
-        var parent = session.CreateObj(TestModel.Generated.TestingFolder.TypId);
-        var childA = session.CreateObj(TestModel.Generated.TestingFolder.TypId);
-        var childB = session.CreateObj(TestModel.Generated.TestingFolder.TypId);
+        var parent = session.CreateObj(TestingFolder.TypId);
+        var childA = session.CreateObj(TestingFolder.TypId);
+        var childB = session.CreateObj(TestingFolder.TypId);
 
-        session.CreateAso(childA, TestModel.Generated.TestingFolder.Fields.Parent, parent, TestModel.Generated.TestingFolder.Fields.Subfolders);
-        session.CreateAso(childB, TestModel.Generated.TestingFolder.Fields.Parent, parent, TestModel.Generated.TestingFolder.Fields.Subfolders);
+        session.CreateAso(childA, TestingFolder.Fields.Parent, parent, TestingFolder.Fields.Subfolders);
+        session.CreateAso(childB, TestingFolder.Fields.Parent, parent, TestingFolder.Fields.Subfolders);
 
-        Assert.Equal(2, session.GetAsoCount(parent, TestModel.Generated.TestingFolder.Fields.Subfolders));
+        Assert.Equal(2, session.GetAsoCount(parent, TestingFolder.Fields.Subfolders));
 
-        session.RemoveAllAso(parent, TestModel.Generated.TestingFolder.Fields.Subfolders);
+        session.RemoveAllAso(parent, TestingFolder.Fields.Subfolders);
 
-        Assert.Equal(0, session.GetAsoCount(parent, TestModel.Generated.TestingFolder.Fields.Subfolders));
-        Assert.Equal(0, session.GetAsoCount(childA, TestModel.Generated.TestingFolder.Fields.Parent));
-        Assert.Equal(0, session.GetAsoCount(childB, TestModel.Generated.TestingFolder.Fields.Parent));
+        Assert.Equal(0, session.GetAsoCount(parent, TestingFolder.Fields.Subfolders));
+        Assert.Equal(0, session.GetAsoCount(childA, TestingFolder.Fields.Parent));
+        Assert.Equal(0, session.GetAsoCount(childB, TestingFolder.Fields.Parent));
     }
 
     [Fact]
@@ -76,9 +76,9 @@ public sealed class DbSessionTests
         using var session = new DbSession(env);
 
         var id = Guid.NewGuid();
-        var created = session.CreateObj(TestModel.Generated.TestingFolder.TypId, fixedId: id);
+        var created = session.CreateObj(TestingFolder.TypId, fixedId: id);
         Assert.Equal(id, created);
-        Assert.Equal(TestModel.Generated.TestingFolder.TypId, session.GetTypId(id));
+        Assert.Equal(TestingFolder.TypId, session.GetTypId(id));
 
         session.DeleteObj(id);
         Assert.Equal(Guid.Empty, session.GetTypId(id));
@@ -90,10 +90,10 @@ public sealed class DbSessionTests
         using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
         using var session = new DbSession(env);
 
-        var id = session.CreateObj(TestModel.Generated.TestingFolder.TypId);
+        var id = session.CreateObj(TestingFolder.TypId);
 
-        Assert.False(session.TryGetObjFromGuid<TestModel.Generated.TestingDocument>(id, out _));
-        Assert.True(session.TryGetObjFromGuid<TestModel.Generated.TestingFolder>(id, out var folder));
+        Assert.False(session.TryGetObjFromGuid<TestingDocument>(id, out _));
+        Assert.True(session.TryGetObjFromGuid<TestingFolder>(id, out var folder));
         Assert.Equal(id, folder.ObjId);
     }
 
@@ -103,14 +103,14 @@ public sealed class DbSessionTests
         using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
         using var session = new DbSession(env);
 
-        var parent = session.CreateObj(TestModel.Generated.TestingFolder.TypId);
-        var childA = session.CreateObj(TestModel.Generated.TestingFolder.TypId);
-        var childB = session.CreateObj(TestModel.Generated.TestingFolder.TypId);
+        var parent = session.CreateObj(TestingFolder.TypId);
+        var childA = session.CreateObj(TestingFolder.TypId);
+        var childB = session.CreateObj(TestingFolder.TypId);
 
-        session.CreateAso(childA, TestModel.Generated.TestingFolder.Fields.Parent, parent, TestModel.Generated.TestingFolder.Fields.Subfolders);
-        session.CreateAso(childB, TestModel.Generated.TestingFolder.Fields.Parent, parent, TestModel.Generated.TestingFolder.Fields.Subfolders);
+        session.CreateAso(childA, TestingFolder.Fields.Parent, parent, TestingFolder.Fields.Subfolders);
+        session.CreateAso(childB, TestingFolder.Fields.Parent, parent, TestingFolder.Fields.Subfolders);
 
-        var ids = session.EnumerateAso(parent, TestModel.Generated.TestingFolder.Fields.Subfolders)
+        var ids = session.EnumerateAso(parent, TestingFolder.Fields.Subfolders)
             .Select(x => x.ObjId)
             .ToHashSet();
 
@@ -123,14 +123,14 @@ public sealed class DbSessionTests
         using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
         using var session = new DbSession(env);
 
-        var parent = session.CreateObj(TestModel.Generated.TestingFolder.TypId);
-        var child = session.CreateObj(TestModel.Generated.TestingFolder.TypId);
+        var parent = session.CreateObj(TestingFolder.TypId);
+        var child = session.CreateObj(TestingFolder.TypId);
 
-        Assert.Null(session.GetSingleAsoValue(child, TestModel.Generated.TestingFolder.Fields.Parent));
+        Assert.Null(session.GetSingleAsoValue(child, TestingFolder.Fields.Parent));
 
-        session.CreateAso(child, TestModel.Generated.TestingFolder.Fields.Parent, parent, TestModel.Generated.TestingFolder.Fields.Subfolders);
+        session.CreateAso(child, TestingFolder.Fields.Parent, parent, TestingFolder.Fields.Subfolders);
 
-        Assert.Equal(parent, session.GetSingleAsoValue(child, TestModel.Generated.TestingFolder.Fields.Parent));
+        Assert.Equal(parent, session.GetSingleAsoValue(child, TestingFolder.Fields.Parent));
     }
 
     [Fact]

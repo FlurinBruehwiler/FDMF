@@ -1,18 +1,17 @@
 using System.Runtime.InteropServices;
 using System.Text;
-using BaseModel.Generated;
 using FDMF.Core;
-using FDMF.Core.Database;
+using FDMF.Core.DatabaseLayer;
 
 namespace FDMF.SourceGen;
 
 public static class ModelGenerator
 {
-    public static void Generate(Model model, string targetDir)
+    public static void Generate(Model model, string targetDir, string targetNamespace)
     {
         Directory.CreateDirectory(targetDir);
 
-        var @namespace = $"{Path.GetFileName(model.Name)}.Generated";
+        var @namespace = targetNamespace;
 
         foreach (var entity in model.GetAllEntityDefinitions())
         {
@@ -23,7 +22,7 @@ public static class ModelGenerator
             sourceBuilder.AppendLine("using System.Text;");
             sourceBuilder.AppendLine("using MemoryPack;");
             sourceBuilder.AppendLine("using FDMF.Core;");
-            sourceBuilder.AppendLine("using FDMF.Core.Database;");
+            sourceBuilder.AppendLine("using FDMF.Core.DatabaseLayer;");
 
             sourceBuilder.AppendLine($"namespace {@namespace};");
             sourceBuilder.AppendLine();

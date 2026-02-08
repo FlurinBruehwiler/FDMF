@@ -3,8 +3,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using MemoryPack;
 using FDMF.Core;
-using FDMF.Core.Database;
-namespace BusinessModel.Generated;
+using FDMF.Core.DatabaseLayer;
+namespace FDMF.Tests.BusinessModelModel;
 
 [MemoryPackable]
 public partial struct DocumentCategory : ITransactionObject, IEquatable<DocumentCategory>

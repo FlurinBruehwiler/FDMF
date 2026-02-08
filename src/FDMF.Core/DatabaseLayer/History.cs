@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using FDMF.Core.Utils;
 using LightningDB;
 
-namespace FDMF.Core.Database;
+namespace FDMF.Core.DatabaseLayer;
 
 public enum HistoryEventType : byte
 {

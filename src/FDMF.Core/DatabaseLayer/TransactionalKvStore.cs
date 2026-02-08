@@ -2,7 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using FDMF.Core.Utils;
 using LightningDB;
 
-namespace FDMF.Core.Database;
+namespace FDMF.Core.DatabaseLayer;
 
 public sealed class TransactionalKvStore : IDisposable
 {

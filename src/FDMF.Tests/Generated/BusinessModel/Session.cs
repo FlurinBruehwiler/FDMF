@@ -3,8 +3,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using MemoryPack;
 using FDMF.Core;
-using FDMF.Core.Database;
-namespace BusinessModel.Generated;
+using FDMF.Core.DatabaseLayer;
+namespace FDMF.Tests.BusinessModelModel;
 
 [MemoryPackable]
 public partial struct Session : ITransactionObject, IEquatable<Session>
@@ -52,7 +52,7 @@ public partial struct Session : ITransactionObject, IEquatable<Session>
     public BusinessCase? BusinessCase
     {
         get => GeneratedCodeHelper.GetNullableAssoc<BusinessCase>(DbSession, ObjId, Fields.BusinessCase);
-        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.BusinessCase, value?.ObjId ?? Guid.Empty, BusinessModel.Generated.BusinessCase.Fields.Sessions);
+        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.BusinessCase, value?.ObjId ?? Guid.Empty, FDMF.Tests.BusinessModelModel.BusinessCase.Fields.Sessions);
     }
 
     public static bool operator ==(Session a, Session b) => a.DbSession == b.DbSession && a.ObjId == b.ObjId;

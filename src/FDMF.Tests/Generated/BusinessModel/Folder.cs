@@ -3,8 +3,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using MemoryPack;
 using FDMF.Core;
-using FDMF.Core.Database;
-namespace BusinessModel.Generated;
+using FDMF.Core.DatabaseLayer;
+namespace FDMF.Tests.BusinessModelModel;
 
 [MemoryPackable]
 public partial struct Folder : ITransactionObject, IEquatable<Folder>
@@ -44,7 +44,7 @@ public partial struct Folder : ITransactionObject, IEquatable<Folder>
     public Folder? Parent
     {
         get => GeneratedCodeHelper.GetNullableAssoc<Folder>(DbSession, ObjId, Fields.Parent);
-        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Parent, value?.ObjId ?? Guid.Empty, BusinessModel.Generated.Folder.Fields.Subfolders);
+        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Parent, value?.ObjId ?? Guid.Empty, FDMF.Tests.BusinessModelModel.Folder.Fields.Subfolders);
     }
     [MemoryPackIgnore]
     public AssocCollection<Folder> Subfolders => new(DbSession, ObjId, Fields.Subfolders, Folder.Fields.Parent);

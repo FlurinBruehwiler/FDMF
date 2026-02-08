@@ -1,8 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
-using BaseModel.Generated;
-using FDMF.Core.Database;
+using FDMF.Core.DatabaseLayer;
 
 namespace FDMF.Core.PathLayer;
 
@@ -60,6 +59,8 @@ public static class PathEvaluation
             }
             else if (thisStep is AstRepeatStep repeatStep)
             {
+                var otherType = session.GetObjFromGuid<EntityDefinition>(semanticModel.PossibleTypesByExpr[repeatStep.Steps.Last()])!.Value;
+
                 //we do the repeat n times until the repeat doesn't match anymore
                 //after each step, we evaluate what comes after the repeat
                 while (true)
@@ -68,7 +69,7 @@ public static class PathEvaluation
                     if (EvalSteps(repeatStep.Steps, obj, out obj))
                     {
                         //check exit condition (can only exit the loop if the exit condition matches)
-                        if (repeatStep.Filter != null && !CheckCondition(repeatStep.Filter.Condition, obj, default)) //todo what entity?
+                        if (repeatStep.Filter != null && !CheckCondition(repeatStep.Filter.Condition, obj, otherType))
                         {
                             continue;
                         }
@@ -111,6 +112,7 @@ public static class PathEvaluation
                             r = MemoryMarshal.Read<bool>(actualValue) == astBoolLiteral.Value;
                             break;
                         case AstNumberLiteral astNumberLiteral:
+                            //todo
                             break;
                         case AstStringLiteral astStringLiteral:
                             r = Encoding.Unicode.GetString(actualValue).SequenceEqual(astStringLiteral.Raw.Span);
@@ -129,21 +131,4 @@ public static class PathEvaluation
             return true;
         }
     }
-
-
-
-    /* is it depth-first or breadth-first? I think depth-first makes sense
-     *
-     * pseudo code:
-     *
-     * obj->AssocA->AssocB->AssocC
-     *
-     * foreach(var objA in obj.AssocA){
-     *   foreach(var objB in objA.AssocB){
-     *      foreach(var objC in objB.AssocC){
-     *
-     *      }
-     *   }
-     * }
-     */
 }

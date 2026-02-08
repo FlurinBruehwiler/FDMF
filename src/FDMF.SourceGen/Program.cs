@@ -1,5 +1,4 @@
-﻿using BaseModel.Generated;
-using FDMF.Core.Database;
+﻿using FDMF.Core.DatabaseLayer;
 using FDMF.SourceGen;
 using Environment = FDMF.Core.Environment;
 using Helper = FDMF.SourceGen.Helper;
@@ -12,7 +11,7 @@ using var env2 = Environment.CreateDatabase("temp2");
 using (var session = new DbSession(env2))
 {
     var model = session.GetObjFromGuid<Model>(env2.ModelGuid);
-    ModelGenerator.Generate(model!.Value, Path.Combine(root, "FDMF.Core/Generated"));
+    ModelGenerator.Generate(model!.Value, Path.Combine(root, "FDMF.Core/Generated"), "FDMF.Core.DatabaseLayer");
 }
 
 //Test Data
@@ -26,7 +25,7 @@ void GenerateModel(string path)
     using (var session = new DbSession(env))
     {
         var model = session.GetObjFromGuid<Model>(env.ModelGuid)!.Value;
-        ModelGenerator.Generate(model, Path.Combine(root, $"FDMF.Tests/Generated/{model.Name}"));
+        ModelGenerator.Generate(model, Path.Combine(root, $"FDMF.Tests/Generated/{model.Name}"), $"FDMF.Tests.{model.Name}Model");
     }
 }
 

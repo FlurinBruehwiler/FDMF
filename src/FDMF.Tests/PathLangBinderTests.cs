@@ -1,8 +1,7 @@
-using BaseModel.Generated;
-using BusinessModel.Generated;
-using FDMF.Core.Database;
+using FDMF.Core.DatabaseLayer;
 using FDMF.Core.PathLayer;
-using TestModel.Generated;
+using FDMF.Tests.BusinessModelModel;
+using FDMF.Tests.TestModelModel;
 using Environment = FDMF.Core.Environment;
 
 namespace FDMF.Tests;

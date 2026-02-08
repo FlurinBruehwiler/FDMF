@@ -1,6 +1,6 @@
 using System.Text.Json;
-using FDMF.Core.Database;
-using TestModel.Generated;
+using FDMF.Core.DatabaseLayer;
+using FDMF.Tests.TestModelModel;
 using Environment = FDMF.Core.Environment;
 
 namespace FDMF.Tests;

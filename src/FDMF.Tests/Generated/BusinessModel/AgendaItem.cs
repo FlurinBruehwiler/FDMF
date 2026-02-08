@@ -3,8 +3,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using MemoryPack;
 using FDMF.Core;
-using FDMF.Core.Database;
-namespace BusinessModel.Generated;
+using FDMF.Core.DatabaseLayer;
+namespace FDMF.Tests.BusinessModelModel;
 
 [MemoryPackable]
 public partial struct AgendaItem : ITransactionObject, IEquatable<AgendaItem>
@@ -50,7 +50,7 @@ public partial struct AgendaItem : ITransactionObject, IEquatable<AgendaItem>
     public Session? Session
     {
         get => GeneratedCodeHelper.GetNullableAssoc<Session>(DbSession, ObjId, Fields.Session);
-        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Session, value?.ObjId ?? Guid.Empty, BusinessModel.Generated.Session.Fields.AgendaItems);
+        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Session, value?.ObjId ?? Guid.Empty, FDMF.Tests.BusinessModelModel.Session.Fields.AgendaItems);
     }
     [MemoryPackIgnore]
     public AssocCollection<Document> Documents => new(DbSession, ObjId, Fields.Documents, Document.Fields.AgendaItems);

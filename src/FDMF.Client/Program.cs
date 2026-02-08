@@ -1,6 +1,6 @@
 ﻿using FDMF.Client;
 using FDMF.Core;
-using FDMF.Core.Database;
+using FDMF.Core.DatabaseLayer;
 using Environment = FDMF.Core.Environment;
 
 //todo, the goal is that the server and client can be in the same process!!!

@@ -3,9 +3,8 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
-using BaseModel.Generated;
 
-namespace FDMF.Core.Database;
+namespace FDMF.Core.DatabaseLayer;
 
 //A Database has a "Model" (this model can then reference other models)
 //Lets create a metadata table, for the guid of the model is stored

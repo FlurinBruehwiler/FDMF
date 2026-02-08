@@ -3,8 +3,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using MemoryPack;
 using FDMF.Core;
-using FDMF.Core.Database;
-namespace TestModel.Generated;
+using FDMF.Core.DatabaseLayer;
+namespace FDMF.Tests.TestModelModel;
 
 [MemoryPackable]
 public partial struct TestingDocument : ITransactionObject, IEquatable<TestingDocument>

@@ -1,12 +1,10 @@
 using System.Collections;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using FDMF.Core.Utils;
-using LightningDB;
 
-namespace FDMF.Core.Database;
+namespace FDMF.Core.DatabaseLayer;
 
 //todo the following things need to be implemented
 // [ ] implement updated/created at/by

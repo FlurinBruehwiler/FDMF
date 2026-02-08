@@ -3,8 +3,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using MemoryPack;
 using FDMF.Core;
-using FDMF.Core.Database;
-namespace BaseModel.Generated;
+using FDMF.Core.DatabaseLayer;
+namespace FDMF.Core.DatabaseLayer;
 
 [MemoryPackable]
 public partial struct FieldDefinition : ITransactionObject, IEquatable<FieldDefinition>
@@ -56,7 +56,7 @@ public partial struct FieldDefinition : ITransactionObject, IEquatable<FieldDefi
     public EntityDefinition OwningEntity
     {
         get => GeneratedCodeHelper.GetAssoc<EntityDefinition>(DbSession, ObjId, Fields.OwningEntity);
-        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.OwningEntity, value.ObjId, BaseModel.Generated.EntityDefinition.Fields.FieldDefinitions);
+        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.OwningEntity, value.ObjId, FDMF.Core.DatabaseLayer.EntityDefinition.Fields.FieldDefinitions);
     }
 
     public static bool operator ==(FieldDefinition a, FieldDefinition b) => a.DbSession == b.DbSession && a.ObjId == b.ObjId;

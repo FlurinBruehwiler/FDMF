@@ -3,8 +3,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using MemoryPack;
 using FDMF.Core;
-using FDMF.Core.Database;
-namespace BaseModel.Generated;
+using FDMF.Core.DatabaseLayer;
+namespace FDMF.Core.DatabaseLayer;
 
 [MemoryPackable]
 public partial struct EntityDefinition : ITransactionObject, IEquatable<EntityDefinition>
@@ -44,7 +44,7 @@ public partial struct EntityDefinition : ITransactionObject, IEquatable<EntityDe
     public Model Model
     {
         get => GeneratedCodeHelper.GetAssoc<Model>(DbSession, ObjId, Fields.Model);
-        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Model, value.ObjId, BaseModel.Generated.Model.Fields.EntityDefinitions);
+        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Model, value.ObjId, FDMF.Core.DatabaseLayer.Model.Fields.EntityDefinitions);
     }
     [MemoryPackIgnore]
     public AssocCollection<EntityDefinition> Parents => new(DbSession, ObjId, Fields.Parents, EntityDefinition.Fields.Children);

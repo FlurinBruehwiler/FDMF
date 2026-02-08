@@ -1,4 +1,4 @@
-namespace FDMF.Core.Database;
+namespace FDMF.Core.DatabaseLayer;
 
 public interface ISearchCriterion;
 

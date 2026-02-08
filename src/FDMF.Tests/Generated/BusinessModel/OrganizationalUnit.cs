@@ -3,8 +3,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using MemoryPack;
 using FDMF.Core;
-using FDMF.Core.Database;
-namespace BusinessModel.Generated;
+using FDMF.Core.DatabaseLayer;
+namespace FDMF.Tests.BusinessModelModel;
 
 [MemoryPackable]
 public partial struct OrganizationalUnit : ITransactionObject, IEquatable<OrganizationalUnit>
@@ -38,7 +38,7 @@ public partial struct OrganizationalUnit : ITransactionObject, IEquatable<Organi
     public OrganizationalUnit? Parent
     {
         get => GeneratedCodeHelper.GetNullableAssoc<OrganizationalUnit>(DbSession, ObjId, Fields.Parent);
-        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Parent, value?.ObjId ?? Guid.Empty, BusinessModel.Generated.OrganizationalUnit.Fields.Children);
+        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Parent, value?.ObjId ?? Guid.Empty, FDMF.Tests.BusinessModelModel.OrganizationalUnit.Fields.Children);
     }
     [MemoryPackIgnore]
     public AssocCollection<User> Members => new(DbSession, ObjId, Fields.Members, User.Fields.MemberOfUnits);

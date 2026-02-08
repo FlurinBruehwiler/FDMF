@@ -1,7 +1,7 @@
 ﻿using System.Net.WebSockets;
 using System.Threading.Channels;
 using FDMF.Core;
-using FDMF.Core.Database;
+using FDMF.Core.DatabaseLayer;
 using FDMF.Core.Generated;
 
 namespace FDMF.Client;

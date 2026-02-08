@@ -1,4 +1,4 @@
-﻿using BaseModel.Generated;
+﻿using FDMF.Core.DatabaseLayer;
 
 namespace FDMF.Core;
 

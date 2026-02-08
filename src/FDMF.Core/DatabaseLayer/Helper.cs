@@ -1,7 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace FDMF.Core.Database;
+namespace FDMF.Core.DatabaseLayer;
 
 public static class Helper
 {

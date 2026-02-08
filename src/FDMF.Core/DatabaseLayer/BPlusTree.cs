@@ -1,6 +1,6 @@
 using FDMF.Core.Utils;
 
-namespace FDMF.Core.Database;
+namespace FDMF.Core.DatabaseLayer;
 
 // A simple B+Tree implementation.
 // Keys are compared lexicographically by default.

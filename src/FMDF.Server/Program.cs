@@ -1,5 +1,4 @@
-﻿using FDMF.Core.Database;
-using Environment = FDMF.Core.Environment;
+﻿using Environment = FDMF.Core.Environment;
 
 //we can store all fields objId+fieldIds that where changed in a dictionary within the transaction,
 //when saving, we have a separate table where we store the "history" of all objects

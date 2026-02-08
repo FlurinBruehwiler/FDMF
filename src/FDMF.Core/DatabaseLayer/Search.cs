@@ -1,10 +1,9 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
-using BaseModel.Generated;
 using LightningDB;
 
-namespace FDMF.Core.Database;
+namespace FDMF.Core.DatabaseLayer;
 
 //key: [flag][fldid][value]:[obj]
 

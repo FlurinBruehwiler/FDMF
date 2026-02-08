@@ -3,8 +3,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using MemoryPack;
 using FDMF.Core;
-using FDMF.Core.Database;
-namespace BaseModel.Generated;
+using FDMF.Core.DatabaseLayer;
+namespace FDMF.Core.DatabaseLayer;
 
 [MemoryPackable]
 public partial struct Model : ITransactionObject, IEquatable<Model>
