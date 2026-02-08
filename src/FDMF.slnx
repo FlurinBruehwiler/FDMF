@@ -7,12 +7,13 @@
   <Folder Name="/.SolutionItems/">
     <File Path="../.github/workflows/ci.yml" />
     <File Path="../.gitignore" />
-    <File Path="../business_model.md" />
-    <File Path="../database.md" />
-    <File Path="../networking.md" />
+    <File Path="../notes/business_model.md" />
+    <File Path="../notes/database.md" />
+    <File Path="../notes/networking.md" />
+    <File Path="../notes/PathLangSpec.md" />
+    <File Path="../notes/scalability.md" />
+    <File Path="../notes/todo.md" />
     <File Path="../README.md" />
-    <File Path="../todo.md" />
-    <File Path="PathLangSpec.md" />
   </Folder>
   <Project Path="FDMF.Cli/FDMF.Cli.csproj" />
   <Project Path="FDMF.Client/FDMF.Client.csproj" />
