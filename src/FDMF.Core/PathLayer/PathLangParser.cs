@@ -9,6 +9,7 @@ public sealed class PathLangParser
 
     public List<PathLangDiagnostic> Diagnostics { get; } = new();
 
+    //todo put error messages of parser directly into the ast, and when trying to evaluate the ast, we cancel because it doesn't contains errorss
     public static PathLangParseResult Parse(string source)
     {
         return new PathLangParser(source).ParseProgram();

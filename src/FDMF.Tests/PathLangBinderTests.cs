@@ -189,4 +189,35 @@ public sealed class PathLangBinderTests
             d.Severity == PathLangDiagnosticSeverity.Error &&
             d.Message == "Unknown type 'DoesNotExist'");
     }
+
+    [Fact]
+    public void RepeatPathStepMustStartAndEndWithTheSameType_Positive()
+    {
+        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetBusinessModelDumpFile());
+        using var session = new DbSession(env, readOnly: true);
+        var model = LoadBusinessModel(env, session);
+
+        var src = "P(Document): this->Folder->repeat(->Parent)[$.Name=\"Foo\"]";
+        var parse = PathLangParser.Parse(src);
+        var bind = PathLangBinder.Bind(model, session, parse.Predicates);
+
+        Assert.Empty(bind.Diagnostics);
+    }
+
+    [Fact]
+    public void RepeatPathStepMustStartAndEndWithTheSameType_Negative()
+    {
+        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetBusinessModelDumpFile());
+        using var session = new DbSession(env, readOnly: true);
+        var model = LoadBusinessModel(env, session);
+
+        var src = "P(Document): this->Folder->repeat(->Parent->Documents)[$.Title=\"Foo\"]";
+        var parse = PathLangParser.Parse(src);
+        var bind = PathLangBinder.Bind(model, session, parse.Predicates);
+
+        Assert.Single(bind.Diagnostics);
+        Assert.Equal(PathLangDiagnosticSeverity.Error, bind.Diagnostics[0].Severity);
+        Assert.Equal("Start and end of steps in repeat expr need to have the same type", bind.Diagnostics[0].Message);
+    }
 }
+

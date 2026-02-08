@@ -90,6 +90,35 @@ public sealed class PathEvaluationTest
     }
 
     [Fact]
+    public void RepeatTest()
+    {
+        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var session = new DbSession(env);
+
+        var model = session.GetObjFromGuid<Model>(env.ModelGuid)!.Value;
+
+        var p1 = new TestingFolder(session);
+
+        var p2 = new TestingFolder(session);
+        p2.Parent = p1;
+        p2.Name = "TargetFolder";
+
+        var p3 = new TestingFolder(session);
+        p3.Parent = p2;
+
+        var p4 = new TestingFolder(session);
+        p4.Parent = p3;
+
+        var src = "P(TestingFolder): this->repeat(->Parent)[$.Name=\"TargetFolder\"]";
+        var parse = PathLangParser.Parse(src);
+        var predicate = parse.Predicates.First();
+        var bind = PathLangBinder.Bind(model, session, parse.Predicates);
+
+        Assert.True(PathEvaluation.Evaluate(session, p4.ObjId, predicate, bind.SemanticModel));
+        Assert.False(PathEvaluation.Evaluate(session, p1.ObjId, predicate, bind.SemanticModel));
+    }
+
+    [Fact]
     public void BusinessModel_Document_To_PublicSession_Via_AgendaItem_With_ComplexFilter()
     {
         using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetBusinessModelDumpFile());
