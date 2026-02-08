@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace FDMF.Core.PathLayer;
 
 /// <summary>
@@ -12,6 +14,13 @@ public readonly record struct TextView(string Source, int Start, int Length)
     public override string ToString() => Span.ToString();
 
     public static TextView Empty(string source) => new(source, 0, 0);
+
+    public static TextView From(TextView start, TextView end)
+    {
+        Debug.Assert(start.Source == end.Source);
+
+        return new TextView(start.Source, start.Start, (end.Start + end.Length) - start.Start);
+    }
 }
 
 public enum TokenKind : byte

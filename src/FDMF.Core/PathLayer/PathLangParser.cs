@@ -3,6 +3,7 @@ namespace FDMF.Core.PathLayer;
 public sealed class PathLangParser
 {
     private readonly PathLangTokenizer _tokenizer;
+    private Token _prev;
     private Token _current;
     private readonly List<Token> _lookahead = new();
 
@@ -53,26 +54,10 @@ public sealed class PathLangParser
         return new PathLangParseResult(predicates, new List<PathLangDiagnostic>(Diagnostics));
     }
 
-    // predicateDef = ident, "(", typeName, ")", ":", expr ;
-    public PathLangParseResult ParsePredicateDef()
-    {
-        Diagnostics.Clear();
-        var predicates = new List<AstPredicate>();
-        try
-        {
-            predicates.Add(ParsePredicateDefCore());
-        }
-        catch (Exception ex)
-        {
-            Report(PathLangDiagnosticSeverity.Error, $"Internal parser error: {ex.Message}", _current);
-            predicates.Add(new AstPredicate(new AstIdent(TextView.Empty(_current.Text.Source)), new AstIdent(TextView.Empty(_current.Text.Source)), new AstErrorExpr()));
-        }
-
-        return new PathLangParseResult(predicates, new List<PathLangDiagnostic>(Diagnostics));
-    }
-
     private AstPredicate ParsePredicateDefCore()
     {
+        var start = _current.Text;
+
         var name = Expect(TokenKind.Identifier, TokenKind.LParen, TokenKind.Colon);
         Expect(TokenKind.LParen, TokenKind.Identifier, TokenKind.RParen, TokenKind.Colon);
         var typeName = Expect(TokenKind.Identifier, TokenKind.RParen, TokenKind.Colon);
@@ -81,31 +66,35 @@ public sealed class PathLangParser
 
         var body = ParseExpr();
 
-        return new AstPredicate(new AstIdent(name.Text), new AstIdent(typeName.Text), body);
+        return new AstPredicate(new AstIdent(name.Text), new AstIdent(typeName.Text), body, TextView.From(start, _prev.Text));
     }
 
     private AstExpr ParseExpr() => ParseOr();
 
     private AstExpr ParseOr()
     {
+        var start = _current.Text;
+
         var left = ParseAnd();
         while (_current.Kind == TokenKind.KeywordOr)
         {
             Next();
             var right = ParseAnd();
-            left = new AstLogicalExpr(AstLogicalOp.Or, left, right);
+            left = new AstLogicalExpr(AstLogicalOp.Or, left, right, TextView.From(start, _prev.Text));
         }
         return left;
     }
 
     private AstExpr ParseAnd()
     {
+        var start = _current.Text;
+
         var left = ParseTerm();
         while (_current.Kind == TokenKind.KeywordAnd)
         {
             Next();
             var right = ParseTerm();
-            left = new AstLogicalExpr(AstLogicalOp.And, left, right);
+            left = new AstLogicalExpr(AstLogicalOp.And, left, right, TextView.From(start, _prev.Text));
         }
         return left;
     }
@@ -136,12 +125,14 @@ public sealed class PathLangParser
 
     private bool ParsePredicateCall(out AstExpr call)
     {
+        var start = _current.Text;
+
         var pred = Expect(TokenKind.Identifier);
         Expect(TokenKind.LParen, TokenKind.KeywordThis, TokenKind.Dollar, TokenKind.RParen);
         var arg = ParseArgExpr();
         Expect(TokenKind.RParen, TokenKind.Equals, TokenKind.NotEquals, TokenKind.KeywordAnd, TokenKind.KeywordOr, TokenKind.EndOfFile);
 
-        call = (AstExpr)new AstPredicateCallExpr(new AstIdent(pred.Text), arg);
+        call = (AstExpr)new AstPredicateCallExpr(new AstIdent(pred.Text), arg, TextView.From(start, _prev.Text));
 
         // Allow the common (redundant) boolean compare syntax at expression level:
         //   Visible(this)=true
@@ -184,25 +175,27 @@ public sealed class PathLangParser
         if (_current.Kind == TokenKind.KeywordThis)
         {
             Next();
-            return new AstThisExpr();
+            return new AstThisExpr(TextView.From(_prev.Text, _prev.Text));
         }
 
         if (_current.Kind == TokenKind.Dollar)
         {
             Next();
-            return new AstCurrentExpr();
+            return new AstCurrentExpr(TextView.From(_prev.Text, _prev.Text));
         }
 
         Report(PathLangDiagnosticSeverity.Error, $"Expected argument '$' or 'this' but got {_current.Kind}", _current);
         if (_current.Kind != TokenKind.EndOfFile)
             Next();
-        return new AstErrorExpr();
+        return new AstErrorExpr(TextView.From(_prev.Text, _prev.Text));
     }
 
     // pathExpr = sourceExpr, { "->", step } , [ filter ] ;
     //eg this->hallo[condition]->repeat(->bello[condition])[condition2]->end
     private AstExpr ParsePathExpr()
     {
+        var start = _current.Text;
+
         var source = ParseSourceExpr(); //this or $
 
         var steps = new List<AstPathStep>();
@@ -216,13 +209,14 @@ public sealed class PathLangParser
         }
 
         if (steps.Count > 0)
-            source = new AstPathExpr(source, steps);
+            source = new AstPathExpr(source, steps, TextView.From(start, _prev.Text));
 
         // optional trailing filter (this[cond])
         if (_current.Kind == TokenKind.LBracket)
         {
+            var startFilter = _current.Text;
             var filter = ParseFilter();
-            source = new AstFilterExpr(source, filter);
+            source = new AstFilterExpr(source, filter, TextView.From(startFilter, _prev.Text));
         }
 
         return source;
@@ -232,6 +226,8 @@ public sealed class PathLangParser
     {
         if (_current.Kind == TokenKind.KeywordRepeat)
         {
+            var start = _current.Text;
+
             Next();
             Expect(TokenKind.LParen);
 
@@ -249,17 +245,19 @@ public sealed class PathLangParser
             if (_current.Kind == TokenKind.LBracket)
                 filter = ParseFilter();
 
-            return new AstRepeatStep(steps.ToArray(), filter);
+            return new AstRepeatStep(steps.ToArray(), TextView.From(start, _prev.Text), filter);
         }
         else
         {
+            var start = _current.Text;
+
             var assoc = Expect(TokenKind.Identifier, TokenKind.LBracket, TokenKind.Arrow, TokenKind.KeywordAnd, TokenKind.KeywordOr, TokenKind.RParen, TokenKind.RBracket, TokenKind.EndOfFile);
 
             AstFilter? filter = null;
             if (_current.Kind == TokenKind.LBracket)
                 filter = ParseFilter();
 
-            return new AstAsoStep(new AstIdent(assoc.Text), filter);
+            return new AstAsoStep(new AstIdent(assoc.Text), TextView.From(start, _prev.Text), filter);
         }
     }
 
@@ -268,49 +266,56 @@ public sealed class PathLangParser
         if (_current.Kind == TokenKind.KeywordThis)
         {
             Next();
-            return new AstThisExpr();
+            return new AstThisExpr(TextView.From(_prev.Text, _prev.Text));
         }
 
         if (_current.Kind == TokenKind.Dollar)
         {
             Next();
-            return new AstCurrentExpr();
+            return new AstCurrentExpr(TextView.From(_prev.Text, _prev.Text));
         }
 
         Report(PathLangDiagnosticSeverity.Error, $"Expected 'this' or '$' but got {_current.Kind}", _current);
         if (_current.Kind != TokenKind.EndOfFile)
             Next();
-        return new AstErrorExpr();
+
+        return new AstErrorExpr(TextView.From(_prev.Text, _prev.Text));
     }
 
     private AstFilter ParseFilter()
     {
+        var start = _current.Text;
+
         Expect(TokenKind.LBracket, TokenKind.Dollar, TokenKind.Identifier, TokenKind.LParen, TokenKind.RBracket);
         var cond = ParseConditionOr();
         Expect(TokenKind.RBracket, TokenKind.Arrow, TokenKind.KeywordAnd, TokenKind.KeywordOr, TokenKind.EndOfFile);
-        return new AstFilter(cond);
+        return new AstFilter(cond, TextView.From(start, _prev.Text));
     }
 
     private AstCondition ParseConditionOr()
     {
+        var start = _current.Text;
+
         var left = ParseConditionAnd();
         while (_current.Kind == TokenKind.KeywordOr)
         {
             Next();
             var right = ParseConditionAnd();
-            left = new AstConditionBinary(AstConditionOp.Or, left, right);
+            left = new AstConditionBinary(AstConditionOp.Or, left, right, TextView.From(start, _prev.Text));
         }
         return left;
     }
 
     private AstCondition ParseConditionAnd()
     {
+        var start = _current.Text;
+
         var left = ParseConditionAtom();
         while (_current.Kind == TokenKind.KeywordAnd)
         {
             Next();
             var right = ParseConditionAtom();
-            left = new AstConditionBinary(AstConditionOp.And, left, right);
+            left = new AstConditionBinary(AstConditionOp.And, left, right, TextView.From(start, _prev.Text));
         }
         return left;
     }
@@ -328,6 +333,8 @@ public sealed class PathLangParser
         // Predicate compare: Pred($)=true
         if (_current.Kind == TokenKind.Identifier)
         {
+            var start = _current.Text;
+
             var pred = Expect(TokenKind.Identifier);
             Expect(TokenKind.LParen, TokenKind.KeywordThis, TokenKind.Dollar, TokenKind.RParen);
             var arg = ParseArgExpr();
@@ -336,7 +343,7 @@ public sealed class PathLangParser
             var op = ParseCompareOp();
             var lit = ParseLiteral();
 
-            return new AstPredicateCompareCondition(new AstIdent(pred.Text), arg, op, lit);
+            return new AstPredicateCompareCondition(new AstIdent(pred.Text), arg, op, lit, TextView.From(start, _prev.Text));
         }
 
         // Field compare: $.Field=... or $(Type).Field=...
@@ -345,8 +352,10 @@ public sealed class PathLangParser
             Report(PathLangDiagnosticSeverity.Error, "Condition must start with '$' or an identifier (predicate call)", _current);
             if (_current.Kind != TokenKind.EndOfFile)
                 Next();
-            return new AstErrorCondition();
+            return new AstErrorCondition(TextView.From(_prev.Text, _prev.Text));
         }
+
+        var s = _current.Text;
 
         Next(); // '$'
 
@@ -365,7 +374,7 @@ public sealed class PathLangParser
         var cmpOp = ParseCompareOp();
         var value = ParseLiteral();
 
-        return new AstFieldCompareCondition(typeGuard, new AstIdent(field.Text), cmpOp, value);
+        return new AstFieldCompareCondition(typeGuard, new AstIdent(field.Text), cmpOp, value, TextView.From(s, _prev.Text));
     }
 
     private AstCompareOp ParseCompareOp()
@@ -393,33 +402,33 @@ public sealed class PathLangParser
         if (_current.Kind == TokenKind.KeywordTrue)
         {
             Next();
-            return new AstBoolLiteral(true);
+            return new AstBoolLiteral(true, TextView.From(_prev.Text, _prev.Text));
         }
 
         if (_current.Kind == TokenKind.KeywordFalse)
         {
             Next();
-            return new AstBoolLiteral(false);
+            return new AstBoolLiteral(false, TextView.From(_prev.Text, _prev.Text));
         }
 
         if (_current.Kind == TokenKind.Number)
         {
             var tv = _current.Text;
             Next();
-            return new AstNumberLiteral(tv);
+            return new AstNumberLiteral(tv, TextView.From(_prev.Text, _prev.Text));
         }
 
         if (_current.Kind == TokenKind.String)
         {
             var tv = _current.Text;
             Next();
-            return new AstStringLiteral(new TextView(tv.Source, tv.Start + 1, tv.Length - 2)); //removing start and end quotes
+            return new AstStringLiteral(new TextView(tv.Source, tv.Start + 1, tv.Length - 2), TextView.From(_prev.Text, _prev.Text)); //removing start and end quotes
         }
 
         Report(PathLangDiagnosticSeverity.Error, $"Expected literal but got {_current.Kind}", _current);
         if (_current.Kind != TokenKind.EndOfFile)
             Next();
-        return new AstErrorLiteral();
+        return new AstErrorLiteral(TextView.From(_prev.Text, _prev.Text));
     }
 
     private Token Expect(TokenKind kind, params ReadOnlySpan<TokenKind> recoveryStop)
@@ -453,11 +462,13 @@ public sealed class PathLangParser
     {
         if (_lookahead.Count > 0)
         {
+            _prev = _current;
             _current = _lookahead[0];
             _lookahead.RemoveAt(0);
             return;
         }
 
+        _prev = _current;
         _current = _tokenizer.GetNextToken();
     }
 
