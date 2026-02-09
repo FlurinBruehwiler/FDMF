@@ -15,6 +15,10 @@ In Phase 1 we want to implement a database. This includes the following points.
 
 - Add more FLD data types (guid! / enum) / think about how we are going to handle custom data types
 - implement access management (path lang)
+  - [x] parser
+  - [x] basic evaluation
+  - [ ] fast evaluation
+  - [ ] caching
 - add a user to the base model / have the concept of the current user
 - add inheritance (multi?)
 - add unions
