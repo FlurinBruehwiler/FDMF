@@ -5,9 +5,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <RootNamespace>PerformanceTests</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\FDMF.Testing.Shared\FDMF.Testing.Shared.csproj" />
   </ItemGroup>
 
 </Project>

@@ -38,16 +38,16 @@ public sealed class DbSession : IDisposable
 
     public TransactionalKvStore.Cursor Cursor;
     public TransactionalKvStore Store;
-    public Environment Environment;
+    public DbEnvironment DbEnvironment;
     public Arena Arena;
     public bool IsReadOnly { get; }
 
-    public DbSession(Environment environment, bool readOnly = false, int arenaSize = 100_000)
+    public DbSession(DbEnvironment dbEnvironment, bool readOnly = false, int arenaSize = 100_000)
     {
         Arena = new Arena(arenaSize);
-        Store = new TransactionalKvStore(environment.LightningEnvironment, environment.ObjectDb, Arena, readOnly: readOnly);
+        Store = new TransactionalKvStore(dbEnvironment.LightningEnvironment, dbEnvironment.ObjectDb, Arena, readOnly: readOnly);
         Cursor = Store.CreateCursor();
-        Environment = environment;
+        DbEnvironment = dbEnvironment;
         IsReadOnly = readOnly;
     }
 
@@ -60,12 +60,12 @@ public sealed class DbSession : IDisposable
         //so the alternative design, which may be better is to first update the readonly transaction of the TKV to the current version,
         //then execute all saveaction/validations, and only then commit
 
-        using (var writeTransaction = Environment.LightningEnvironment.BeginTransaction())
+        using (var writeTransaction = DbEnvironment.LightningEnvironment.BeginTransaction())
         {
             var userId = Guid.NewGuid();
             var timestampUtc = DateTime.UtcNow;
 
-            History.WriteCommit(Arena, Environment, writeTransaction, Store.ChangeSet!, timestampUtc, userId);
+            History.WriteCommit(Arena, DbEnvironment, writeTransaction, Store.ChangeSet!, timestampUtc, userId);
 
             Searcher.UpdateSearchIndex(this, writeTransaction, Store.ChangeSet!);
 
@@ -78,7 +78,7 @@ public sealed class DbSession : IDisposable
         Store.Dispose();
 
         // reset the store/cursor to a fresh read view
-        Store = new TransactionalKvStore(Environment.LightningEnvironment, Environment.ObjectDb, Arena);
+        Store = new TransactionalKvStore(DbEnvironment.LightningEnvironment, DbEnvironment.ObjectDb, Arena);
         Cursor = Store.CreateCursor();
     }
 

@@ -24,17 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FDMF.Core\FDMF.Core.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Generated\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Update="testdata\*.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    <ProjectReference Include="..\FDMF.Testing.Shared\FDMF.Testing.Shared.csproj" />
   </ItemGroup>
 
 </Project>

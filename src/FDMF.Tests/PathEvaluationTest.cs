@@ -1,8 +1,9 @@
+using FDMF.Core;
 using FDMF.Core.DatabaseLayer;
 using FDMF.Core.PathLayer;
-using FDMF.Tests.BusinessModelModel;
-using FDMF.Tests.TestModelModel;
-using Environment = FDMF.Core.Environment;
+using FDMF.Testing.Shared;
+using FDMF.Testing.Shared.BusinessModelModel;
+using FDMF.Testing.Shared.TestModelModel;
 
 namespace FDMF.Tests;
 
@@ -12,7 +13,7 @@ public sealed class PathEvaluationTest
     [Fact]
     public void Basic_Test()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
         using var session = new DbSession(env);
 
         var model = session.GetObjFromGuid<Model>(env.ModelGuid)!.Value;
@@ -34,7 +35,7 @@ public sealed class PathEvaluationTest
     [Fact]
     public void Basic_Test_2()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
         using var session = new DbSession(env);
 
         var model = session.GetObjFromGuid<Model>(env.ModelGuid)!.Value;
@@ -61,7 +62,7 @@ public sealed class PathEvaluationTest
     [Fact]
     public void Basic_Test_3()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
         using var session = new DbSession(env);
 
         var model = session.GetObjFromGuid<Model>(env.ModelGuid)!.Value;
@@ -92,7 +93,7 @@ public sealed class PathEvaluationTest
     [Fact]
     public void RepeatTest()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
         using var session = new DbSession(env);
 
         var model = session.GetObjFromGuid<Model>(env.ModelGuid)!.Value;
@@ -121,7 +122,7 @@ public sealed class PathEvaluationTest
     [Fact]
     public void BusinessModel_Document_To_PublicSession_Via_AgendaItem_With_ComplexFilter()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetBusinessModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetBusinessModelDumpFile());
         using var session = new DbSession(env);
 
         var model = session.GetObjFromGuid<Model>(env.ModelGuid)!.Value;
@@ -181,7 +182,7 @@ public sealed class PathEvaluationTest
     [Fact]
     public void BusinessModel_Document_Can_Reach_Sibling_Document_Through_Folder_Graph()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetBusinessModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetBusinessModelDumpFile());
         using var session = new DbSession(env);
 
         var model = session.GetObjFromGuid<Model>(env.ModelGuid)!.Value;
@@ -216,7 +217,7 @@ public sealed class PathEvaluationTest
     [Fact]
     public void BusinessModel_Document_To_OwnerUnit_Parent_With_ComplexBusinessCaseFilter()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetBusinessModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetBusinessModelDumpFile());
         using var session = new DbSession(env);
 
         var model = session.GetObjFromGuid<Model>(env.ModelGuid)!.Value;
@@ -257,7 +258,7 @@ public sealed class PathEvaluationTest
     [Fact]
     public void BusinessModel_Document_To_Category_With_MultiField_Filter()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetBusinessModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetBusinessModelDumpFile());
         using var session = new DbSession(env);
 
         var model = session.GetObjFromGuid<Model>(env.ModelGuid)!.Value;

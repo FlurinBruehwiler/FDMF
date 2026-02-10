@@ -1,4 +1,4 @@
-﻿using Environment = FDMF.Core.Environment;
+﻿using FDMF.Core;
 
 //we can store all fields objId+fieldIds that where changed in a dictionary within the transaction,
 //when saving, we have a separate table where we store the "history" of all objects
@@ -7,7 +7,7 @@
 
 try
 {
-    using var env = Environment.CreateDatabase("testdb");
+    using var env = DbEnvironment.CreateDatabase("testdb");
 
 
 }

@@ -5,7 +5,7 @@ using MemoryPack;
 using FDMF.Core;
 using FDMF.Core.DatabaseLayer;
 
-namespace FDMF.Tests.BusinessModelModel;
+namespace FDMF.Testing.Shared.BusinessModelModel;
 
 [MemoryPackable]
 public partial struct Session : ITransactionObject, IEquatable<Session>
@@ -58,7 +58,7 @@ public partial struct Session : ITransactionObject, IEquatable<Session>
     public BusinessCase? BusinessCase
     {
         get => GeneratedCodeHelper.GetNullableAssoc<BusinessCase>(DbSession, ObjId, Fields.BusinessCase);
-        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.BusinessCase, value?.ObjId ?? Guid.Empty, FDMF.Tests.BusinessModelModel.BusinessCase.Fields.Sessions);
+        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.BusinessCase, value?.ObjId ?? Guid.Empty, FDMF.Testing.Shared.BusinessModelModel.BusinessCase.Fields.Sessions);
     }
 
     public static bool operator ==(Session a, Session b) => a.DbSession == b.DbSession && a.ObjId == b.ObjId;

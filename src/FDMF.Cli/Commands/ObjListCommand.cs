@@ -1,7 +1,7 @@
 using System.CommandLine;
 using FDMF.Cli.Utils;
+using FDMF.Core;
 using FDMF.Core.DatabaseLayer;
-using Environment = FDMF.Core.Environment;
 
 namespace FDMF.Cli.Commands;
 
@@ -27,7 +27,7 @@ public static class ObjListCommand
             FieldDefinition[]? scalarFields = null;
             ReferenceFieldDefinition[]? refFields = null;
 
-            using var env = Environment.Open(resolvedDb);
+            using var env = DbEnvironment.Open(resolvedDb);
             using var session = new DbSession(env, readOnly: true);
 
             if (!string.IsNullOrWhiteSpace(typeKey))

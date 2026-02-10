@@ -70,8 +70,8 @@ public sealed class HistoryCommit
 
 /// <summary>
 /// History storage:
-/// - Commit record stored in <see cref="Environment.HistoryDb"/> with key = UUIDv7 bytes.
-/// - Object index stored in <see cref="Environment.HistoryObjIndexDb"/> as dupsort: objId -> commitId.
+/// - Commit record stored in <see cref="DbEnvironment.HistoryDb"/> with key = UUIDv7 bytes.
+/// - Object index stored in <see cref="DbEnvironment.HistoryObjIndexDb"/> as dupsort: objId -> commitId.
 /// </summary>
 public static class History
 {
@@ -123,7 +123,7 @@ public static class History
 
     public static unsafe void WriteCommit(
         Arena transactionArena,
-        Environment environment,
+        DbEnvironment dbEnvironment,
         LightningTransaction writeTransaction,
         BPlusTree changeSet,
         DateTime timestampUtc,
@@ -191,7 +191,7 @@ public static class History
                     nextCommitEventPtrLocation = &o->FirstEvent;
 
                     // objId -> commitId index
-                    writeTransaction.Put(environment.HistoryObjIndexDb, objId.AsSpan(), commitKey.AsSpan());
+                    writeTransaction.Put(dbEnvironment.HistoryObjIndexDb, objId.AsSpan(), commitKey.AsSpan());
                 }
 
                 // OBJ
@@ -247,7 +247,7 @@ public static class History
                     nextCommitEventPtrLocation = &e->Next;
 
                     // Old payload
-                    var (oldRes, _, oldVal) = writeTransaction.Get(environment.ObjectDb, key);
+                    var (oldRes, _, oldVal) = writeTransaction.Get(dbEnvironment.ObjectDb, key);
                     ReadOnlySpan<byte> oldPayload = ReadOnlySpan<byte>.Empty;
                     if (oldRes == MDBResultCode.Success)
                     {
@@ -293,12 +293,12 @@ public static class History
         var commitData = transactionArena.GetRegion((byte*)header);
 
         // Write commit record
-        writeTransaction.Put(environment.HistoryDb, commitKey.AsSpan(), commitData);
+        writeTransaction.Put(dbEnvironment.HistoryDb, commitKey.AsSpan(), commitData);
     }
 
-    public static IEnumerable<Guid> GetCommitsForObject(Environment environment, LightningTransaction readTransaction, Guid objId)
+    public static IEnumerable<Guid> GetCommitsForObject(DbEnvironment dbEnvironment, LightningTransaction readTransaction, Guid objId)
     {
-        using var cursor = readTransaction.CreateCursor(environment.HistoryObjIndexDb);
+        using var cursor = readTransaction.CreateCursor(dbEnvironment.HistoryObjIndexDb);
 
         if (cursor.SetKey(objId.AsSpan()).resultCode != MDBResultCode.Success)
             yield break;
@@ -310,18 +310,18 @@ public static class History
         } while (cursor.NextDuplicate().resultCode == MDBResultCode.Success);
     }
 
-    public static HistoryCommit? TryGetCommit(Environment environment, LightningTransaction readTransaction, Guid commitId)
+    public static HistoryCommit? TryGetCommit(DbEnvironment dbEnvironment, LightningTransaction readTransaction, Guid commitId)
     {
-        var (rc, _, value) = readTransaction.Get(environment.HistoryDb, commitId.AsSpan());
+        var (rc, _, value) = readTransaction.Get(dbEnvironment.HistoryDb, commitId.AsSpan());
         if (rc != MDBResultCode.Success)
             return null;
 
         return DecodeCommitValue(commitId, value.AsSlice());
     }
 
-    public static IEnumerable<HistoryCommit> GetAllCommits(Environment environment, LightningTransaction readTransaction, int max = int.MaxValue)
+    public static IEnumerable<HistoryCommit> GetAllCommits(DbEnvironment dbEnvironment, LightningTransaction readTransaction, int max = int.MaxValue)
     {
-        using var cursor = readTransaction.CreateCursor(environment.HistoryDb);
+        using var cursor = readTransaction.CreateCursor(dbEnvironment.HistoryDb);
         if (cursor.First().resultCode != MDBResultCode.Success)
             yield break;
 

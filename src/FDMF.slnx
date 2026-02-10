@@ -19,8 +19,9 @@
   <Project Path="FDMF.Client/FDMF.Client.csproj" />
   <Project Path="FDMF.Core/FDMF.Core.csproj" />
   <Project Path="FDMF.SourceGen/FDMF.SourceGen.csproj" />
+  <Project Path="FDMF.Testing.Performance/FDMF.Testing.Performance.csproj" />
+  <Project Path="FDMF.Testing.Shared/FDMF.Testing.Shared.csproj" />
   <Project Path="FDMF.Tests/FDMF.Tests.csproj" />
   <Project Path="FMDF.Server/FMDF.Server.csproj" />
-  <Project Path="PerformanceTests/PerformanceTests.csproj" />
   <Project Path="Playground/Playground.csproj" />
 </Solution>

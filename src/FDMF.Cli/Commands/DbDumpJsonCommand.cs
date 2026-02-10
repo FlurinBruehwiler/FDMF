@@ -1,7 +1,7 @@
 using System.CommandLine;
 using FDMF.Cli.Utils;
+using FDMF.Core;
 using FDMF.Core.DatabaseLayer;
-using Environment = FDMF.Core.Environment;
 
 namespace FDMF.Cli.Commands;
 
@@ -23,7 +23,7 @@ public static class DbDumpJsonCommand
         {
             var resolvedDb = DbPath.Resolve(dbDir, allowCwd: true);
 
-            using var env = Environment.Open(resolvedDb);
+            using var env = DbEnvironment.Open(resolvedDb);
             using var session = new DbSession(env, readOnly: true);
 
             var json = JsonDump.GetJsonDump(session);

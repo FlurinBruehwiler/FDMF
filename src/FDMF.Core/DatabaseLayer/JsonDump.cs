@@ -14,7 +14,7 @@ public static class JsonDump
 {
     public static string GetJsonDump(DbSession dbSession)
     {
-        var model = dbSession.GetObjFromGuid<Model>(dbSession.Environment.ModelGuid);
+        var model = dbSession.GetObjFromGuid<Model>(dbSession.DbEnvironment.ModelGuid);
         var entityById = model!.Value.GetAllEntityDefinitions().ToDictionary(x => Guid.Parse(x.Id), x => x);
 
         using var stream = new MemoryStream();
@@ -22,7 +22,7 @@ public static class JsonDump
         {
             writer.WriteStartObject();
 
-            writer.WriteString("modelGuid", dbSession.Environment.ModelGuid);
+            writer.WriteString("modelGuid", dbSession.DbEnvironment.ModelGuid);
             writer.WritePropertyName("entities");
             writer.WriteStartObject();
 
@@ -138,7 +138,7 @@ public static class JsonDump
         }
 
 
-        var model = dbSession.GetObjFromGuid<Model>(dbSession.Environment.ModelGuid);
+        var model = dbSession.GetObjFromGuid<Model>(dbSession.DbEnvironment.ModelGuid);
         var entityById = model!.Value.GetAllEntityDefinitions().ToDictionary(x => Guid.Parse(x.Id), x => x);
 
         //TODO: better error handling

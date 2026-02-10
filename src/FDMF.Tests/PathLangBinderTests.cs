@@ -1,8 +1,9 @@
+using FDMF.Core;
 using FDMF.Core.DatabaseLayer;
 using FDMF.Core.PathLayer;
-using FDMF.Tests.BusinessModelModel;
-using FDMF.Tests.TestModelModel;
-using Environment = FDMF.Core.Environment;
+using FDMF.Testing.Shared;
+using FDMF.Testing.Shared.BusinessModelModel;
+using FDMF.Testing.Shared.TestModelModel;
 
 namespace FDMF.Tests;
 
@@ -12,7 +13,7 @@ public sealed class PathLangBinderTests
     [Fact]
     public void Bind_Resolves_Field_And_Association_Ids_From_Model()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
         using var session = new DbSession(env, readOnly: true);
 
         var model = session.GetObjFromGuid<Model>(env.ModelGuid);
@@ -39,7 +40,7 @@ public sealed class PathLangBinderTests
     [Fact]
     public void Bind_Unknown_Field_Reports_Error_But_Does_Not_Throw()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
         using var session = new DbSession(env, readOnly: true);
 
         var model = session.GetObjFromGuid<Model>(env.ModelGuid);
@@ -52,7 +53,7 @@ public sealed class PathLangBinderTests
         Assert.Contains(bind.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
     }
 
-    private static Model LoadBusinessModel(Environment env, DbSession session)
+    private static Model LoadBusinessModel(DbEnvironment env, DbSession session)
     {
         var model = session.GetObjFromGuid<Model>(env.ModelGuid);
         Assert.NotNull(model);
@@ -100,7 +101,7 @@ public sealed class PathLangBinderTests
     [Fact]
     public void Bind_ComplexPredicate_ResolvesNestedTraversals_AndFields()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetBusinessModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetBusinessModelDumpFile());
         using var session = new DbSession(env, readOnly: true);
         var model = LoadBusinessModel(env, session);
 
@@ -145,7 +146,7 @@ public sealed class PathLangBinderTests
     [Fact]
     public void Bind_UnknownAssociation_ReturnsHelpfulError()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetBusinessModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetBusinessModelDumpFile());
         using var session = new DbSession(env, readOnly: true);
         var model = LoadBusinessModel(env, session);
 
@@ -161,7 +162,7 @@ public sealed class PathLangBinderTests
     [Fact]
     public void Bind_UnknownField_ReturnsHelpfulError()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetBusinessModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetBusinessModelDumpFile());
         using var session = new DbSession(env, readOnly: true);
         var model = LoadBusinessModel(env, session);
 
@@ -177,7 +178,7 @@ public sealed class PathLangBinderTests
     [Fact]
     public void Bind_UnknownType_ReturnsHelpfulError()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetBusinessModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetBusinessModelDumpFile());
         using var session = new DbSession(env, readOnly: true);
         var model = LoadBusinessModel(env, session);
 
@@ -193,7 +194,7 @@ public sealed class PathLangBinderTests
     [Fact]
     public void RepeatPathStepMustStartAndEndWithTheSameType_Positive()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetBusinessModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetBusinessModelDumpFile());
         using var session = new DbSession(env, readOnly: true);
         var model = LoadBusinessModel(env, session);
 
@@ -207,7 +208,7 @@ public sealed class PathLangBinderTests
     [Fact]
     public void RepeatPathStepMustStartAndEndWithTheSameType_Negative()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetBusinessModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetBusinessModelDumpFile());
         using var session = new DbSession(env, readOnly: true);
         var model = LoadBusinessModel(env, session);
 

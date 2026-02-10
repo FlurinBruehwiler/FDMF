@@ -5,7 +5,7 @@ using MemoryPack;
 using FDMF.Core;
 using FDMF.Core.DatabaseLayer;
 
-namespace FDMF.Tests.BusinessModelModel;
+namespace FDMF.Testing.Shared.BusinessModelModel;
 
 [MemoryPackable]
 public partial struct AgendaItem : ITransactionObject, IEquatable<AgendaItem>
@@ -55,7 +55,7 @@ public partial struct AgendaItem : ITransactionObject, IEquatable<AgendaItem>
     public Session? Session
     {
         get => GeneratedCodeHelper.GetNullableAssoc<Session>(DbSession, ObjId, Fields.Session);
-        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Session, value?.ObjId ?? Guid.Empty, FDMF.Tests.BusinessModelModel.Session.Fields.AgendaItems);
+        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Session, value?.ObjId ?? Guid.Empty, FDMF.Testing.Shared.BusinessModelModel.Session.Fields.AgendaItems);
     }
 
     [MemoryPackIgnore]

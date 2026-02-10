@@ -5,7 +5,7 @@ using MemoryPack;
 using FDMF.Core;
 using FDMF.Core.DatabaseLayer;
 
-namespace FDMF.Tests.TestModelModel;
+namespace FDMF.Testing.Shared.TestModelModel;
 
 [MemoryPackable]
 public partial struct TestingDocument : ITransactionObject, IEquatable<TestingDocument>

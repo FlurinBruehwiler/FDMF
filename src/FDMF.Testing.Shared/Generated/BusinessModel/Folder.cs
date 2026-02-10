@@ -5,7 +5,7 @@ using MemoryPack;
 using FDMF.Core;
 using FDMF.Core.DatabaseLayer;
 
-namespace FDMF.Tests.BusinessModelModel;
+namespace FDMF.Testing.Shared.BusinessModelModel;
 
 [MemoryPackable]
 public partial struct Folder : ITransactionObject, IEquatable<Folder>
@@ -48,7 +48,7 @@ public partial struct Folder : ITransactionObject, IEquatable<Folder>
     public Folder? Parent
     {
         get => GeneratedCodeHelper.GetNullableAssoc<Folder>(DbSession, ObjId, Fields.Parent);
-        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Parent, value?.ObjId ?? Guid.Empty, FDMF.Tests.BusinessModelModel.Folder.Fields.Subfolders);
+        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Parent, value?.ObjId ?? Guid.Empty, FDMF.Testing.Shared.BusinessModelModel.Folder.Fields.Subfolders);
     }
 
     [MemoryPackIgnore]

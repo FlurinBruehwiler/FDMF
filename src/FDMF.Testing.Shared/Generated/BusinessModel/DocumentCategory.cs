@@ -5,7 +5,7 @@ using MemoryPack;
 using FDMF.Core;
 using FDMF.Core.DatabaseLayer;
 
-namespace FDMF.Tests.BusinessModelModel;
+namespace FDMF.Testing.Shared.BusinessModelModel;
 
 [MemoryPackable]
 public partial struct DocumentCategory : ITransactionObject, IEquatable<DocumentCategory>

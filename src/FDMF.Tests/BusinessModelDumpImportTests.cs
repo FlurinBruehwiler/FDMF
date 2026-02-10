@@ -1,5 +1,6 @@
+using FDMF.Core;
 using FDMF.Core.DatabaseLayer;
-using Environment = FDMF.Core.Environment;
+using FDMF.Testing.Shared;
 
 namespace FDMF.Tests;
 
@@ -9,7 +10,7 @@ public sealed class BusinessModelDumpImportTests
     [Fact]
     public void Create_Db_From_BusinessModel_Dump()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetBusinessModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetBusinessModelDumpFile());
         using var session = new DbSession(env, readOnly: true);
 
         var model = session.GetObjFromGuid<Model>(env.ModelGuid);

@@ -1,6 +1,6 @@
 using System.CommandLine;
 using FDMF.Cli.Utils;
-using Environment = FDMF.Core.Environment;
+using FDMF.Core;
 
 namespace FDMF.Cli.Commands;
 
@@ -28,7 +28,7 @@ public static class DbCommands
                 Directory.Delete(resolvedDb, recursive: true);
             }
 
-            using var _ = Environment.CreateDatabase(resolvedDb);
+            using var _ = DbEnvironment.CreateDatabase(resolvedDb);
 
             Console.WriteLine($"Initialized database at '{resolvedDb}'.");
         }, CliOptions.Db, forceOption);

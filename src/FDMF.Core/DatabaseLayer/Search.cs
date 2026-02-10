@@ -59,7 +59,7 @@ public static class Searcher
 
     public static void BuildIndex(DbSession session)
     {
-        var environment = session.Environment;
+        var environment = session.DbEnvironment;
 
         using var txn = environment.LightningEnvironment.BeginTransaction();
 
@@ -104,7 +104,7 @@ public static class Searcher
     /// </summary>
     public static void UpdateSearchIndex(DbSession session, LightningTransaction txn, BPlusTree changeSet)
     {
-        var environment = session.Environment;
+        var environment = session.DbEnvironment;
         var model = session.GetObjFromGuid<Model>(environment.ModelGuid)!.Value;
         var fieldsById = model.GetAllFieldDefinitions().ToDictionary(x => Guid.Parse(x.Id), x => x);
 
@@ -234,7 +234,7 @@ public static class Searcher
                         break;
                     case AssocCriterion.AssocCriterionType.Null:
                     {
-                        using var cursor = dbSession.Store.ReadTransaction.CreateCursor(dbSession.Environment.ObjectDb);
+                        using var cursor = dbSession.Store.ReadTransaction.CreateCursor(dbSession.DbEnvironment.ObjectDb);
 
                         Span<byte> prefix = stackalloc byte[2 * 16];
                         MemoryMarshal.Write(prefix, obj);
@@ -252,7 +252,7 @@ public static class Searcher
                     }
                     case AssocCriterion.AssocCriterionType.NotNull:
                     {
-                        using var cursor = dbSession.Store.ReadTransaction.CreateCursor(dbSession.Environment.ObjectDb);
+                        using var cursor = dbSession.Store.ReadTransaction.CreateCursor(dbSession.DbEnvironment.ObjectDb);
 
                         Span<byte> prefix = stackalloc byte[2 * 16];
                         MemoryMarshal.Write(prefix, obj);
@@ -274,15 +274,15 @@ public static class Searcher
 
                 return false;
             case DateTimeCriterion dateTimeCriterion:
-                return MatchNonStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, obj, dateTimeCriterion.FieldId, dateTimeCriterion.From, dateTimeCriterion.To);
+                return MatchNonStringSearch(dbSession.DbEnvironment, dbSession.Store.ReadTransaction, obj, dateTimeCriterion.FieldId, dateTimeCriterion.From, dateTimeCriterion.To);
             case DecimalCriterion decimalCriterion:
-                return MatchNonStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, obj, decimalCriterion.FieldId, decimalCriterion.From, decimalCriterion.To);
+                return MatchNonStringSearch(dbSession.DbEnvironment, dbSession.Store.ReadTransaction, obj, decimalCriterion.FieldId, decimalCriterion.From, decimalCriterion.To);
             case BooleanCriterion booleanCriterion:
-                return MatchBooleanCriterion(dbSession.Environment, dbSession.Store.ReadTransaction, obj, booleanCriterion);
+                return MatchBooleanCriterion(dbSession.DbEnvironment, dbSession.Store.ReadTransaction, obj, booleanCriterion);
             case IdCriterion idCriterion:
                 return obj == idCriterion.Guid;
             case LongCriterion longCriterion:
-                return MatchNonStringSearch(dbSession.Environment, dbSession.Store.ReadTransaction, obj, longCriterion.FieldId, longCriterion.From, longCriterion.To);
+                return MatchNonStringSearch(dbSession.DbEnvironment, dbSession.Store.ReadTransaction, obj, longCriterion.FieldId, longCriterion.From, longCriterion.To);
             case MultiCriterion { Type: MultiCriterion.MultiType.OR } multiCriterion:
                 foreach (var crit in multiCriterion.Criterions)
                 {
@@ -316,7 +316,7 @@ public static class Searcher
                     return false;
                 return MatchCriterion(dbSession, searchQuery.SearchCriterion, obj);
             case StringCriterion stringCriterion:
-                return MatchStringCriterion(dbSession.Environment, dbSession.Store.ReadTransaction, obj, stringCriterion);
+                return MatchStringCriterion(dbSession.DbEnvironment, dbSession.Store.ReadTransaction, obj, stringCriterion);
             default:
                 throw new ArgumentOutOfRangeException(nameof(criterion));
         }
@@ -337,7 +337,7 @@ public static class Searcher
             case SearchQuery searchQuery:
                 if (searchQuery.SearchCriterion == null)
                 {
-                    return ExecuteTypeSearch(dbSession.Environment, dbSession.Store.ReadTransaction, searchQuery.TypId, addResult);
+                    return ExecuteTypeSearch(dbSession.DbEnvironment, dbSession.Store.ReadTransaction, searchQuery.TypId, addResult);
                 }
 
                 return SearchInternal(dbSession, searchQuery.SearchCriterion, addResult);
@@ -489,7 +489,7 @@ public static class Searcher
     [SuppressMessage("ReSharper", "AccessToDisposedClosure")]
     private static bool ExecuteAssocSearch(DbSession dbSession, AssocCriterion criterion, Func<Guid, bool> addResult)
     {
-        Environment env = dbSession.Environment;
+        DbEnvironment env = dbSession.DbEnvironment;
         LightningTransaction transaction = dbSession.Store.ReadTransaction;
 
 
@@ -588,9 +588,9 @@ public static class Searcher
         }
     }
 
-    private static bool MatchNonStringSearch<T>(Environment environment, LightningTransaction transaction, Guid objId, Guid fieldId, T from, T to) where T : unmanaged, IComparable<T>
+    private static bool MatchNonStringSearch<T>(DbEnvironment dbEnvironment, LightningTransaction transaction, Guid objId, Guid fieldId, T from, T to) where T : unmanaged, IComparable<T>
     {
-        var val = GetFldValue<byte>(environment, transaction, objId, fieldId);
+        var val = GetFldValue<byte>(dbEnvironment, transaction, objId, fieldId);
 
         if (val.Length == 0)
         {
@@ -622,9 +622,9 @@ public static class Searcher
 
         if (!fld!.Value.IsIndexed)
         {
-            return ExecuteTypeSearch(dbSession.Environment, transaction, Guid.Parse(fld!.Value.OwningEntity.Id), (objId) =>
+            return ExecuteTypeSearch(dbSession.DbEnvironment, transaction, Guid.Parse(fld!.Value.OwningEntity.Id), (objId) =>
             {
-                if (MatchNonStringSearch(dbSession.Environment, transaction, objId, fieldId, from, to))
+                if (MatchNonStringSearch(dbSession.DbEnvironment, transaction, objId, fieldId, from, to))
                 {
                     if (!addResult(objId))
                     {
@@ -638,7 +638,7 @@ public static class Searcher
 
         HashSet<Guid>? seen = null;
 
-        using var cursor = transaction.CreateCursor(dbSession.Environment.NonStringSearchIndex);
+        using var cursor = transaction.CreateCursor(dbSession.DbEnvironment.NonStringSearchIndex);
 
         Span<byte> minKey = stackalloc byte[GetNonStringKeySize<T>()];
         ConstructNonStringIndexKey(comparison, fieldId, from, minKey);
@@ -673,12 +673,12 @@ public static class Searcher
         if (!includesDefault)
             return true;
 
-        return AddMissingFieldValues(dbSession.Environment, transaction, Guid.Parse(fld!.Value.OwningEntity.Id), fieldId, seen!, addResult);
+        return AddMissingFieldValues(dbSession.DbEnvironment, transaction, Guid.Parse(fld!.Value.OwningEntity.Id), fieldId, seen!, addResult);
     }
 
-    private static bool ExecuteTypeSearch(Environment environment, LightningTransaction transaction, Guid typId, Func<Guid, bool> addResult)
+    private static bool ExecuteTypeSearch(DbEnvironment dbEnvironment, LightningTransaction transaction, Guid typId, Func<Guid, bool> addResult)
     {
-        using var cursor = transaction.CreateCursor(environment.NonStringSearchIndex);
+        using var cursor = transaction.CreateCursor(dbEnvironment.NonStringSearchIndex);
 
         Span<byte> dest = stackalloc byte[1 + 16];
         dest[0] = (byte)CustomIndexComparer.Comparison.Type;
@@ -703,13 +703,13 @@ public static class Searcher
         return true;
     }
 
-    private static ReadOnlySpan<T> GetFldValue<T>(Environment environment, LightningTransaction transaction, Guid objId, Guid fldId) where T : unmanaged
+    private static ReadOnlySpan<T> GetFldValue<T>(DbEnvironment dbEnvironment, LightningTransaction transaction, Guid objId, Guid fldId) where T : unmanaged
     {
         Span<byte> keyBuf = stackalloc byte[2 * 16];
         MemoryMarshal.Write(keyBuf.Slice(0 * 16, 16), objId);
         MemoryMarshal.Write(keyBuf.Slice(1 * 16, 16), fldId);
 
-        var (r, _, v) = transaction.Get(environment.ObjectDb, keyBuf);
+        var (r, _, v) = transaction.Get(dbEnvironment.ObjectDb, keyBuf);
         if (r == MDBResultCode.Success)
         {
             return MemoryMarshal.Cast<byte, T>(v.AsSpan().Slice(1));
@@ -718,9 +718,9 @@ public static class Searcher
         return ReadOnlySpan<T>.Empty;
     }
 
-    private static bool AddMissingFieldValues(Environment environment, LightningTransaction transaction, Guid typId, Guid fieldId, HashSet<Guid> seen, Func<Guid, bool> addResult)
+    private static bool AddMissingFieldValues(DbEnvironment dbEnvironment, LightningTransaction transaction, Guid typId, Guid fieldId, HashSet<Guid> seen, Func<Guid, bool> addResult)
     {
-        using var typeCursor = transaction.CreateCursor(environment.NonStringSearchIndex);
+        using var typeCursor = transaction.CreateCursor(dbEnvironment.NonStringSearchIndex);
 
         Span<byte> typeKey = stackalloc byte[1 + 16];
         typeKey[0] = (byte)CustomIndexComparer.Comparison.Type;
@@ -729,7 +729,7 @@ public static class Searcher
         if (typeCursor.SetKey(typeKey).resultCode != MDBResultCode.Success)
             return true;
 
-        using var presenceCursor = transaction.CreateCursor(environment.FieldPresenceIndex);
+        using var presenceCursor = transaction.CreateCursor(dbEnvironment.FieldPresenceIndex);
 
         bool hasPresence = presenceCursor.SetKey(fieldId.AsSpan()).resultCode == MDBResultCode.Success;
         Guid currentPresence = default;
@@ -767,9 +767,9 @@ public static class Searcher
         return true;
     }
 
-    private static bool MatchBooleanCriterion(Environment environment, LightningTransaction transaction, Guid objId, BooleanCriterion criterion)
+    private static bool MatchBooleanCriterion(DbEnvironment dbEnvironment, LightningTransaction transaction, Guid objId, BooleanCriterion criterion)
     {
-        var val = GetFldValue<byte>(environment, transaction, objId, criterion.FieldId);
+        var val = GetFldValue<byte>(dbEnvironment, transaction, objId, criterion.FieldId);
 
         if (val.Length == 0)
         {
@@ -780,31 +780,31 @@ public static class Searcher
         return MemoryMarshal.Read<bool>(val) == criterion.Value;
     }
 
-    private static bool MatchStringCriterion(Environment environment, LightningTransaction transaction, Guid objId, StringCriterion criterion)
+    private static bool MatchStringCriterion(DbEnvironment dbEnvironment, LightningTransaction transaction, Guid objId, StringCriterion criterion)
     {
         switch (criterion.Type)
         {
             case StringCriterion.MatchType.Substring:
             {
-                var val = GetFldValue<char>(environment, transaction, objId, criterion.FieldId);
+                var val = GetFldValue<char>(dbEnvironment, transaction, objId, criterion.FieldId);
 
                 return val.Contains(criterion.Value.AsSpan(), StringComparison.OrdinalIgnoreCase);
             }
             case StringCriterion.MatchType.Exact:
             {
-                var val = GetFldValue<char>(environment, transaction, objId, criterion.FieldId);
+                var val = GetFldValue<char>(dbEnvironment, transaction, objId, criterion.FieldId);
 
                 return val.Equals(criterion.Value.AsSpan(), StringComparison.OrdinalIgnoreCase);
             }
             case StringCriterion.MatchType.Prefix:
             {
-                var val = GetFldValue<char>(environment, transaction, objId, criterion.FieldId);
+                var val = GetFldValue<char>(dbEnvironment, transaction, objId, criterion.FieldId);
 
                 return val.StartsWith(criterion.Value.AsSpan(), StringComparison.OrdinalIgnoreCase);
             }
             case StringCriterion.MatchType.Postfix:
             {
-                var val = GetFldValue<char>(environment, transaction, objId, criterion.FieldId);
+                var val = GetFldValue<char>(dbEnvironment, transaction, objId, criterion.FieldId);
 
                 return val.EndsWith(criterion.Value.AsSpan(), StringComparison.OrdinalIgnoreCase);
             }
@@ -827,9 +827,9 @@ public static class Searcher
 
         if (!fld!.Value.IsIndexed)
         {
-            return ExecuteTypeSearch(dbSession.Environment, transaction, Guid.Parse(fld!.Value.OwningEntity.Id), objId =>
+            return ExecuteTypeSearch(dbSession.DbEnvironment, transaction, Guid.Parse(fld!.Value.OwningEntity.Id), objId =>
             {
-                if (MatchBooleanCriterion(dbSession.Environment, transaction, objId, criterion))
+                if (MatchBooleanCriterion(dbSession.DbEnvironment, transaction, objId, criterion))
                 {
                     if (!addResult(objId))
                         return false;
@@ -843,7 +843,7 @@ public static class Searcher
         if (criterion.Value == false)
             seen = [];
 
-        using var cursor = transaction.CreateCursor(dbSession.Environment.NonStringSearchIndex);
+        using var cursor = transaction.CreateCursor(dbSession.DbEnvironment.NonStringSearchIndex);
 
         Span<byte> key = stackalloc byte[GetNonStringKeySize<bool>()];
         ConstructNonStringIndexKey(CustomIndexComparer.Comparison.Boolean, criterion.FieldId, criterion.Value, key);
@@ -865,7 +865,7 @@ public static class Searcher
 
         if (criterion.Value == false)
         {
-            return AddMissingFieldValues(dbSession.Environment, transaction, Guid.Parse(fld!.Value.OwningEntity.Id), criterion.FieldId, seen!, addResult);
+            return AddMissingFieldValues(dbSession.DbEnvironment, transaction, Guid.Parse(fld!.Value.OwningEntity.Id), criterion.FieldId, seen!, addResult);
         }
 
         return true;
@@ -877,9 +877,9 @@ public static class Searcher
 
         if (!fld!.Value.IsIndexed)
         {
-            return ExecuteTypeSearch(dbSession.Environment, transaction, Guid.Parse(fld!.Value.OwningEntity.Id), (objId) =>
+            return ExecuteTypeSearch(dbSession.DbEnvironment, transaction, Guid.Parse(fld!.Value.OwningEntity.Id), (objId) =>
             {
-                if (MatchStringCriterion(dbSession.Environment, transaction, objId, criterion))
+                if (MatchStringCriterion(dbSession.DbEnvironment, transaction, objId, criterion))
                 {
                     if (!addResult(objId))
                     {
@@ -892,7 +892,7 @@ public static class Searcher
         }
 
 
-        using var cursor = transaction.CreateCursor(dbSession.Environment.StringSearchIndex);
+        using var cursor = transaction.CreateCursor(dbSession.DbEnvironment.StringSearchIndex);
 
         var strValue = Normalize(criterion.Value);
 
@@ -909,7 +909,7 @@ public static class Searcher
 
             if (strValue.Length == 0)
             {
-                return AddMissingFieldValues(dbSession.Environment, transaction, Guid.Parse(fld!.Value.OwningEntity.Id), criterion.FieldId, seen!, addResult);
+                return AddMissingFieldValues(dbSession.DbEnvironment, transaction, Guid.Parse(fld!.Value.OwningEntity.Id), criterion.FieldId, seen!, addResult);
             }
 
             return true;
@@ -1011,7 +1011,7 @@ public static class Searcher
                 MemoryMarshal.Write(keyBuf.Slice(0 * 16, 16), guid);
                 MemoryMarshal.Write(keyBuf.Slice(1 * 16, 16), criterion.FieldId);
 
-                var (r, _, v) = transaction.Get(dbSession.Environment.ObjectDb, keyBuf);
+                var (r, _, v) = transaction.Get(dbSession.DbEnvironment.ObjectDb, keyBuf);
                 if (r == MDBResultCode.Success)
                 {
                     if (MemoryMarshal.Cast<byte, char>(v.AsSpan().Slice(1)).Contains(strValue.AsSpan(), StringComparison.OrdinalIgnoreCase))
@@ -1095,37 +1095,37 @@ public static class Searcher
         return forwardIndexKey;
     }
 
-    private static void InsertIndex(FieldDataType indexType, Guid objId, Guid fldId, ReadOnlySpan<byte> val, LightningTransaction txn, Environment environment)
+    private static void InsertIndex(FieldDataType indexType, Guid objId, Guid fldId, ReadOnlySpan<byte> val, LightningTransaction txn, DbEnvironment dbEnvironment)
     {
         switch (indexType)
         {
             case FieldDataType.String:
-                InsertStringIndex(objId, fldId, MemoryMarshal.Cast<byte, char>(val), txn, environment.StringSearchIndex);
+                InsertStringIndex(objId, fldId, MemoryMarshal.Cast<byte, char>(val), txn, dbEnvironment.StringSearchIndex);
                 break;
             case FieldDataType.DateTime:
-                InsertNonStringIndex<DateTime>(CustomIndexComparer.Comparison.DateTime, fldId, objId, val, txn, environment.NonStringSearchIndex);
+                InsertNonStringIndex<DateTime>(CustomIndexComparer.Comparison.DateTime, fldId, objId, val, txn, dbEnvironment.NonStringSearchIndex);
                 break;
             case FieldDataType.Integer:
-                InsertNonStringIndex<long>(CustomIndexComparer.Comparison.SignedLong, fldId, objId, val, txn, environment.NonStringSearchIndex);
+                InsertNonStringIndex<long>(CustomIndexComparer.Comparison.SignedLong, fldId, objId, val, txn, dbEnvironment.NonStringSearchIndex);
                 break;
             case FieldDataType.Decimal:
-                InsertNonStringIndex<decimal>(CustomIndexComparer.Comparison.Decimal, fldId, objId, val, txn, environment.NonStringSearchIndex);
+                InsertNonStringIndex<decimal>(CustomIndexComparer.Comparison.Decimal, fldId, objId, val, txn, dbEnvironment.NonStringSearchIndex);
                 break;
             case FieldDataType.Boolean:
-                InsertNonStringIndex<bool>(CustomIndexComparer.Comparison.Boolean, fldId, objId, val, txn, environment.NonStringSearchIndex);
+                InsertNonStringIndex<bool>(CustomIndexComparer.Comparison.Boolean, fldId, objId, val, txn, dbEnvironment.NonStringSearchIndex);
                 break;
             default:
                 throw new ArgumentOutOfRangeException();
         }
     }
 
-    private static void InsertTypeIndex(Environment environment, Guid typId, LightningTransaction txn, Guid objId)
+    private static void InsertTypeIndex(DbEnvironment dbEnvironment, Guid typId, LightningTransaction txn, Guid objId)
     {
         Span<byte> dest = stackalloc byte[1 + 16];
         dest[0] = (byte)CustomIndexComparer.Comparison.Type;
         typId.AsSpan().CopyTo(dest.Slice(1));
 
-        txn.Put(environment.NonStringSearchIndex, dest, objId.AsSpan());
+        txn.Put(dbEnvironment.NonStringSearchIndex, dest, objId.AsSpan());
     }
 
     private static void InsertNonStringIndex<T>(CustomIndexComparer.Comparison comparison, Guid fldId, Guid objId, ReadOnlySpan<byte> val, LightningTransaction transaction, LightningDatabase indexDb) where T : unmanaged

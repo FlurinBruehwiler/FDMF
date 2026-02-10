@@ -1,7 +1,8 @@
 using System.Text.Json;
+using FDMF.Core;
 using FDMF.Core.DatabaseLayer;
-using FDMF.Tests.TestModelModel;
-using Environment = FDMF.Core.Environment;
+using FDMF.Testing.Shared;
+using FDMF.Testing.Shared.TestModelModel;
 
 namespace FDMF.Tests;
 
@@ -11,7 +12,7 @@ public sealed class JsonDumpTests
     [Fact]
     public void JsonDump_Dumps_Scalar_Fields()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
 
         Guid objId;
         DateTime dt = new DateTime(2001, 02, 03, 04, 05, 06, DateTimeKind.Utc);
@@ -49,7 +50,7 @@ public sealed class JsonDumpTests
     [Fact]
     public void JsonDump_Dumps_Associations_Single_And_Multiple()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
 
         Guid parentId;
         Guid childAId;
@@ -91,7 +92,7 @@ public sealed class JsonDumpTests
     [Fact]
     public void JsonDump_Omits_Unset_Fields_And_Empty_Assocs()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
 
         Guid objId;
 

@@ -1,5 +1,6 @@
+using FDMF.Core;
 using FDMF.Core.DatabaseLayer;
-using Environment = FDMF.Core.Environment;
+using FDMF.Testing.Shared;
 
 namespace FDMF.Tests;
 
@@ -9,7 +10,7 @@ public sealed class JsonDumpImportTests
     [Fact]
     public void Create_EmptyDb_And_Import_From_Dump()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory());
 
         using var session = new DbSession(env);
         {
@@ -45,7 +46,7 @@ public sealed class JsonDumpImportTests
     [Fact]
     public void Create_Db_From_Dump()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
 
         using var readSession = new DbSession(env, readOnly: true);
 

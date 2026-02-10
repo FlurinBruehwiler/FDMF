@@ -5,7 +5,7 @@ using LightningDB;
 
 namespace FDMF.Core;
 
-public sealed class Environment : IDisposable
+public sealed class DbEnvironment : IDisposable
 {
     public required LightningEnvironment LightningEnvironment;
     public required LightningDatabase ObjectDb;
@@ -16,7 +16,7 @@ public sealed class Environment : IDisposable
     public required LightningDatabase FieldPresenceIndex;
     public required Guid ModelGuid;
 
-    public static Environment CreateDatabase(string dbName, string dumpFile = "")
+    public static DbEnvironment CreateDatabase(string dbName, string dumpFile = "")
     {
         // NOTE: This is intentionally destructive and used by tests/dev.
         if (Directory.Exists(dbName))
@@ -50,7 +50,7 @@ public sealed class Environment : IDisposable
         return env;
     }
 
-    public static Environment Open(string dbDir)
+    public static DbEnvironment Open(string dbDir)
     {
         if (!Directory.Exists(dbDir))
             throw new DirectoryNotFoundException($"Database directory '{dbDir}' does not exist");
@@ -58,7 +58,7 @@ public sealed class Environment : IDisposable
         return OpenInternal(dbDir, create: false);
     }
 
-    private static Environment OpenInternal(string dbDir, bool create)
+    private static DbEnvironment OpenInternal(string dbDir, bool create)
     {
         var lightningEnv = new LightningEnvironment(dbDir, new EnvironmentConfiguration
         {
@@ -106,7 +106,7 @@ public sealed class Environment : IDisposable
 
         lightningTransaction.Commit();
  
-        var env = new Environment
+        var env = new DbEnvironment
         {
             LightningEnvironment = lightningEnv,
             ObjectDb = objDb,
@@ -121,13 +121,13 @@ public sealed class Environment : IDisposable
         return env;
     }
 
-    private static void InsertBaseModel(Environment environment)
+    private static void InsertBaseModel(DbEnvironment dbEnvironment)
     {
-        using var session = new DbSession(environment);
+        using var session = new DbSession(dbEnvironment);
 
         // Stable id for the built-in base model instance.
         var baseModelId = Guid.Parse("5270c4a5-71e0-4474-9f94-50745b29b404");
-        environment.ModelGuid = baseModelId;
+        dbEnvironment.ModelGuid = baseModelId;
 
         // If it's already present, do nothing.
         if (session.GetTypId(baseModelId) != Guid.Empty)
@@ -289,7 +289,7 @@ public sealed class Environment : IDisposable
         // Finish
         session.Commit();
 
-        environment.ModelGuid = baseModelId;
+        dbEnvironment.ModelGuid = baseModelId;
     }
 
     public void Dispose()

@@ -5,6 +5,7 @@ using FDMF.Core.DatabaseLayer;
 
 namespace FDMF.Core.PathLayer;
 
+//todo, the current implementation is just a proof of concept, it is *very* inefficient...
 public static class PathEvaluation
 {
     public static bool Evaluate(DbSession session, Guid thisObj, AstPredicate predicate, PathLangSemanticModel semanticModel)

@@ -5,7 +5,7 @@ using MemoryPack;
 using FDMF.Core;
 using FDMF.Core.DatabaseLayer;
 
-namespace FDMF.Tests.BusinessModelModel;
+namespace FDMF.Testing.Shared.BusinessModelModel;
 
 [MemoryPackable]
 public partial struct OrganizationalUnit : ITransactionObject, IEquatable<OrganizationalUnit>
@@ -41,7 +41,7 @@ public partial struct OrganizationalUnit : ITransactionObject, IEquatable<Organi
     public OrganizationalUnit? Parent
     {
         get => GeneratedCodeHelper.GetNullableAssoc<OrganizationalUnit>(DbSession, ObjId, Fields.Parent);
-        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Parent, value?.ObjId ?? Guid.Empty, FDMF.Tests.BusinessModelModel.OrganizationalUnit.Fields.Children);
+        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Parent, value?.ObjId ?? Guid.Empty, FDMF.Testing.Shared.BusinessModelModel.OrganizationalUnit.Fields.Children);
     }
 
     [MemoryPackIgnore]

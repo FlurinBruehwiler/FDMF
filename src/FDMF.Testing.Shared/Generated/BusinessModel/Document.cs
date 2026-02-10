@@ -5,7 +5,7 @@ using MemoryPack;
 using FDMF.Core;
 using FDMF.Core.DatabaseLayer;
 
-namespace FDMF.Tests.BusinessModelModel;
+namespace FDMF.Testing.Shared.BusinessModelModel;
 
 [MemoryPackable]
 public partial struct Document : ITransactionObject, IEquatable<Document>
@@ -69,28 +69,28 @@ public partial struct Document : ITransactionObject, IEquatable<Document>
     public Folder? Folder
     {
         get => GeneratedCodeHelper.GetNullableAssoc<Folder>(DbSession, ObjId, Fields.Folder);
-        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Folder, value?.ObjId ?? Guid.Empty, FDMF.Tests.BusinessModelModel.Folder.Fields.Documents);
+        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Folder, value?.ObjId ?? Guid.Empty, FDMF.Testing.Shared.BusinessModelModel.Folder.Fields.Documents);
     }
 
     [MemoryPackIgnore]
     public OrganizationalUnit? OwnerUnit
     {
         get => GeneratedCodeHelper.GetNullableAssoc<OrganizationalUnit>(DbSession, ObjId, Fields.OwnerUnit);
-        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.OwnerUnit, value?.ObjId ?? Guid.Empty, FDMF.Tests.BusinessModelModel.OrganizationalUnit.Fields.Documents);
+        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.OwnerUnit, value?.ObjId ?? Guid.Empty, FDMF.Testing.Shared.BusinessModelModel.OrganizationalUnit.Fields.Documents);
     }
 
     [MemoryPackIgnore]
     public DocumentCategory? Category
     {
         get => GeneratedCodeHelper.GetNullableAssoc<DocumentCategory>(DbSession, ObjId, Fields.Category);
-        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Category, value?.ObjId ?? Guid.Empty, FDMF.Tests.BusinessModelModel.DocumentCategory.Fields.Documents);
+        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Category, value?.ObjId ?? Guid.Empty, FDMF.Testing.Shared.BusinessModelModel.DocumentCategory.Fields.Documents);
     }
 
     [MemoryPackIgnore]
     public User? CreatedBy
     {
         get => GeneratedCodeHelper.GetNullableAssoc<User>(DbSession, ObjId, Fields.CreatedBy);
-        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.CreatedBy, value?.ObjId ?? Guid.Empty, FDMF.Tests.BusinessModelModel.User.Fields.CreatedDocuments);
+        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.CreatedBy, value?.ObjId ?? Guid.Empty, FDMF.Testing.Shared.BusinessModelModel.User.Fields.CreatedDocuments);
     }
 
     [MemoryPackIgnore]
@@ -100,7 +100,7 @@ public partial struct Document : ITransactionObject, IEquatable<Document>
     public BusinessCase? BusinessCase
     {
         get => GeneratedCodeHelper.GetNullableAssoc<BusinessCase>(DbSession, ObjId, Fields.BusinessCase);
-        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.BusinessCase, value?.ObjId ?? Guid.Empty, FDMF.Tests.BusinessModelModel.BusinessCase.Fields.Documents);
+        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.BusinessCase, value?.ObjId ?? Guid.Empty, FDMF.Testing.Shared.BusinessModelModel.BusinessCase.Fields.Documents);
     }
 
     [MemoryPackIgnore]

@@ -1,7 +1,8 @@
 using System.Text;
+using FDMF.Core;
 using FDMF.Core.DatabaseLayer;
-using FDMF.Tests.TestModelModel;
-using Environment = FDMF.Core.Environment;
+using FDMF.Testing.Shared;
+using FDMF.Testing.Shared.TestModelModel;
 
 namespace FDMF.Tests;
 
@@ -11,7 +12,7 @@ public sealed class DbSessionTests
     [Fact]
     public void DeleteObj_Removes_Obj_And_All_Values()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
         using var session = new DbSession(env);
 
         var objId = session.CreateObj(TestingFolder.TypId);
@@ -29,7 +30,7 @@ public sealed class DbSessionTests
     [Fact]
     public void DeleteObj_Removes_Associations_On_Both_Sides()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
         using var session = new DbSession(env);
 
         var a = session.CreateObj(TestingFolder.TypId);
@@ -50,7 +51,7 @@ public sealed class DbSessionTests
     [Fact]
     public void RemoveAllAso_Removes_All_Associations_And_All_Opposites()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
         using var session = new DbSession(env);
 
         var parent = session.CreateObj(TestingFolder.TypId);
@@ -72,7 +73,7 @@ public sealed class DbSessionTests
     [Fact]
     public void CreateObj_With_FixedId_Can_Be_Loaded_And_Deleted()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
         using var session = new DbSession(env);
 
         var id = Guid.NewGuid();
@@ -87,7 +88,7 @@ public sealed class DbSessionTests
     [Fact]
     public void TryGetObjFromGuid_Returns_False_For_Wrong_Type()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
         using var session = new DbSession(env);
 
         var id = session.CreateObj(TestingFolder.TypId);
@@ -100,7 +101,7 @@ public sealed class DbSessionTests
     [Fact]
     public void EnumerateAso_Enumerates_All_Associations_For_Field()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
         using var session = new DbSession(env);
 
         var parent = session.CreateObj(TestingFolder.TypId);
@@ -120,7 +121,7 @@ public sealed class DbSessionTests
     [Fact]
     public void GetSingleAsoValue_Returns_Null_When_Empty_And_Value_When_Set()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
         using var session = new DbSession(env);
 
         var parent = session.CreateObj(TestingFolder.TypId);
@@ -136,7 +137,7 @@ public sealed class DbSessionTests
     [Fact]
     public void GetTypId_Returns_Empty_For_Missing_Object()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
         using var session = new DbSession(env);
 
         Assert.Equal(Guid.Empty, session.GetTypId(Guid.NewGuid()));

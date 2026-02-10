@@ -1,7 +1,8 @@
 using System.Runtime.InteropServices;
+using FDMF.Core;
 using FDMF.Core.DatabaseLayer;
-using FDMF.Tests.TestModelModel;
-using Environment = FDMF.Core.Environment;
+using FDMF.Testing.Shared;
+using FDMF.Testing.Shared.TestModelModel;
 
 namespace FDMF.Tests;
 
@@ -11,7 +12,7 @@ public sealed class HistoryTests
     [Fact]
     public void History_Commits_Can_Be_Enumerated()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
 
         Guid objId;
 
@@ -43,7 +44,7 @@ public sealed class HistoryTests
     [Fact]
     public void History_Assoc_Add_And_Remove_Are_Recorded_On_Both_Sides()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
 
         Guid aId;
         Guid bId;
@@ -91,7 +92,7 @@ public sealed class HistoryTests
     [Fact]
     public void History_Field_Delete_Is_Recorded_As_Defaulting()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
 
         Guid objId;
 
@@ -128,7 +129,7 @@ public sealed class HistoryTests
     [Fact]
     public void History_Records_Field_Changes_For_All_Types()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
 
         Guid objId;
 
@@ -186,7 +187,7 @@ public sealed class HistoryTests
     [Fact]
     public void History_Object_Delete_Records_Assoc_Removals_Without_Field_Noise()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
 
         Guid aId;
         Guid bId;
@@ -234,7 +235,7 @@ public sealed class HistoryTests
     [Fact]
     public void History_Multiple_Changes_In_Single_Commit_Are_Recorded()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
 
         Guid aId;
         Guid bId;
@@ -286,7 +287,7 @@ public sealed class HistoryTests
     [Fact]
     public void History_Last_Write_Wins_Within_A_Commit_For_A_Field()
     {
-        using var env = Environment.CreateDatabase(dbName: DatabaseCollection.GetTempDbDirectory(), dumpFile: DatabaseCollection.GetTestModelDumpFile());
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
 
         Guid objId;
 
@@ -325,7 +326,7 @@ public sealed class HistoryTests
     // public async Task History_All_Commits_Are_Time_Ordered()
     // {
     //     var testModel = ProjectModel.CreateFromDirectory("TestModel");
-    //     using var env = Environment.Create(testModel, dbName: DatabaseCollection.GetTempDbDirectory());
+    //     using var env = DbEnvironment.Create(testModel, dbName: TempDbHelper.GetTempDbDirectory());
     //
     //     Guid objId;
     //
