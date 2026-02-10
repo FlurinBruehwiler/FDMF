@@ -1,61 +1,113 @@
 ﻿using System.Diagnostics;
-using FDMF.Core;
-using FDMF.Core.DatabaseLayer;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
 using FDMF.Testing.Shared;
-using FDMF.Testing.Shared.BusinessModelModel;
 
 namespace PerformanceTests;
+
+public class RunResult
+{
+    public required DateTime Time;
+    public required int PerRunCount;
+    public required int Runs;
+    public required double Average;
+    public required double Median;
+    public required double Min;
+    public required double Max;
+}
 
 public sealed class Program
 {
     public static void Main()
     {
+        RunTest<WriteTests>();
+
         //Ideas for performance tests:
         //Database Read
         //Database Write
         //Path Evaluation
+    }
 
-        //For each tests we also want some scaling parameter, so that we can see if the time scales linearly/log/exponential
+    public static void RunTest<T>() where T : IPerformanceTest, new()
+    {
+        const int runCount = 10;
 
+        Console.WriteLine($"Running {typeof(T).Name} ({runCount} iterations)");
+
+        var counts = T.Counts.OrderBy(x => x).ToArray();
+
+        //warmup
+        RunTestWithCount<T>(counts.First());
+
+        foreach (var count in counts)
+        {
+            List<double> runs = [];
+
+            for (int i = 0; i < runCount; i++)
+            {
+                var res = RunTestWithCount<T>(count);
+                if (res == 0)
+                    return; //error
+
+                runs.Add(res);
+            }
+
+            var result = new RunResult
+            {
+                Max = runs.Max(),
+                Min = runs.Min(),
+                Average = runs.Average(),
+                Median = Median(runs),
+                Runs = runCount,
+                PerRunCount = count,
+                Time = DateTime.Now,
+            };
+            Console.WriteLine($"Count {count} took {result.Average}ms");
+
+            var serializedResult = JsonSerializer.Serialize(result, new JsonSerializerOptions{ IncludeFields = true});
+
+            File.AppendAllLines(Path.Combine(GetRunHistoryDirectory(), $"{typeof(T).Name}.txt"), [serializedResult]);
+        }
+    }
+
+    private static double RunTestWithCount<T>(int count) where T : IPerformanceTest, new()
+    {
         try
         {
-            var objCount = 100_000;
-
             TempDbHelper.ClearDatabases();
 
-            //warmup
-            Write(objCount);
-
-            TempDbHelper.ClearDatabases();
+            using var test = new T();
 
             var s = Stopwatch.GetTimestamp();
 
-            //actual
-            Write(objCount);
+            test.Run(count);
 
-            Console.WriteLine($"Write with {objCount} objects took {Stopwatch.GetElapsedTime(s).TotalMilliseconds}ms");
+            return Stopwatch.GetElapsedTime(s).TotalMilliseconds;
         }
         catch (Exception e)
         {
             Console.WriteLine(e);
         }
+
+        return 0;
     }
 
-    public static void Write(int objectCount)
+    static double Median(IEnumerable<double> values)
     {
-        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetBusinessModelDumpFile());
-        using var session = new DbSession(env, arenaSize: 100_000_000);
+        var sorted = values.OrderBy(x => x).ToArray();
+        int n = sorted.Length;
 
-        var user = new User(session);
+        if (n == 0)
+            throw new InvalidOperationException("Sequence contains no elements");
 
-        for (int i = 0; i < objectCount; i++)
-        {
-            var document = new Document(session);
-            document.CreatedAt = DateTime.Now;
-            document.FileSize = 1000;
-            document.Title = "Testing Folder";
-            document.State = "Active";
-            document.CreatedBy = user;
-        }
+        if (n % 2 == 1)
+            return sorted[n / 2];
+
+        return (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0;
+    }
+
+    private static string GetRunHistoryDirectory([CallerFilePath] string callerFilePath = "")
+    {
+        return Path.Combine(Path.GetDirectoryName(callerFilePath)!, "RunHistory");
     }
 }

@@ -12,4 +12,8 @@
     <ProjectReference Include="..\FDMF.Testing.Shared\FDMF.Testing.Shared.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="RunHistory\" />
+  </ItemGroup>
+
 </Project>
