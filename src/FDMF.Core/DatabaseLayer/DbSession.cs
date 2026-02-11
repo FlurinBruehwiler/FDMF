@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using FDMF.Core.Utils;
+using LightningDB;
 
 namespace FDMF.Core.DatabaseLayer;
 
@@ -71,7 +72,9 @@ public sealed class DbSession : IDisposable
 
             Store.Commit(writeTransaction);
 
-            writeTransaction.Commit();
+            Debug.Assert(writeTransaction.State == LightningTransactionState.Ready);
+            var res = writeTransaction.Commit();
+            Debug.Assert(res == MDBResultCode.Success, $"Expected commit to succeed, but got {res}");
         }
 
         Cursor.Dispose();

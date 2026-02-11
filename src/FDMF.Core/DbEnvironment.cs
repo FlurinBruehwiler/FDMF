@@ -62,9 +62,9 @@ public sealed class DbEnvironment : IDisposable
     {
         var lightningEnv = new LightningEnvironment(dbDir, new EnvironmentConfiguration
         {
-            MaxDatabases = 128
+            MaxDatabases = 128,
         });
-        lightningEnv.Open();
+        lightningEnv.Open(EnvironmentOpenFlags.NoThreadLocalStorage);
 
         using var lightningTransaction = lightningEnv.BeginTransaction();
 

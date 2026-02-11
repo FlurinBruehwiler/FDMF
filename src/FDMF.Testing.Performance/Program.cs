@@ -20,12 +20,21 @@ public sealed class Program
 {
     public static void Main()
     {
-        RunTest<WriteTests>();
+        try
+        {
+            // RunTest<WriteTests>();
+            RunTest<TraversingAssocsTest>();
 
-        //Ideas for performance tests:
-        //Database Read
-        //Database Write
-        //Path Evaluation
+            //Ideas for performance tests:
+            //Database Read
+            //Database Write
+            //Path Evaluation
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e.InnerException);
+            Console.WriteLine(e);
+        }
     }
 
     public static void RunTest<T>() where T : IPerformanceTest, new()
