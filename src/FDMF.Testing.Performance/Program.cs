@@ -22,7 +22,7 @@ public sealed class Program
     {
         try
         {
-            // RunTest<WriteTests>();
+            RunTest<WriteTests>();
             RunTest<TraversingAssocsTest>();
 
             //Ideas for performance tests:

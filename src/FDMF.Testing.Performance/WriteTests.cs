@@ -31,6 +31,8 @@ public class WriteTests : IPerformanceTest
             document.State = "Active";
             document.CreatedBy = user;
         }
+
+        _session.Commit();
     }
 
     public void Dispose()

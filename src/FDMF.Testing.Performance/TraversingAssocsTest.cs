@@ -58,9 +58,6 @@ public class TraversingAssocsTest : IPerformanceTest
     {
         using var session = new DbSession(_env, readOnly: true);
 
-        var allFolders = Searcher.Search<Folder>(session);
-        Console.WriteLine(allFolders.Count);
-
         var current = session.GetObjFromGuid<Folder>(_startingFolder)!.Value;
         for (int i = 0; i < count; i++)
         {

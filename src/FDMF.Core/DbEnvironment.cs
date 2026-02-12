@@ -63,6 +63,7 @@ public sealed class DbEnvironment : IDisposable
         var lightningEnv = new LightningEnvironment(dbDir, new EnvironmentConfiguration
         {
             MaxDatabases = 128,
+            MapSize = 10L * 1024 * 1024 * 1024, // 10 GiB
         });
         lightningEnv.Open(EnvironmentOpenFlags.NoThreadLocalStorage);
 

@@ -67,7 +67,10 @@ public sealed unsafe class Arena : IDisposable
 
     public Slice<byte> GetRegion(byte* start)
     {
-        return new Slice<byte>(start, (int)(BasePtr + Pos - (nint)start));
+        // Length is the byte distance from 'start' to the current arena position.
+        // Use integer subtraction on addresses (NOT pointer arithmetic against absolute addresses).
+        var len = checked((int)((nint)(BasePtr + Pos) - (nint)start));
+        return new Slice<byte>(start, len);
     }
 
     public void Reset()
