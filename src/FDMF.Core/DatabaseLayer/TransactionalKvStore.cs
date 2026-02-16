@@ -299,12 +299,16 @@ public sealed class TransactionalKvStore : IDisposable
                 }
 
                 var changeCurrent = ChangeSetCursor!.GetCurrent();
-                // Need at least 2 bytes: 1 for actual key + 1 for flag
-                if (changeCurrent.ResultCode != ResultCode.Success || changeCurrent.Key.Length < 2)
+                // ChangeSet keys must be at least 2 bytes: [key][flag]
+                // If we encounter an invalid entry, this is a bug - fail loudly
+                if (changeCurrent.ResultCode != ResultCode.Success)
                 {
                     ChangeIsFinished = true;
                     continue;
                 }
+                
+                if (changeCurrent.Key.Length < 2)
+                    throw new InvalidOperationException($"Invalid ChangeSet entry with key length {changeCurrent.Key.Length}. ChangeSet keys must be at least 2 bytes ([key][flag]).");
 
                 var changeKey = changeCurrent.Key.Slice(0, changeCurrent.Key.Length - 1);
                 var changeFlag = (ValueFlag)changeCurrent.Key[^1];
@@ -409,10 +413,15 @@ public sealed class TransactionalKvStore : IDisposable
                         var baseCur = LightningCursor.GetCurrent();
                         var changeCur = ChangeSetCursor!.GetCurrent();
 
-                        // Need at least 2 bytes: 1 for actual key + 1 for flag
-                        if (changeCur.ResultCode != ResultCode.Success || changeCur.Key.Length < 2)
+                        // ChangeSet keys must be at least 2 bytes: [key][flag]
+                        // If we encounter an invalid entry, this is a bug - fail loudly
+                        if (changeCur.ResultCode != ResultCode.Success)
                         {
                             ChangeIsFinished = true;
+                        }
+                        else if (changeCur.Key.Length < 2)
+                        {
+                            throw new InvalidOperationException($"Invalid ChangeSet entry with key length {changeCur.Key.Length}. ChangeSet keys must be at least 2 bytes ([key][flag]).");
                         }
                         else
                         {
@@ -457,12 +466,16 @@ public sealed class TransactionalKvStore : IDisposable
             var baseCurrent = LightningCursor.GetCurrent();
             var changeCurrent = ChangeSetCursor!.GetCurrent();
 
-            // Need at least 2 bytes: 1 for actual key + 1 for flag  
-            if (changeCurrent.ResultCode != ResultCode.Success || changeCurrent.Key.Length < 2)
+            // ChangeSet keys must be at least 2 bytes: [key][flag]
+            // If we encounter an invalid entry, this is a bug - fail loudly
+            if (changeCurrent.ResultCode != ResultCode.Success)
             {
                 ChangeIsFinished = true;
                 return Next();
             }
+            
+            if (changeCurrent.Key.Length < 2)
+                throw new InvalidOperationException($"Invalid ChangeSet entry with key length {changeCurrent.Key.Length}. ChangeSet keys must be at least 2 bytes ([key][flag]).");
 
             var changeKey = changeCurrent.Key.Slice(0, changeCurrent.Key.Length - 1);
             var comp = BPlusTree.CompareLexicographic(baseCurrent.key.AsSpan(), changeKey);
