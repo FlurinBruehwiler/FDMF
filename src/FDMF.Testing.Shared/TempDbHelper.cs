@@ -17,13 +17,14 @@ public static class TempDbHelper
                 Directory.Delete(TestDirectory, recursive: true);
                 return; // Success
             }
-            catch (IOException) when (attempt < maxAttempts - 1)
-            {
-                // If deletion fails (e.g., files still in use), try again after a short delay
-                Thread.Sleep(100);
-            }
             catch (IOException)
             {
+                // If this is not the final attempt, wait and retry
+                if (attempt < maxAttempts - 1)
+                {
+                    Thread.Sleep(100);
+                    continue;
+                }
                 // Final attempt failed - ignore as databases will be cleaned up on next run
                 // This can happen if database files are still locked by the OS
                 return;
