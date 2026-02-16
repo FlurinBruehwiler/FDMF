@@ -20,9 +20,10 @@ public sealed class DatabaseCollection : IClassFixture<DatabaseCollection>, IDis
         {
             TempDbHelper.ClearDatabases();
         }
-        catch
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Ignore cleanup errors to avoid masking test failures
+            // Database files may still be in use or locked
         }
     }
 }

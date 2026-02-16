@@ -20,10 +20,19 @@ public static class TempDbHelper
                 {
                     Directory.Delete(TestDirectory, recursive: true);
                 }
-                catch
+                catch (IOException)
                 {
                     // Ignore if still can't delete - databases will be cleaned up on next run
+                    // This can happen if database files are still locked by the OS
                 }
+                catch (UnauthorizedAccessException)
+                {
+                    // Ignore permission errors - databases will be cleaned up on next run
+                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Ignore permission errors - databases will be cleaned up on next run
             }
         }
     }
