@@ -9,6 +9,7 @@ public static class TempDbHelper
         if (!Directory.Exists(TestDirectory))
             return;
 
+        // Retry deletion since LMDB may hold locks briefly even after disposal
         const int maxAttempts = 2;
         for (int attempt = 0; attempt < maxAttempts; attempt++)
         {
@@ -26,7 +27,6 @@ public static class TempDbHelper
                     continue;
                 }
                 // Final attempt failed - ignore as databases will be cleaned up on next run
-                // This can happen if database files are still locked by the OS
                 return;
             }
             catch (UnauthorizedAccessException)
