@@ -81,6 +81,10 @@ public sealed class TransactionalKvStore : IDisposable
         if (IsReadOnly)
             throw new InvalidOperationException("TransactionalKvStore is read-only");
 
+        // Empty keys should never be stored - they would create invalid 1-byte ChangeSet entries
+        if (key.Length == 0)
+            throw new ArgumentException("Cannot store an entry with an empty key", nameof(key));
+
         var keySlice = CopyKeyWithFlag(key, ValueFlag.AddModify);
         var valueSlice = _arena.AllocateSlice(value);
 
@@ -130,6 +134,10 @@ public sealed class TransactionalKvStore : IDisposable
     {
         if (IsReadOnly)
             throw new InvalidOperationException("TransactionalKvStore is read-only");
+
+        // Empty keys should never be deleted - they would create invalid 1-byte ChangeSet entries
+        if (key.Length == 0)
+            throw new ArgumentException("Cannot delete an entry with an empty key", nameof(key));
 
         // Always write a delete marker into the change set.
         // Even if the key doesn't exist in the base set, removing the changeset entry would shift B+tree leaf indices

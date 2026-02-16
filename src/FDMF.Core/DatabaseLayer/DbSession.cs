@@ -126,14 +126,6 @@ public sealed class DbSession : IDisposable
                 var k = current.Key;
                 var v = current.Value;
 
-                // Defensive check: all keys in this database should be at least 16 bytes (1 GUID)
-                // If we encounter a shorter key, the database is corrupted - break out to avoid crash
-                if (k.Length < 16)
-                {
-                    Debug.Assert(false, $"Encountered invalid key with length {k.Length} - database may be corrupted");
-                    break;
-                }
-
                 if (!k.Slice(0, 16).SequenceEqual(prefix))
                     break;
 
