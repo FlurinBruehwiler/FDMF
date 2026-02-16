@@ -291,7 +291,8 @@ public sealed class TransactionalKvStore : IDisposable
                 }
 
                 var changeCurrent = ChangeSetCursor!.GetCurrent();
-                if (changeCurrent.ResultCode != ResultCode.Success || changeCurrent.Key.Length == 0)
+                // Need at least 2 bytes: 1 for actual key + 1 for flag
+                if (changeCurrent.ResultCode != ResultCode.Success || changeCurrent.Key.Length < 2)
                 {
                     ChangeIsFinished = true;
                     continue;
@@ -400,7 +401,8 @@ public sealed class TransactionalKvStore : IDisposable
                         var baseCur = LightningCursor.GetCurrent();
                         var changeCur = ChangeSetCursor!.GetCurrent();
 
-                        if (changeCur.ResultCode != ResultCode.Success || changeCur.Key.Length == 0)
+                        // Need at least 2 bytes: 1 for actual key + 1 for flag
+                        if (changeCur.ResultCode != ResultCode.Success || changeCur.Key.Length < 2)
                         {
                             ChangeIsFinished = true;
                         }
@@ -447,7 +449,8 @@ public sealed class TransactionalKvStore : IDisposable
             var baseCurrent = LightningCursor.GetCurrent();
             var changeCurrent = ChangeSetCursor!.GetCurrent();
 
-            if (changeCurrent.ResultCode != ResultCode.Success || changeCurrent.Key.Length == 0)
+            // Need at least 2 bytes: 1 for actual key + 1 for flag  
+            if (changeCurrent.ResultCode != ResultCode.Success || changeCurrent.Key.Length < 2)
             {
                 ChangeIsFinished = true;
                 return Next();
