@@ -6,33 +6,32 @@ public static class TempDbHelper
 
     public static void ClearDatabases()
     {
-        if (Directory.Exists(TestDirectory))
+        if (!Directory.Exists(TestDirectory))
+            return;
+
+        const int maxAttempts = 2;
+        for (int attempt = 0; attempt < maxAttempts; attempt++)
         {
             try
             {
                 Directory.Delete(TestDirectory, recursive: true);
+                return; // Success
             }
-            catch (IOException)
+            catch (IOException) when (attempt < maxAttempts - 1)
             {
                 // If deletion fails (e.g., files still in use), try again after a short delay
                 Thread.Sleep(100);
-                try
-                {
-                    Directory.Delete(TestDirectory, recursive: true);
-                }
-                catch (IOException)
-                {
-                    // Ignore if still can't delete - databases will be cleaned up on next run
-                    // This can happen if database files are still locked by the OS
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    // Ignore permission errors - databases will be cleaned up on next run
-                }
+            }
+            catch (IOException)
+            {
+                // Final attempt failed - ignore as databases will be cleaned up on next run
+                // This can happen if database files are still locked by the OS
+                return;
             }
             catch (UnauthorizedAccessException)
             {
                 // Ignore permission errors - databases will be cleaned up on next run
+                return;
             }
         }
     }
