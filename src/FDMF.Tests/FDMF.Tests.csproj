@@ -27,4 +27,10 @@
     <ProjectReference Include="..\FDMF.Testing.Shared\FDMF.Testing.Shared.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="xunit.runner.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
