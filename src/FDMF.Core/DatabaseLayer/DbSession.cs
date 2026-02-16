@@ -126,6 +126,11 @@ public sealed class DbSession : IDisposable
                 var k = current.Key;
                 var v = current.Value;
 
+                // All database keys should be at least 16 bytes (1 GUID)
+                // If not, skip this entry to avoid crashes
+                if (k.Length < 16)
+                    break;
+
                 if (!k.Slice(0, 16).SequenceEqual(prefix))
                     break;
 
