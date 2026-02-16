@@ -83,7 +83,8 @@ public sealed class Program
     {
         try
         {
-            TempDbHelper.ClearDatabases();
+            //todo
+            //TempDbHelper.ClearDatabases();
 
             using var test = new T();
 

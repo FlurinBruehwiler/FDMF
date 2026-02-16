@@ -15,6 +15,7 @@ public sealed class DbEnvironment : IDisposable
     public required LightningDatabase NonStringSearchIndex;
     public required LightningDatabase FieldPresenceIndex;
     public required Guid ModelGuid;
+    public required string DbDir;
 
     public static DbEnvironment CreateDatabase(string dbName, string dumpFile = "")
     {
@@ -60,10 +61,11 @@ public sealed class DbEnvironment : IDisposable
 
     private static DbEnvironment OpenInternal(string dbDir, bool create)
     {
+        Directory.CreateDirectory(dbDir);
         var lightningEnv = new LightningEnvironment(dbDir, new EnvironmentConfiguration
         {
             MaxDatabases = 128,
-            MapSize = 10L * 1024 * 1024 * 1024, // 10 GiB
+            MapSize = 10 * 1024 * 1024, // 500 MB
         });
         lightningEnv.Open(EnvironmentOpenFlags.NoThreadLocalStorage);
 
@@ -116,7 +118,8 @@ public sealed class DbEnvironment : IDisposable
             StringSearchIndex = stringSearchIndex,
             NonStringSearchIndex = nonStringSearchIndex,
             FieldPresenceIndex = fieldPresenceIndex,
-            ModelGuid = Guid.Empty //todo
+            ModelGuid = Guid.Empty, //todo
+            DbDir = dbDir
         };
         
         return env;
@@ -302,7 +305,12 @@ public sealed class DbEnvironment : IDisposable
         NonStringSearchIndex.Dispose();
         FieldPresenceIndex.Dispose();
         LightningEnvironment.Dispose();
+
+        if(IsTesting)
+            Directory.Delete(DbDir, true);
     }
+
+    public static bool IsTesting = false;
 }
 
 public sealed class CustomIndexComparer : IComparer<MDBValue>

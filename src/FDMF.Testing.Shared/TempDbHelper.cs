@@ -2,19 +2,20 @@
 
 public static class TempDbHelper
 {
-    public const string TestDirectory = "TestDbs";
-
-    public static void ClearDatabases()
-    {
-        if (Directory.Exists(TestDirectory))
-        {
-            Directory.Delete(TestDirectory, recursive: true);
-        }
-    }
+    private const string TestDirectory = "TestDbs";
 
     public static string GetTempDbDirectory()
     {
-        return Path.Combine(TestDirectory, Guid.NewGuid().ToString("N"));
+        return Path.Combine(AppContext.BaseDirectory, TestDirectory, Guid.NewGuid().ToString("N"));
+    }
+
+    public static TempDbDisposable CreateTempDbDirectory()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, TestDirectory, Guid.NewGuid().ToString("N"));
+        return new TempDbDisposable
+        {
+            Dir = path,
+        };
     }
 
     public static string GetTestModelDumpFile()
@@ -25,5 +26,15 @@ public static class TempDbHelper
     public static string GetBusinessModelDumpFile()
     {
         return Path.Combine(AppContext.BaseDirectory, "testdata", "BusinessModelDump.json");
+    }
+
+    public struct TempDbDisposable : IDisposable
+    {
+        public string Dir;
+
+        public void Dispose()
+        {
+            Directory.Delete(Dir, recursive: true);
+        }
     }
 }

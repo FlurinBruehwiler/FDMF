@@ -11,7 +11,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void ReadOnly_Forwards_Reads_And_Blocks_Writes()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -41,7 +42,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Data_From_The_Base_Set_Is_Visible()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -63,7 +65,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Data_From_The_Change_Set_Is_Visible()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -86,7 +89,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Data_From_The_Change_Overrides_Base_Set()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -110,7 +114,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Entry_Can_Be_Deleted()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -133,7 +138,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Entry_Can_Be_Deleted_And_Added_Again()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -161,7 +167,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Entry_Can_Be_Overriden_And_Then_Deleted()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -189,7 +196,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_Simple()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -217,7 +225,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_Simple_2()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -245,7 +254,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_Simple_3()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -272,7 +282,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_Complex()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -310,7 +321,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_Complex_2()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -348,7 +360,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_Delete()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -380,7 +393,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_Delete_2()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -412,7 +426,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_Delete_3()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -444,7 +459,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_Delete_4()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -475,7 +491,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_Delete_Base_Entry()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -506,7 +523,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_Delete_ChangeSet_Only_Entry()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -533,7 +551,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_Delete_Overridden_Base_Entry()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -561,7 +580,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_Delete_Overridden_Base_Entry_2()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -588,7 +608,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_Delete_Overridden_Base_Entry_3()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -617,7 +638,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_Delete_Overridden_Base_Entry_4()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -652,7 +674,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_Delete_Then_Put_Same_Key_GetCurrent_Stays_NotFound_Until_Next()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -692,7 +715,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_Delete_Then_Put_Same_Key_With_Base_Override()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -736,7 +760,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_Delete_Then_Store_Delete_Then_Put_Still_Visible_On_Next()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -774,7 +799,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_At_End_Then_Put_New_Max_Key_Next_Returns_It()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -809,7 +835,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_At_End_Then_Put_New_Max_Key_When_Base_Empty()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -841,7 +868,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_At_End_Then_Delete_Last_Then_Put_New_Last_Next_Returns_It()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -876,7 +904,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_At_End_GetCurrent_Stays_NotFound_Until_Next_When_New_Key_Appended()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -911,7 +940,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_At_End_Then_Update_Last_Key_Does_Not_Resurface_On_Next()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -944,7 +974,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_At_End_With_Trailing_DeleteMarker_Then_Append_New_Key()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -977,7 +1008,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_At_End_Then_Insert_Key_In_Middle_Does_Not_Resurface()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -1017,7 +1049,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_Delete_Then_Insert_Smaller_Key_Next_Does_Not_Go_Backwards()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -1059,7 +1092,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_SetRange_After_Delete_Clears_AfterDelete_State()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;
@@ -1088,7 +1122,8 @@ public sealed class TransactionalKvStoreTests
     [Fact]
     public void Cursor_Delete_Test()
     {
-        using var env = new LightningEnvironment(TempDbHelper.GetTempDbDirectory());
+        using var dir = TempDbHelper.CreateTempDbDirectory();
+        using var env = new LightningEnvironment(dir.Dir);
         env.Open();
 
         LightningDatabase db;

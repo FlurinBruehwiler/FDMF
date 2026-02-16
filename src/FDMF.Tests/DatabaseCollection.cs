@@ -1,15 +1,18 @@
-using FDMF.Testing.Shared;
+using FDMF.Core;
 
 namespace FDMF.Tests;
 
-[CollectionDefinition(DatabaseCollectionName)]
-public sealed class DatabaseCollection : IClassFixture<DatabaseCollection>
+// ReSharper disable once ClassNeverInstantiated.Global
+public sealed class DatabaseFixture
 {
-
-    public const string DatabaseCollectionName = "Database Collection";
-
-    public DatabaseCollection()
+    public DatabaseFixture()
     {
-        TempDbHelper.ClearDatabases();
+        DbEnvironment.IsTesting = true;
     }
+}
+
+[CollectionDefinition(DatabaseCollectionName)]
+public sealed class DatabaseCollection : ICollectionFixture<DatabaseFixture>
+{
+    public const string DatabaseCollectionName = "Database Collection";
 }
