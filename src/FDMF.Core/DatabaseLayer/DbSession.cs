@@ -126,6 +126,10 @@ public sealed class DbSession : IDisposable
                 var k = current.Key;
                 var v = current.Value;
 
+                // Ensure key is at least 16 bytes (1 GUID) before slicing
+                if (k.Length < 16)
+                    break;
+
                 if (!k.Slice(0, 16).SequenceEqual(prefix))
                     break;
 
