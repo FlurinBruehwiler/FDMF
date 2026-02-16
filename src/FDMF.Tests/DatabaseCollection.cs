@@ -3,7 +3,7 @@ using FDMF.Testing.Shared;
 namespace FDMF.Tests;
 
 [CollectionDefinition(DatabaseCollectionName)]
-public sealed class DatabaseCollection : IClassFixture<DatabaseCollection>
+public sealed class DatabaseCollection : IClassFixture<DatabaseCollection>, IDisposable
 {
 
     public const string DatabaseCollectionName = "Database Collection";
@@ -11,5 +11,18 @@ public sealed class DatabaseCollection : IClassFixture<DatabaseCollection>
     public DatabaseCollection()
     {
         TempDbHelper.ClearDatabases();
+    }
+
+    public void Dispose()
+    {
+        // Ensure all test databases are cleaned up after test collection completes
+        try
+        {
+            TempDbHelper.ClearDatabases();
+        }
+        catch
+        {
+            // Ignore cleanup errors to avoid masking test failures
+        }
     }
 }

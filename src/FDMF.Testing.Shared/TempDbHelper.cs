@@ -8,7 +8,23 @@ public static class TempDbHelper
     {
         if (Directory.Exists(TestDirectory))
         {
-            Directory.Delete(TestDirectory, recursive: true);
+            try
+            {
+                Directory.Delete(TestDirectory, recursive: true);
+            }
+            catch (IOException)
+            {
+                // If deletion fails (e.g., files still in use), try again after a short delay
+                Thread.Sleep(100);
+                try
+                {
+                    Directory.Delete(TestDirectory, recursive: true);
+                }
+                catch
+                {
+                    // Ignore if still can't delete - databases will be cleaned up on next run
+                }
+            }
         }
     }
 
