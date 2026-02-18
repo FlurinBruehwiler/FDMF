@@ -9,11 +9,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="LightningDB" Version="0.20.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\FDMF.Core\FDMF.Core.csproj" />
+    <PackageReference Include="cmi.domainmodel" Version="296.4.1" />
+    <PackageReference Include="Wasmtime" Version="34.0.2" />
   </ItemGroup>
 
 </Project>

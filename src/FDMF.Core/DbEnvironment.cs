@@ -37,9 +37,9 @@ public sealed class DbEnvironment : IDisposable
             if (File.Exists(dumpFile))
             {
                 var json = File.ReadAllText(dumpFile);
-                var modelGuid = JsonDump.FromJson(json, session);
+                var model = JsonDump.FromJson(json, session);
                 session.Commit();
-                env.ModelGuid = modelGuid;
+                env.ModelGuid = model.ObjId;
             }
             else
             {

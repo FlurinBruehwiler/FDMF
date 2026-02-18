@@ -187,49 +187,52 @@ public sealed class HistoryTests
     [Fact]
     public void History_Object_Delete_Records_Assoc_Removals_Without_Field_Noise()
     {
-        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
-
-        Guid aId;
-        Guid bId;
-
-        using (var session = new DbSession(env))
+        for (int i = 0; i < 100; i++)
         {
-            var a = new TestingFolder(session);
-            var b = new TestingFolder(session);
+            using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
 
-            aId = a.ObjId;
-            bId = b.ObjId;
+            Guid aId;
+            Guid bId;
 
-            a.Parent = b;
-            session.Commit();
+            using (var session = new DbSession(env))
+            {
+                var a = new TestingFolder(session);
+                var b = new TestingFolder(session);
 
-            session.DeleteObj(bId);
-            session.Commit();
+                aId = a.ObjId;
+                bId = b.ObjId;
+
+                a.Parent = b;
+                session.Commit();
+
+                session.DeleteObj(bId);
+                session.Commit();
+            }
+
+            using var readSession = new DbSession(env, readOnly: true);
+
+
+            Assert.Null(readSession.GetObjFromGuid<TestingFolder>(bId));
+            Assert.Null(readSession.GetObjFromGuid<TestingFolder>(aId)!.Value.Parent);
+
+            var commitsA = History.GetCommitsForObject(env, readSession.Store.ReadTransaction, aId).ToList();
+            var commitsB = History.GetCommitsForObject(env, readSession.Store.ReadTransaction, bId).ToList();
+
+            Assert.Equal(2, commitsA.Count);
+            Assert.Equal(2, commitsB.Count);
+
+            var deleteCommitA = History.TryGetCommit(env, readSession.Store.ReadTransaction, commitsA[1]);
+            var deleteCommitB = History.TryGetCommit(env, readSession.Store.ReadTransaction, commitsB[1]);
+            Assert.NotNull(deleteCommitA);
+            Assert.NotNull(deleteCommitB);
+
+            var aEvents = deleteCommitA.EventsByObject[aId];
+            Assert.Contains(aEvents, e => e.Type == HistoryEventType.AsoRemoved && e.FldId == TestingFolder.Fields.Parent);
+
+            var bEvents = deleteCommitB.EventsByObject[bId];
+            Assert.Contains(bEvents, e => e.Type == HistoryEventType.ObjDeleted);
+            Assert.DoesNotContain(bEvents, e => e.Type == HistoryEventType.FldChanged);
         }
-
-        using var readSession = new DbSession(env, readOnly: true);
-
-
-        Assert.Null(readSession.GetObjFromGuid<TestingFolder>(bId));
-        Assert.Null(readSession.GetObjFromGuid<TestingFolder>(aId)!.Value.Parent);
-
-        var commitsA = History.GetCommitsForObject(env, readSession.Store.ReadTransaction, aId).ToList();
-        var commitsB = History.GetCommitsForObject(env, readSession.Store.ReadTransaction, bId).ToList();
-
-        Assert.Equal(2, commitsA.Count);
-        Assert.Equal(2, commitsB.Count);
-
-        var deleteCommitA = History.TryGetCommit(env, readSession.Store.ReadTransaction, commitsA[1]);
-        var deleteCommitB = History.TryGetCommit(env, readSession.Store.ReadTransaction, commitsB[1]);
-        Assert.NotNull(deleteCommitA);
-        Assert.NotNull(deleteCommitB);
-
-        var aEvents = deleteCommitA.EventsByObject[aId];
-        Assert.Contains(aEvents, e => e.Type == HistoryEventType.AsoRemoved && e.FldId == TestingFolder.Fields.Parent);
-
-        var bEvents = deleteCommitB.EventsByObject[bId];
-        Assert.Contains(bEvents, e => e.Type == HistoryEventType.ObjDeleted);
-        Assert.DoesNotContain(bEvents, e => e.Type == HistoryEventType.FldChanged);
     }
 
     [Fact]

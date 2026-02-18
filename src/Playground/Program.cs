@@ -1,8 +1,18 @@
-using FDMF.Core.PathLayer;
+//Wasi Tests
 
-var ast = PathLangParser.Parse("OwnerCanView(Document): this->Business->Owners[$(Person).CurrentUser=true]");
+using Wasmtime;
 
-Console.WriteLine(ast.Diagnostics.Count);
+using var engine = new Engine();
 
-var output = PathLangAstPrinter.PrintProgram(ast.Predicates, true);
-Console.WriteLine(output);
+//can also use FromFile here
+using var module =  Module.FromText(engine, "testmodule", """(module (func $hello (import "" "hello")) (func (export "run") (call $hello)))""");
+
+using var linker = new Linker(engine);
+using var store = new Store(engine);
+
+linker.Define("", "hello", Function.FromCallback(store, () => Console.WriteLine("Hello From C#")));
+
+var instance = linker.Instantiate(store, module);
+
+var run = instance.GetAction("run");
+run();

@@ -13,18 +13,13 @@ public sealed class JsonDumpImportTests
         using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory());
 
         using var session = new DbSession(env);
-        {
-            var json = File.ReadAllText("testdata/TestModelDump.json");
-            var modelGuid = JsonDump.FromJson(json, session);
-            //session.Commit();
-            env.ModelGuid = modelGuid;
-        }
+        var json = File.ReadAllText("testdata/TestModelDump.json");
+        var model = JsonDump.FromJson(json, session);
+        env.ModelGuid = model.ObjId;
 
         //using var readSession = new DbSession(env, readOnly: true);
 
-        var model = session.GetObjFromGuid<Model>(env.ModelGuid);
-        Assert.NotNull(model);
-        Assert.Equal("TestModel", model.Value.Name);
+        Assert.Equal("TestModel", model.Name);
         
         var testingDocument = session.GetObjFromGuid<EntityDefinition>(Guid.Parse("e5184bba-f470-4bab-aeed-28fb907da349"));
         Assert.NotNull(testingDocument);

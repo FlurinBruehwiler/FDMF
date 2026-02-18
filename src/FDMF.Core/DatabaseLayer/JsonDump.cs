@@ -89,7 +89,7 @@ public static class JsonDump
         return Encoding.UTF8.GetString(stream.ToArray());
     }
 
-    public static Guid FromJson(string json, DbSession dbSession)
+    public static Model FromJson(string json, DbSession dbSession)
     {
         if (dbSession.IsReadOnly)
             throw new InvalidOperationException("DbSession is read-only");
@@ -98,8 +98,29 @@ public static class JsonDump
 
         var modelGuid = doc.RootElement.GetProperty("modelGuid").GetGuid();
 
-        if (!doc.RootElement.TryGetProperty("entities", out var entities) || entities.ValueKind != JsonValueKind.Object)
-            return modelGuid;
+        var model = dbSession.GetObjFromGuid<Model>(dbSession.CreateObj(Model.TypId, modelGuid))!.Value;
+
+        if (doc.RootElement.TryGetProperty("entities", out var entities) && entities.ValueKind == JsonValueKind.Object)
+            ParseEntities(dbSession, entities, model);
+
+        if (doc.RootElement.TryGetProperty("importedModels", out var importedModels) && entities.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var importedModelGuid in importedModels.EnumerateArray())
+            {
+                if (importedModelGuid.TryGetGuid(out var guid))
+                {
+                    var importedModel = dbSession.GetObjFromGuid<Model>(guid)!.Value;
+                    model.ImportedModels.Add(importedModel);
+                }
+            }
+        }
+
+        return model;
+    }
+
+    private static void ParseEntities(DbSession dbSession, JsonElement entities, Model model1)
+    {
+        //we would actually need to first discover the new entities that are defined
 
         // Pass 1, so: ensure all objects exist, and types match.
         foreach (var entityProp in entities.EnumerateObject())
@@ -137,12 +158,11 @@ public static class JsonDump
             }
         }
 
-
         var model = dbSession.GetObjFromGuid<Model>(dbSession.DbEnvironment.ModelGuid);
         var entityById = model!.Value.GetAllEntityDefinitions().ToDictionary(x => Guid.Parse(x.Id), x => x);
 
         //TODO: better error handling
-        
+
         // Pass 2: set fields and associations.
         foreach (var entityProp in entities.EnumerateObject())
         {
@@ -180,10 +200,10 @@ public static class JsonDump
 
                 if (entity.FieldDefinitions.All(x => x.Key != jsonProperty.Name) && entity.ReferenceFieldDefinitions.All(x => x.Key != jsonProperty.Name))
                 {
-                    Logging.Log(LogFlags.Info, $"There is no field with the key {jsonProperty.Name} on the type {entity.Key}"); //todo inheritance   
+                    Logging.Log(LogFlags.Info, $"There is no field with the key {jsonProperty.Name} on the type {entity.Key}"); //todo inheritance
                 }
             }
-            
+
             foreach (var field in entity.FieldDefinitions)
             {
                 if (entityJson.TryGetProperty(field.Key, out var value))
@@ -241,8 +261,6 @@ public static class JsonDump
                 }
             }
         }
-
-        return modelGuid;
     }
 
     private static void CreateObjWithId(DbSession dbSession, Guid objId, Guid typId)
