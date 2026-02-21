@@ -54,4 +54,15 @@ public static class Logging
     {
         metrics.AddOrUpdate(category, _ => 1, (_, i) => i + 1);
     }
+
+    public static void WaitForDebugger()
+    {
+        Console.WriteLine("Waiting for debugger");
+        while (!Debugger.IsAttached)
+        {
+            Thread.Sleep(1000);
+        }
+
+        Debugger.Break();
+    }
 }

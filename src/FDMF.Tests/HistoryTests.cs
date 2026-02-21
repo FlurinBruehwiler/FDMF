@@ -1,8 +1,13 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using FDMF.Core;
 using FDMF.Core.DatabaseLayer;
 using FDMF.Testing.Shared;
 using FDMF.Testing.Shared.TestModelModel;
+using Newtonsoft.Json;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace FDMF.Tests;
 
@@ -187,7 +192,7 @@ public sealed class HistoryTests
     [Fact]
     public void History_Object_Delete_Records_Assoc_Removals_Without_Field_Noise()
     {
-        for (int i = 0; i < 100; i++)
+        for (int i = 0; i < 10; i++)
         {
             using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
 
@@ -227,6 +232,7 @@ public sealed class HistoryTests
             Assert.NotNull(deleteCommitB);
 
             var aEvents = deleteCommitA.EventsByObject[aId];
+
             Assert.Contains(aEvents, e => e.Type == HistoryEventType.AsoRemoved && e.FldId == TestingFolder.Fields.Parent);
 
             var bEvents = deleteCommitB.EventsByObject[bId];

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using FDMF.Core.Utils;
 using LightningDB;
@@ -61,11 +62,72 @@ public readonly struct HistoryEvent
 
 public sealed class HistoryCommit
 {
-    public required Guid CommitId;
+    public required SortedId CommitId;
     public required DateTime TimestampUtc;
     public required Guid UserId;
 
     public required Dictionary<Guid, List<HistoryEvent>> EventsByObject;
+}
+
+//id according to GuidV8 custom format (https://www.rfc-editor.org/rfc/rfc9562#name-uuid-version-8)
+//should be the same as guid v7, but with a better memory layout so that
+//it works for sorting with lmdb without a custom compare function
+[InlineArray(16)]
+public struct SortedId
+{
+    public byte First;
+
+    //todo performance test this....
+    public static SortedId Create()
+    {
+        long unixTs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+        var id = new SortedId();
+
+        //the first 6bytes (48 bits) are the timestamp
+        unixTs.AsSpan().Slice(0, 6).CopyToReverse(id.AsSpan());
+
+        //the latter 10bytes (80 bits) are from a normal guid
+        var guid = Guid.NewGuid();
+        var guidSpan = guid.AsSpan();
+        guidSpan.Slice(6).CopyTo(id.AsSpan().Slice(6));
+
+        const byte versionMask = 0b11110000;
+        const byte versionValue = 0b10000000;
+
+        const byte variantMask = 0b11000000;
+        const byte variantValue = 0b10000000;
+
+        //set ver
+        id[6] = (byte)((id[6] & ~versionMask) | versionValue);
+
+        //set var
+        id[8] = (byte)((id[8] & ~variantMask) | variantValue);
+
+        return id;
+    }
+
+    public override string ToString()
+    {
+        Span<byte> bytes = this.AsSpan();
+        Span<char> chars = stackalloc char[36];
+
+        static char Hex(int v) => (char)(v < 10 ? '0' + v : 'a' + (v - 10));
+
+        int ci = 0;
+
+        for (int i = 0; i < 16; i++)
+        {
+            if (i == 4 || i == 6 || i == 8 || i == 10)
+                chars[ci++] = '-';
+
+            byte b = bytes[i];
+            chars[ci++] = Hex(b >> 4);
+            chars[ci++] = Hex(b & 0xF);
+        }
+
+        return new string(chars);
+    }
 }
 
 /// <summary>
@@ -138,8 +200,7 @@ public static class History
             UserId = userId,
         });
 
-        var commitKey = Guid.CreateVersion7();
-
+        var commitKey = SortedId.Create();
 
         Guid currentObjId = Guid.Empty;
         bool hasCurrentObj = false;
@@ -296,7 +357,7 @@ public static class History
         writeTransaction.Put(dbEnvironment.HistoryDb, commitKey.AsSpan(), commitData);
     }
 
-    public static IEnumerable<Guid> GetCommitsForObject(DbEnvironment dbEnvironment, LightningTransaction readTransaction, Guid objId)
+    public static IEnumerable<SortedId> GetCommitsForObject(DbEnvironment dbEnvironment, LightningTransaction readTransaction, Guid objId)
     {
         using var cursor = readTransaction.CreateCursor(dbEnvironment.HistoryObjIndexDb);
 
@@ -306,11 +367,11 @@ public static class History
         do
         {
             var (_, _, value) = cursor.GetCurrent();
-            yield return MemoryMarshal.Read<Guid>(value.AsSpan());
+            yield return MemoryMarshal.Read<SortedId>(value.AsSpan());
         } while (cursor.NextDuplicate().resultCode == MDBResultCode.Success);
     }
 
-    public static HistoryCommit? TryGetCommit(DbEnvironment dbEnvironment, LightningTransaction readTransaction, Guid commitId)
+    public static HistoryCommit? TryGetCommit(DbEnvironment dbEnvironment, LightningTransaction readTransaction, SortedId commitId)
     {
         var (rc, _, value) = readTransaction.Get(dbEnvironment.HistoryDb, commitId.AsSpan());
         if (rc != MDBResultCode.Success)
@@ -334,7 +395,7 @@ public static class History
             if (keySpan.Length != 16)
                 continue;
 
-            var commitId = MemoryMarshal.Read<Guid>(keySpan);
+            var commitId = MemoryMarshal.Read<SortedId>(keySpan);
             yield return DecodeCommitValue(commitId, value.AsSlice());
 
             count++;
@@ -366,7 +427,7 @@ public static class History
         return Read<T>(data, ptr.Offset);
     }
 
-    private static unsafe HistoryCommit DecodeCommitValue(Guid commitId, Slice<byte> data)
+    private static unsafe HistoryCommit DecodeCommitValue(SortedId commitId, Slice<byte> data)
     {
         var header = Read<CommitHeader>(data, 0);
 

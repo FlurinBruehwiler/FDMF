@@ -438,7 +438,7 @@ public sealed class DbSession : IDisposable
             return val;
         }
 
-        Logging.Log(LogFlags.Error, $"Can't find {typeof(T).Name}({T.TypId}) with id {objId}");
+        //Logging.Log(LogFlags.Error, $"Can't find {typeof(T).Name}({T.TypId}) with id {objId}");
         return null;
     }
 
