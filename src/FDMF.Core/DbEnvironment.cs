@@ -32,7 +32,7 @@ public sealed class DbEnvironment : IDisposable
         //import base model
         using (var session = new DbSession(env))
         {
-            JsonDump.FromJson(EmbeddedResources.BaseModel, session);
+            env.ModelGuid = JsonDump.FromJson(EmbeddedResources.BaseModel, session).ObjId;
             session.Commit();
         }
 

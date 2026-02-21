@@ -2,6 +2,7 @@
 using FDMF.Core.DatabaseLayer;
 using FDMF.Testing.Shared;
 using FDMF.Testing.Shared.BusinessModelModel;
+using User = FDMF.Testing.Shared.BusinessModelModel.User;
 
 namespace PerformanceTests;
 

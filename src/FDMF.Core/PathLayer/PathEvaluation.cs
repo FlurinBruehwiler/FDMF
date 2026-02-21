@@ -8,7 +8,7 @@ namespace FDMF.Core.PathLayer;
 //todo, the current implementation is just a proof of concept, it is *very* inefficient...
 public static class PathEvaluation
 {
-    public static bool Evaluate(DbSession session, Guid thisObj, AstPredicate predicate, PathLangSemanticModel semanticModel)
+    public static bool Evaluate(DbSession session, Guid thisObj, AstPredicate predicate, PathLangSemanticModel semanticModel, Guid currentUser)
     {
         var type = semanticModel.InputTypIdByPredicate[predicate]; //todo error handling
 
@@ -103,23 +103,34 @@ public static class PathEvaluation
                         return CheckCondition(astConditionBinary.Left, obj, type) || CheckCondition(astConditionBinary.Right, obj, type);
                     break;
                 case AstFieldCompareCondition astFieldCompareCondition:
-                    var fld = type.FieldDefinitions.First(x => astFieldCompareCondition.FieldName.Text.Span.SequenceEqual(x.Key));
-                    var actualValue = session.GetFldValue(obj, fld.ObjId);
+                    var fld = semanticModel.FieldByCompare[astFieldCompareCondition];
+
+                    ReadOnlySpan<byte> actualValue;
 
                     bool r = true;
-                    switch (astFieldCompareCondition.Value)
+
+                    if (fld == PathLangBinder.CurrentUserFieldGuid)
                     {
-                        case AstBoolLiteral astBoolLiteral:
-                            r = MemoryMarshal.Read<bool>(actualValue) == astBoolLiteral.Value;
-                            break;
-                        case AstNumberLiteral astNumberLiteral:
-                            //todo
-                            break;
-                        case AstStringLiteral astStringLiteral:
-                            r = Encoding.Unicode.GetString(actualValue).SequenceEqual(astStringLiteral.Raw.Span);
-                            break;
-                        default:
-                            throw new ArgumentOutOfRangeException();
+                        r = obj == currentUser;
+                    }
+                    else
+                    {
+                        actualValue = session.GetFldValue(obj, fld);
+
+                        switch (astFieldCompareCondition.Value)
+                        {
+                            case AstBoolLiteral astBoolLiteral:
+                                r = MemoryMarshal.Read<bool>(actualValue) == astBoolLiteral.Value;
+                                break;
+                            case AstNumberLiteral astNumberLiteral:
+                                //todo
+                                break;
+                            case AstStringLiteral astStringLiteral:
+                                r = Encoding.Unicode.GetString(actualValue).SequenceEqual(astStringLiteral.Raw.Span);
+                                break;
+                            default:
+                                throw new ArgumentOutOfRangeException();
+                        }
                     }
 
                     return astFieldCompareCondition.Op == AstCompareOp.Equals ? r : !r;

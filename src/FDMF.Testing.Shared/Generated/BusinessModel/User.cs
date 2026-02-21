@@ -52,13 +52,6 @@ public partial struct User : ITransactionObject, IEquatable<User>
     }
 
     [MemoryPackIgnore]
-    public bool CurrentUser
-    {
-        get => MemoryMarshal.Read<bool>(DbSession.GetFldValue(ObjId, Fields.CurrentUser));
-        set => DbSession.SetFldValue(ObjId, Fields.CurrentUser, value.AsSpan());
-    }
-
-    [MemoryPackIgnore]
     public AssocCollection<Document> ExplicitlyViewableDocuments => new(DbSession, ObjId, Fields.ExplicitlyViewableDocuments, Document.Fields.ExplicitViewers);
 
     [MemoryPackIgnore]
@@ -90,8 +83,6 @@ public partial struct User : ITransactionObject, IEquatable<User>
         public static readonly Guid Email = new Guid([83, 89, 19, 70, 100, 218, 44, 76, 143, 214, 184, 97, 140, 17, 206, 192]);
         ///46be95ae-0738-4c18-ae24-51a97b649a51
         public static readonly Guid DisplayName = new Guid([174, 149, 190, 70, 56, 7, 24, 76, 174, 36, 81, 169, 123, 100, 154, 81]);
-        ///9b76cfbf-e9b5-41db-b655-b496fca80732
-        public static readonly Guid CurrentUser = new Guid([191, 207, 118, 155, 181, 233, 219, 65, 182, 85, 180, 150, 252, 168, 7, 50]);
         ///7c857219-3363-4183-9746-cca341d0c5f4
         public static readonly Guid ExplicitlyViewableDocuments = new Guid([25, 114, 133, 124, 99, 51, 131, 65, 151, 70, 204, 163, 65, 208, 197, 244]);
         ///d53ecf20-65c1-4f44-8e3a-fcec2bf26f52

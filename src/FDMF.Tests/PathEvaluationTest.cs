@@ -4,6 +4,7 @@ using FDMF.Core.PathLayer;
 using FDMF.Testing.Shared;
 using FDMF.Testing.Shared.BusinessModelModel;
 using FDMF.Testing.Shared.TestModelModel;
+using User = FDMF.Testing.Shared.BusinessModelModel.User;
 
 namespace FDMF.Tests;
 
@@ -28,8 +29,8 @@ public sealed class PathEvaluationTest
         var predicate = parse.Predicates.First();
         var bind = PathLangBinder.Bind(model, session, parse.Predicates);
 
-        Assert.True(PathEvaluation.Evaluate(session, childFolder.ObjId, predicate, bind.SemanticModel));
-        Assert.False(PathEvaluation.Evaluate(session, parentFolder.ObjId, predicate, bind.SemanticModel));
+        Assert.True(PathEvaluation.Evaluate(session, childFolder.ObjId, predicate, bind.SemanticModel, Guid.Empty));
+        Assert.False(PathEvaluation.Evaluate(session, parentFolder.ObjId, predicate, bind.SemanticModel, Guid.Empty));
     }
 
     [Fact]
@@ -54,9 +55,9 @@ public sealed class PathEvaluationTest
         var predicate = parse.Predicates.First();
         var bind = PathLangBinder.Bind(model, session, parse.Predicates);
 
-        Assert.True(PathEvaluation.Evaluate(session, childFolder.ObjId, predicate, bind.SemanticModel));
-        Assert.True(PathEvaluation.Evaluate(session, childFolder2.ObjId, predicate, bind.SemanticModel));
-        Assert.False(PathEvaluation.Evaluate(session, parentFolder.ObjId, predicate, bind.SemanticModel));
+        Assert.True(PathEvaluation.Evaluate(session, childFolder.ObjId, predicate, bind.SemanticModel, Guid.Empty));
+        Assert.True(PathEvaluation.Evaluate(session, childFolder2.ObjId, predicate, bind.SemanticModel, Guid.Empty));
+        Assert.False(PathEvaluation.Evaluate(session, parentFolder.ObjId, predicate, bind.SemanticModel, Guid.Empty));
     }
 
     [Fact]
@@ -84,10 +85,10 @@ public sealed class PathEvaluationTest
         var predicate = parse.Predicates.First();
         var bind = PathLangBinder.Bind(model, session, parse.Predicates);
 
-        Assert.True(PathEvaluation.Evaluate(session, childFolder.ObjId, predicate, bind.SemanticModel));
-        Assert.False(PathEvaluation.Evaluate(session, childFolder2.ObjId, predicate, bind.SemanticModel));
-        Assert.False(PathEvaluation.Evaluate(session, parentFolder.ObjId, predicate, bind.SemanticModel));
-        Assert.False(PathEvaluation.Evaluate(session, parentFolder2.ObjId, predicate, bind.SemanticModel));
+        Assert.True(PathEvaluation.Evaluate(session, childFolder.ObjId, predicate, bind.SemanticModel, Guid.Empty));
+        Assert.False(PathEvaluation.Evaluate(session, childFolder2.ObjId, predicate, bind.SemanticModel, Guid.Empty));
+        Assert.False(PathEvaluation.Evaluate(session, parentFolder.ObjId, predicate, bind.SemanticModel, Guid.Empty));
+        Assert.False(PathEvaluation.Evaluate(session, parentFolder2.ObjId, predicate, bind.SemanticModel, Guid.Empty));
     }
 
     [Fact]
@@ -115,8 +116,8 @@ public sealed class PathEvaluationTest
         var predicate = parse.Predicates.First();
         var bind = PathLangBinder.Bind(model, session, parse.Predicates);
 
-        Assert.True(PathEvaluation.Evaluate(session, p4.ObjId, predicate, bind.SemanticModel));
-        Assert.False(PathEvaluation.Evaluate(session, p1.ObjId, predicate, bind.SemanticModel));
+        Assert.True(PathEvaluation.Evaluate(session, p4.ObjId, predicate, bind.SemanticModel, Guid.Empty));
+        Assert.False(PathEvaluation.Evaluate(session, p1.ObjId, predicate, bind.SemanticModel, Guid.Empty));
     }
 
     [Fact]
@@ -175,8 +176,8 @@ public sealed class PathEvaluationTest
         var bind = PathLangBinder.Bind(model, session, parse.Predicates);
         Assert.DoesNotContain(bind.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
 
-        Assert.True(PathEvaluation.Evaluate(session, docA.ObjId, predicate, bind.SemanticModel));
-        Assert.False(PathEvaluation.Evaluate(session, docB.ObjId, predicate, bind.SemanticModel));
+        Assert.True(PathEvaluation.Evaluate(session, docA.ObjId, predicate, bind.SemanticModel, Guid.Empty));
+        Assert.False(PathEvaluation.Evaluate(session, docB.ObjId, predicate, bind.SemanticModel, Guid.Empty));
     }
 
     [Fact]
@@ -208,10 +209,10 @@ public sealed class PathEvaluationTest
         var bind = PathLangBinder.Bind(model, session, parse.Predicates);
         Assert.DoesNotContain(bind.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
 
-        Assert.True(PathEvaluation.Evaluate(session, start.ObjId, predicate, bind.SemanticModel));
-        Assert.True(PathEvaluation.Evaluate(session, target.ObjId, predicate, bind.SemanticModel));
-        Assert.False(PathEvaluation.Evaluate(session, excludedByFolderFilter.ObjId, predicate, bind.SemanticModel));
-        Assert.False(PathEvaluation.Evaluate(session, outsideGraph.ObjId, predicate, bind.SemanticModel));
+        Assert.True(PathEvaluation.Evaluate(session, start.ObjId, predicate, bind.SemanticModel, Guid.Empty));
+        Assert.True(PathEvaluation.Evaluate(session, target.ObjId, predicate, bind.SemanticModel, Guid.Empty));
+        Assert.False(PathEvaluation.Evaluate(session, excludedByFolderFilter.ObjId, predicate, bind.SemanticModel, Guid.Empty));
+        Assert.False(PathEvaluation.Evaluate(session, outsideGraph.ObjId, predicate, bind.SemanticModel, Guid.Empty));
     }
 
     [Fact]
@@ -251,8 +252,8 @@ public sealed class PathEvaluationTest
         var bind = PathLangBinder.Bind(model, session, parse.Predicates);
         Assert.DoesNotContain(bind.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
 
-        Assert.True(PathEvaluation.Evaluate(session, ok.ObjId, predicate, bind.SemanticModel));
-        Assert.False(PathEvaluation.Evaluate(session, bad.ObjId, predicate, bind.SemanticModel));
+        Assert.True(PathEvaluation.Evaluate(session, ok.ObjId, predicate, bind.SemanticModel, Guid.Empty));
+        Assert.False(PathEvaluation.Evaluate(session, bad.ObjId, predicate, bind.SemanticModel, Guid.Empty));
     }
 
     [Fact]
@@ -277,7 +278,30 @@ public sealed class PathEvaluationTest
         var bind = PathLangBinder.Bind(model, session, parse.Predicates);
         Assert.DoesNotContain(bind.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
 
-        Assert.True(PathEvaluation.Evaluate(session, docConf.ObjId, predicate, bind.SemanticModel));
-        Assert.False(PathEvaluation.Evaluate(session, docNorm.ObjId, predicate, bind.SemanticModel));
+        Assert.True(PathEvaluation.Evaluate(session, docConf.ObjId, predicate, bind.SemanticModel, Guid.Empty));
+        Assert.False(PathEvaluation.Evaluate(session, docNorm.ObjId, predicate, bind.SemanticModel, Guid.Empty));
+    }
+
+    [Fact]
+    public void CurrentUser()
+    {
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetBusinessModelDumpFile());
+        using var session = new DbSession(env);
+        var model = session.GetObjFromGuid<Model>(env.ModelGuid)!.Value;
+
+        var user = new User(session);
+
+        var document = new Document(session);
+        document.CreatedBy = user;
+
+        var otherDocument = new Document(session);
+
+        var src = "P(Document): this->CreatedBy[$.CurrentUser=true]";
+        var parse = PathLangParser.Parse(src);
+        var bind = PathLangBinder.Bind(model, session, parse.Predicates);
+        Assert.Empty(bind.Diagnostics);
+
+        Assert.True(PathEvaluation.Evaluate(session, document.ObjId, parse.Predicates.First(), bind.SemanticModel, user.ObjId));
+        Assert.False(PathEvaluation.Evaluate(session, otherDocument.ObjId, parse.Predicates.First(), bind.SemanticModel, user.ObjId));
     }
 }

@@ -9,6 +9,8 @@ public sealed record PathLangSemanticResult(
 
 public static class PathLangBinder
 {
+    public static Guid CurrentUserFieldGuid = Guid.Parse("7E5BA146-B27E-4F12-8D1B-511BB840EB8D");
+
     public static PathLangSemanticResult Bind(Model model, DbSession dbSession, IReadOnlyList<AstPredicate> predicates)
     {
         List<PathLangDiagnostic> diagnostics = new();
@@ -79,13 +81,10 @@ public static class PathLangBinder
                 case AstPredicateCallExpr call:
                 {
                     var argTypes = BindNodeSetExpr(call.Argument, thisTypes, currentTypes);
-                    var name = call.PredicateName.Text.ToString();
-                    predicateInputTypIdByName.TryGetValue(name, out var targetInput);
-                    if (!predicateInputTypIdByName.ContainsKey(name))
-                        Report(PathLangDiagnosticSeverity.Error, $"Unknown predicate '{name}'", call.PredicateName.Text);
+                    var targetInput = ResolvePredicate(call.PredicateName.Text);
 
                     semantic.TargetInputTypIdByPredicateCall[call] = targetInput;
-                    ValidatePredicateArgType(name, targetInput, argTypes, call.PredicateName.Text);
+                    ValidatePredicateArgType(call.PredicateName.Text, targetInput, argTypes);
                     return;
                 }
 
@@ -187,13 +186,13 @@ public static class PathLangBinder
             BindCondition(filter.Condition, thisTypes, currentTypes);
         }
 
-        void BindCondition(AstCondition condition, Guid thisTypes, Guid currentTypes)
+        void BindCondition(AstCondition condition, Guid thisTypes, Guid currentType)
         {
             switch (condition)
             {
                 case AstConditionBinary bin:
-                    BindCondition(bin.Left, thisTypes, currentTypes);
-                    BindCondition(bin.Right, thisTypes, currentTypes);
+                    BindCondition(bin.Left, thisTypes, currentType);
+                    BindCondition(bin.Right, thisTypes, currentType);
                     return;
 
                 case AstFieldCompareCondition fc:
@@ -206,14 +205,22 @@ public static class PathLangBinder
 
                     semantic.TypeGuardTypIdByCompare[fc] = guardTypId;
 
-                    var fieldKey = fc.FieldName.Text.ToString();
-                    Guid typesToCheck = guardTypId ?? currentTypes;
+                    var fieldKey = fc.FieldName.Text;
+                    Guid type = guardTypId ?? currentType;
 
-                    if (typesToCheck != Guid.Empty)
+                    if (type != Guid.Empty)
                     {
-                        if (GetFld(typesToCheck, fieldKey) is not {} fld)
+                        if (GetFld(type, fieldKey.Span) is not {} fld)
                         {
-                            Report(PathLangDiagnosticSeverity.Error, $"Unknown field '{fieldKey}' on type {FormatType(typesToCheck)}", fc.FieldName.Text);
+                            if (currentType == User.TypId && fieldKey.Span is "CurrentUser") //special case
+                            {
+                                ValidateLiteralType("bool", fc.Value, fc.FieldName.Text);
+                                semantic.FieldByCompare[fc] = CurrentUserFieldGuid; //special guid for CurrentUser field
+                            }
+                            else
+                            {
+                                Report(PathLangDiagnosticSeverity.Error, $"Unknown field '{fieldKey}' on type {FormatType(type)}", fc.FieldName.Text);
+                            }
                         }
                         else
                         {
@@ -228,15 +235,12 @@ public static class PathLangBinder
 
                 case AstPredicateCompareCondition pc:
                 {
-                    var name = pc.PredicateName.Text.ToString();
-                    predicateInputTypIdByName.TryGetValue(name, out var targetInput);
-                    if (!predicateInputTypIdByName.ContainsKey(name))
-                        Report(PathLangDiagnosticSeverity.Error, $"Unknown predicate '{name}'", pc.PredicateName.Text);
+                    var targetInput = ResolvePredicate(pc.PredicateName.Text);
 
                     semantic.TargetInputTypIdByPredicateCompare[pc] = targetInput;
 
-                    var argTypes = BindNodeSetExpr(pc.Argument, thisTypes, currentTypes);
-                    ValidatePredicateArgType(name, targetInput, argTypes, pc.PredicateName.Text);
+                    var argTypes = BindNodeSetExpr(pc.Argument, thisTypes, currentType);
+                    ValidatePredicateArgType(pc.PredicateName.Text, targetInput, argTypes);
 
                     if (pc.Value is not AstBoolLiteral)
                         Report(PathLangDiagnosticSeverity.Error, "Predicate comparisons must compare against a boolean literal", pc.Value.Range);
@@ -247,6 +251,18 @@ public static class PathLangBinder
                 default:
                     return;
             }
+        }
+
+        Guid? ResolvePredicate(TextView name)
+        {
+            predicateInputTypIdByName.TryGetValue(name.Span, out var targetInput);
+            if (!predicateInputTypIdByName.ContainsKey(name.Span))
+            {
+                Report(PathLangDiagnosticSeverity.Error, $"Unknown predicate '{name}'", name);
+                return null;
+            }
+
+            return targetInput;
         }
 
         ReferenceFieldDefinition? GetAso(Guid ed, ReadOnlySpan<char> key)
@@ -281,7 +297,7 @@ public static class PathLangBinder
             return null;
         }
 
-        void ValidatePredicateArgType(string predName, Guid? targetInputTypId, Guid argTypes, TextView at)
+        void ValidatePredicateArgType(TextView predName, Guid? targetInputTypId, Guid argTypes)
         {
             if (!targetInputTypId.HasValue || targetInputTypId.Value == Guid.Empty)
                 return;
@@ -289,7 +305,7 @@ public static class PathLangBinder
             if (argTypes == targetInputTypId.Value)
                 return;
 
-            Report(PathLangDiagnosticSeverity.Warning, $"Predicate '{predName}' expects {FormatType(targetInputTypId.Value)} but argument may be {FormatType(argTypes)}", at);
+            Report(PathLangDiagnosticSeverity.Warning, $"Predicate '{predName}' expects {FormatType(targetInputTypId.Value)} but argument may be {FormatType(argTypes)}", predName);
         }
 
         void ValidateLiteralType(string dataType, AstLiteral lit, TextView at)
@@ -297,13 +313,12 @@ public static class PathLangBinder
             if (lit is AstErrorLiteral)
                 return;
 
-            var lower = dataType.Trim().ToLowerInvariant();
-            bool ok = lower switch
+            bool ok = dataType switch
             {
-                "bool" or "boolean" => lit is AstBoolLiteral,
+                "bool" => lit is AstBoolLiteral,
                 "string" => lit is AstStringLiteral,
-                "int" or "int32" or "int64" or "long" or "double" or "float" or "decimal" or "number" => lit is AstNumberLiteral,
-                "datetime" or "date" => lit is AstStringLiteral,
+                "long" or "decimal" => lit is AstNumberLiteral,
+                "DateTime" => lit is AstStringLiteral,
                 _ => true,
             };
 

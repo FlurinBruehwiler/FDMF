@@ -306,15 +306,6 @@
       "IsIndexed": true,
       "OwningEntity": "095433D0-4E74-471D-9B11-AEA9538A86CC"
     },
-    "9b76cfbf-e9b5-41db-b655-b496fca80732": {
-      "$type": "42a6f33d-a938-4ad8-9682-aabdc92a53d2",
-      "Key": "CurrentUser",
-      "Name": "CurrentUser",
-      "Id": "9b76cfbf-e9b5-41db-b655-b496fca80732",
-      "DataType": "Boolean",
-      "IsIndexed": true,
-      "OwningEntity": "095433D0-4E74-471D-9B11-AEA9538A86CC"
-    },
     "7c8e8231-f6ed-4738-9a02-c3855d262cde": {
       "$type": "42a6f33d-a938-4ad8-9682-aabdc92a53d2",
       "Key": "Title",

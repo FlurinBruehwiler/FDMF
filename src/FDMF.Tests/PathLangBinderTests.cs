@@ -132,12 +132,10 @@ public sealed class PathLangBinderTests
 
         // Field ids we expect to be resolved.
         var bc_Locked = BusinessCase.Fields.Locked;
-        var user_CurrentUser = User.Fields.CurrentUser;
         var user_TypId = User.TypId;
 
         var fieldCompares = EnumerateFieldCompares(pred.Body).ToList();
         Assert.Contains(fieldCompares, fc => fc.FieldName.Text.ToString() == "Locked" && bind.SemanticModel.FieldByCompare[fc] == bc_Locked);
-        Assert.Contains(fieldCompares, fc => fc.FieldName.Text.ToString() == "CurrentUser" && bind.SemanticModel.FieldByCompare[fc] == user_CurrentUser);
 
         // Ensure the type-guard was resolved for $(User).CurrentUser.
         var guarded = fieldCompares.Single(fc => fc.TypeGuard is not null);
@@ -220,6 +218,20 @@ public sealed class PathLangBinderTests
         Assert.Single(bind.Diagnostics);
         Assert.Equal(PathLangDiagnosticSeverity.Error, bind.Diagnostics[0].Severity);
         Assert.Equal("Start and end of steps in repeat expr need to have the same type", bind.Diagnostics[0].Message);
+    }
+
+    [Fact]
+    public void CurrentUser()
+    {
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetBusinessModelDumpFile());
+        using var session = new DbSession(env, readOnly: true);
+        var model = LoadBusinessModel(env, session);
+
+        var src = "P(Document): this->CreatedBy[$.CurrentUser=true]";
+        var parse = PathLangParser.Parse(src);
+        var bind = PathLangBinder.Bind(model, session, parse.Predicates);
+
+        Assert.Empty(bind.Diagnostics);
     }
 }
 
