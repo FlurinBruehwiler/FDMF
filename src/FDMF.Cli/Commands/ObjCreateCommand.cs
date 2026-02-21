@@ -35,7 +35,7 @@ public static class ObjCreateCommand
 
                 var entity = ModelLookup.GetType(session, typeKey);
 
-                var objId = session.CreateObj(Guid.Parse(entity.Id));
+                var objId = session.CreateObj(entity.Id);
 
                 ObjectMutations.ApplySets(session, entity, objId, setPairs ?? Array.Empty<string>(), ObjectMutations.MultiRefMode.Add);
 

@@ -113,6 +113,14 @@ public static class PathEvaluation
                     {
                         r = obj == currentUser;
                     }
+                    else if (fld == PathLangBinder.CanViewFieldGuid)
+                    {
+                        //todo
+                    }
+                    else if (fld == PathLangBinder.CanEditFieldGuid)
+                    {
+                        //todo
+                    }
                     else
                     {
                         actualValue = session.GetFldValue(obj, fld);

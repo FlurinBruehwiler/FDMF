@@ -62,31 +62,37 @@ public static class ModelGenerator
             {
                 var dataType = field.DataType switch
                 {
-                    nameof(FieldDataType.Integer) => "long",
-                    nameof(FieldDataType.Decimal) => "decimal",
-                    nameof(FieldDataType.String) => "string",
-                    nameof(FieldDataType.DateTime) => "DateTime",
-                    nameof(FieldDataType.Boolean) => "bool",
+                    FieldDataType.Integer => "long",
+                    FieldDataType.Decimal => "decimal",
+                    FieldDataType.String => "string",
+                    FieldDataType.DateTime => "DateTime",
+                    FieldDataType.Boolean => "bool",
+                    FieldDataType.Guid => "Guid",
+                    FieldDataType.Enum => "FieldDataType", //todo
                     _ => throw new ArgumentOutOfRangeException()
                 };
 
                 var toFunction = field.DataType switch
                 {
-                    nameof(FieldDataType.Integer) => "MemoryMarshal.Read<long>({0})",
-                    nameof(FieldDataType.Decimal) => "MemoryMarshal.Read<decimal>({0})",
-                    nameof(FieldDataType.String) => "Encoding.Unicode.GetString({0})",
-                    nameof(FieldDataType.DateTime) => "MemoryMarshal.Read<DateTime>({0})",
-                    nameof(FieldDataType.Boolean) => "MemoryMarshal.Read<bool>({0})",
+                    FieldDataType.Integer => "MemoryMarshal.Read<long>({0})",
+                    FieldDataType.Decimal => "MemoryMarshal.Read<decimal>({0})",
+                    FieldDataType.String => "Encoding.Unicode.GetString({0})",
+                    FieldDataType.DateTime => "MemoryMarshal.Read<DateTime>({0})",
+                    FieldDataType.Boolean => "MemoryMarshal.Read<bool>({0})",
+                    FieldDataType.Guid => "MemoryMarshal.Read<Guid>({0})",
+                    FieldDataType.Enum => "MemoryMarshal.Read<FieldDataType>({0})",
                     _ => throw new ArgumentOutOfRangeException()
                 };
 
                 var fromFunction = field.DataType switch
                 {
-                    nameof(FieldDataType.Integer) => "value.AsSpan()",
-                    nameof(FieldDataType.Decimal) => "value.AsSpan()",
-                    nameof(FieldDataType.String) => "Encoding.Unicode.GetBytes(value)",
-                    nameof(FieldDataType.DateTime) => "value.AsSpan()",
-                    nameof(FieldDataType.Boolean) => "value.AsSpan()",
+                    FieldDataType.Integer => "value.AsSpan()",
+                    FieldDataType.Decimal => "value.AsSpan()",
+                    FieldDataType.String => "Encoding.Unicode.GetBytes(value)",
+                    FieldDataType.DateTime => "value.AsSpan()",
+                    FieldDataType.Boolean => "value.AsSpan()",
+                    FieldDataType.Guid => "value.AsSpan()",
+                    FieldDataType.Enum => "value.AsSpan()",
                     _ => throw new ArgumentOutOfRangeException()
                 };
 
@@ -173,9 +179,8 @@ public static class ModelGenerator
         }
     }
 
-    public static string GetGuidLiteral(string g)
+    public static string GetGuidLiteral(Guid guid)
     {
-        var guid = Guid.Parse(g);
         Span<byte> guidData = stackalloc byte[16];
         MemoryMarshal.Write(guidData, guid);
 

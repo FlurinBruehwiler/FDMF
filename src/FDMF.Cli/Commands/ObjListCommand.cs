@@ -33,7 +33,7 @@ public static class ObjListCommand
             if (!string.IsNullOrWhiteSpace(typeKey))
             {
                 var entity = ModelLookup.GetType(session, typeKey);
-                filterTypId = Guid.Parse(entity.Id);
+                filterTypId = entity.Id;
                 scalarFields = entity.FieldDefinitions.ToArray();
                 refFields = entity.ReferenceFieldDefinitions.ToArray();
                 scalarKeys = scalarFields.Select(f => f.Key).ToArray();
@@ -67,8 +67,8 @@ public static class ObjListCommand
                 int col = 2;
                 foreach (var fld in scalarFields!)
                 {
-                    var bytes = session.GetFldValue(objId, Guid.Parse(fld.Id));
-                    row[col++] = EncodingUtils.DecodeScalar(Enum.Parse<FieldDataType>(fld.DataType), bytes);
+                    var bytes = session.GetFldValue(objId, fld.Id);
+                    row[col++] = EncodingUtils.DecodeScalar(fld.DataType, bytes);
                 }
 
                 foreach (var rf in refFields!)
@@ -93,7 +93,7 @@ public static class ObjListCommand
         if (rf.RefType == nameof(RefType.Multiple))
         {
             var ids = new List<Guid>();
-            foreach (var other in session.EnumerateAso(objId, Guid.Parse(rf.Id)))
+            foreach (var other in session.EnumerateAso(objId, rf.Id))
             {
                 ids.Add(other.ObjId);
                 if (ids.Count >= 3)
@@ -103,7 +103,7 @@ public static class ObjListCommand
             if (ids.Count == 0)
                 return string.Empty;
 
-            var count = session.GetAsoCount(objId, Guid.Parse(rf.Id));
+            var count = session.GetAsoCount(objId, rf.Id);
             if (count <= 2)
                 return string.Join(", ", ids.Select(x => x.ToString()));
 
@@ -111,7 +111,7 @@ public static class ObjListCommand
             return $"{string.Join(", ", shown)} and {count - 2} more";
         }
 
-        var otherId = session.GetSingleAsoValue(objId, Guid.Parse(rf.Id));
+        var otherId = session.GetSingleAsoValue(objId, rf.Id);
         return otherId?.ToString() ?? string.Empty;
     }
 }

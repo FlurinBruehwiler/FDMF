@@ -20,12 +20,12 @@ public static class ObjectMutations
             {
                 if (v.Length == 0)
                 {
-                    session.SetFldValue(objId, Guid.Parse(fld.Id), ReadOnlySpan<byte>.Empty);
+                    session.SetFldValue(objId, fld.Id, ReadOnlySpan<byte>.Empty);
                 }
                 else
                 {
-                    var bytes = EncodingUtils.EncodeScalar(Enum.Parse<FieldDataType>(fld.DataType), v);
-                    session.SetFldValue(objId, Guid.Parse(fld.Id), bytes);
+                    var bytes = EncodingUtils.EncodeScalar(fld.DataType, v);
+                    session.SetFldValue(objId, fld.Id, bytes);
                 }
 
                 continue;
@@ -35,7 +35,7 @@ public static class ObjectMutations
             {
                 if (v.Length == 0)
                 {
-                    session.RemoveAllAso(objId, Guid.Parse(rf.Id));
+                    session.RemoveAllAso(objId, rf.Id);
                     continue;
                 }
 
@@ -51,14 +51,14 @@ public static class ObjectMutations
                     if (!Guid.TryParse(parts[0], out var otherObjId))
                         throw new Exception($"Invalid guid '{parts[0]}' for ref field '{k}'");
 
-                    session.RemoveAllAso(objId, Guid.Parse(rf.Id));
+                    session.RemoveAllAso(objId, rf.Id);
                     if (otherObjId != Guid.Empty)
-                        session.CreateAso(objId, Guid.Parse(rf.Id), otherObjId, Guid.Parse(rf.OtherReferenceFields.Id));
+                        session.CreateAso(objId, rf.Id, otherObjId, rf.OtherReferenceFields.Id);
                 }
                 else
                 {
                     if (multiRefMode == MultiRefMode.Replace)
-                        session.RemoveAllAso(objId, Guid.Parse(rf.Id));
+                        session.RemoveAllAso(objId, rf.Id);
 
                     foreach (var part in parts)
                     {
@@ -66,7 +66,7 @@ public static class ObjectMutations
                             throw new Exception($"Invalid guid '{part}' for ref field '{k}'");
 
                         if (otherObjId != Guid.Empty)
-                            session.CreateAso(objId, Guid.Parse(rf.Id), otherObjId, Guid.Parse(rf.OtherReferenceFields.Id));
+                            session.CreateAso(objId, rf.Id, otherObjId, rf.OtherReferenceFields.Id);
                     }
                 }
 
@@ -86,7 +86,7 @@ public static class ObjectMutations
             if (rf.RefType != nameof(RefType.SingleMandatory))
                 continue;
 
-            var val = session.GetSingleAsoValue(objId, Guid.Parse(rf.Id));
+            var val = session.GetSingleAsoValue(objId, rf.Id);
             if (!val.HasValue)
                 throw new Exception($"Missing mandatory reference field '{rf.Key}' for type '{entity.Key}'.");
         }

@@ -40,13 +40,13 @@ public sealed class JsonDumpImportTests
         Assert.NotNull(testingDocument);
         Assert.Equal("TestingDocument", testingDocument.Value.Name);
         Assert.Equal("TestingDocument", testingDocument.Value.Key);
-        Assert.Equal("e5184bba-f470-4bab-aeed-28fb907da349", testingDocument.Value.Id);
+        Assert.Equal(Guid.Parse("e5184bba-f470-4bab-aeed-28fb907da349") ,testingDocument.Value.Id);
         Assert.Equal(model, testingDocument.Value.Model);
         
         var testingFolder = session.GetObjFromGuid<EntityDefinition>(Guid.Parse("a3ccbd8b-2256-414b-a402-1a091cb407a5"));
         Assert.NotNull(testingFolder);
         Assert.Equal("TestingFolder", testingFolder.Value.Name);
-        Assert.Equal("a3ccbd8b-2256-414b-a402-1a091cb407a5", testingFolder.Value.Id);
+        Assert.Equal(Guid.Parse("a3ccbd8b-2256-414b-a402-1a091cb407a5") ,testingFolder.Value.Id);
         Assert.Equal(model, testingFolder.Value.Model);
         Assert.Equal(5, testingFolder.Value.FieldDefinitions.Count);
         Assert.Equal(2, testingFolder.Value.ReferenceFieldDefinitions.Count);

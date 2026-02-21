@@ -16,7 +16,7 @@ public static class JsonDump
     public static string GetJsonDump(DbSession dbSession)
     {
         var model = dbSession.GetObjFromGuid<Model>(dbSession.DbEnvironment.ModelGuid);
-        var entityById = model!.Value.GetAllEntityDefinitions().ToDictionary(x => Guid.Parse(x.Id), x => x);
+        var entityById = model!.Value.GetAllEntityDefinitions().ToDictionary(x => x.Id, x => x);
 
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
@@ -38,18 +38,18 @@ public static class JsonDump
                 {
                     foreach (var field in entity.FieldDefinitions)
                     {
-                        var raw = dbSession.GetFldValue(objId, Guid.Parse(field.Id));
+                        var raw = dbSession.GetFldValue(objId, field.Id);
                         if (raw.Length == 0)
                             continue;
 
                         writer.WritePropertyName(field.Key);
-                        WriteScalarFieldValue(writer,  Enum.Parse<FieldDataType>(field.DataType) , raw);
+                        WriteScalarFieldValue(writer, field.DataType , raw);
                     }
 
                     foreach (var refField in entity.ReferenceFieldDefinitions)
                     {
                         ArrayBufferWriter<Guid>? collected = null;
-                        foreach (var aso in dbSession.EnumerateAso(objId, Guid.Parse(refField.Id)))
+                        foreach (var aso in dbSession.EnumerateAso(objId, refField.Id))
                         {
                             collected ??= new ArrayBufferWriter<Guid>();
                             collected.GetSpan(1)[0] = aso.ObjId;
@@ -135,7 +135,7 @@ public static class JsonDump
 
     private static void ParseEntities(DbSession dbSession, JsonElement entities, Model model)
     {
-        var _ = model.GetAllEntityDefinitions().ToDictionary(x => Guid.Parse(x.Id), x => x);
+        var _ = model.GetAllEntityDefinitions().ToDictionary(x => x.Id, x => x);
 
         //todo we would actually need to first discover the new entities that are defined
 
@@ -184,7 +184,7 @@ public static class JsonDump
             }
         }
 
-        var entityById = model.GetAllEntityDefinitions().ToDictionary(x => Guid.Parse(x.Id), x => x);
+        var entityById = model.GetAllEntityDefinitions().ToDictionary(x => x.Id, x => x);
 
         //TODO: better error handling
 
@@ -242,12 +242,12 @@ public static class JsonDump
         {
             if (entityJson.TryGetProperty(field.Key, out var value))
             {
-                SetScalarFieldFromJson(dbSession, objId, Guid.Parse(field.Id), Enum.Parse<FieldDataType>(field.DataType), value);
+                SetScalarFieldFromJson(dbSession, objId, field, value);
             }
             else
             {
                 // Match dump semantics: missing means "unset".
-                dbSession.SetFldValue(objId, Guid.Parse(field.Id), ReadOnlySpan<byte>.Empty);
+                dbSession.SetFldValue(objId, field.Id, ReadOnlySpan<byte>.Empty);
             }
         }
 
@@ -275,13 +275,13 @@ public static class JsonDump
                             continue;
 
                         if (Guid.TryParse(item.GetString(), out var otherObjId))
-                            dbSession.CreateAso(objId, Guid.Parse(fldIdA), otherObjId, Guid.Parse(fldIdB.Id));
+                            dbSession.CreateAso(objId, fldIdA, otherObjId, fldIdB.Id);
                     }
                 }
                 else if (value.ValueKind == JsonValueKind.String)
                 {
                     if (Guid.TryParse(value.GetString(), out var otherObjId))
-                        dbSession.CreateAso(objId, Guid.Parse(fldIdA), otherObjId, Guid.Parse(fldIdB.Id));
+                        dbSession.CreateAso(objId, fldIdA, otherObjId, fldIdB.Id);
                 }
 
                 continue;
@@ -291,99 +291,141 @@ public static class JsonDump
             if (value.ValueKind == JsonValueKind.String && Guid.TryParse(value.GetString(), out var singleId))
             {
                 if (singleId != Guid.Empty)
-                    dbSession.CreateAso(objId, Guid.Parse(fldIdA), singleId, Guid.Parse(fldIdB.Id));
+                    dbSession.CreateAso(objId, fldIdA, singleId, fldIdB.Id);
             }
         }
     }
 
-    private static void SetScalarFieldFromJson(DbSession dbSession, Guid objId, Guid fldId, FieldDataType type, JsonElement value)
+    private static void SetScalarFieldFromJson(DbSession dbSession, Guid objId, FieldDefinition fld, JsonElement value)
     {
         if (value.ValueKind == JsonValueKind.Null)
         {
-            dbSession.SetFldValue(objId, fldId, ReadOnlySpan<byte>.Empty);
+            dbSession.SetFldValue(objId, fld.Id, ReadOnlySpan<byte>.Empty);
             return;
         }
 
-        switch (type)
+        switch (fld.DataType)
         {
             case FieldDataType.String:
             {
                 if (value.ValueKind != JsonValueKind.String)
                 {
-                    dbSession.SetFldValue(objId, fldId, ReadOnlySpan<byte>.Empty);
+                    dbSession.SetFldValue(objId, fld.Id, ReadOnlySpan<byte>.Empty);
                     return;
                 }
 
                 var s = value.GetString() ?? string.Empty;
 
-                if (fldId == Guid.Parse("95f47b2f-a39e-4031-b12f-f30e0762d671"))
-                {
-                    
-                }
-                
-                dbSession.SetFldValue(objId, fldId, MemoryMarshal.Cast<char, byte>(s.AsSpan()));
-
-                var x = dbSession.GetFldValue(objId, fldId);
-
+                dbSession.SetFldValue(objId, fld.Id, MemoryMarshal.Cast<char, byte>(s.AsSpan()));
                 return;
             }
             case FieldDataType.Integer:
             {
                 if (value.ValueKind != JsonValueKind.Number)
                 {
-                    dbSession.SetFldValue(objId, fldId, ReadOnlySpan<byte>.Empty);
+                    dbSession.SetFldValue(objId, fld.Id, ReadOnlySpan<byte>.Empty);
                     return;
                 }
 
                 long l = value.GetInt64();
-                dbSession.SetFldValue(objId, fldId, l.AsSpan());
+                dbSession.SetFldValue(objId, fld.Id, l.AsSpan());
                 return;
             }
             case FieldDataType.Decimal:
             {
                 if (value.ValueKind != JsonValueKind.Number)
                 {
-                    dbSession.SetFldValue(objId, fldId, ReadOnlySpan<byte>.Empty);
+                    dbSession.SetFldValue(objId, fld.Id, ReadOnlySpan<byte>.Empty);
                     return;
                 }
 
                 decimal d = value.GetDecimal();
-                dbSession.SetFldValue(objId, fldId, d.AsSpan());
+                dbSession.SetFldValue(objId, fld.Id, d.AsSpan());
                 return;
             }
             case FieldDataType.DateTime:
             {
                 if (value.ValueKind != JsonValueKind.String)
                 {
-                    dbSession.SetFldValue(objId, fldId, ReadOnlySpan<byte>.Empty);
+                    dbSession.SetFldValue(objId, fld.Id, ReadOnlySpan<byte>.Empty);
                     return;
                 }
 
                 var s = value.GetString();
                 if (string.IsNullOrWhiteSpace(s))
                 {
-                    dbSession.SetFldValue(objId, fldId, ReadOnlySpan<byte>.Empty);
+                    dbSession.SetFldValue(objId, fld.Id, ReadOnlySpan<byte>.Empty);
                     return;
                 }
 
                 var dt = DateTime.Parse(s, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
-                dbSession.SetFldValue(objId, fldId, dt.AsSpan());
+                dbSession.SetFldValue(objId, fld.Id, dt.AsSpan());
                 return;
             }
             case FieldDataType.Boolean:
             {
                 if (value.ValueKind != JsonValueKind.True && value.ValueKind != JsonValueKind.False)
                 {
-                    dbSession.SetFldValue(objId, fldId, ReadOnlySpan<byte>.Empty);
+                    dbSession.SetFldValue(objId, fld.Id, ReadOnlySpan<byte>.Empty);
                     return;
                 }
 
                 bool b = value.GetBoolean();
-                dbSession.SetFldValue(objId, fldId, b.AsSpan());
+                dbSession.SetFldValue(objId, fld.Id, b.AsSpan());
                 return;
             }
+            case FieldDataType.Guid:
+            {
+                if (value.ValueKind != JsonValueKind.String)
+                {
+                    dbSession.SetFldValue(objId, fld.Id, ReadOnlySpan<byte>.Empty);
+                    return;
+                }
+
+                if (value.GetString() is { } s)
+                {
+                    var g = Guid.Parse(s);
+                    dbSession.SetFldValue(objId, fld.Id, g.AsSpan());
+                }
+                else
+                {
+                    dbSession.SetFldValue(objId, fld.Id, ReadOnlySpan<byte>.Empty);
+                }
+
+                return;
+            }
+            case FieldDataType.Enum:
+            {
+                if (value.ValueKind != JsonValueKind.String)
+                {
+                    dbSession.SetFldValue(objId, fld.Id, ReadOnlySpan<byte>.Empty);
+                    return;
+                }
+
+                if (value.GetString() is { } s)
+                {
+                    var enumVariants = fld.EnumVariants.AsSpan();
+
+                    int idx = 0;
+                    foreach (var s1 in enumVariants.Split(','))
+                    {
+                        if (enumVariants[s1].SequenceEqual(s))
+                        {
+                            dbSession.SetFldValue(objId, fld.Id, idx.AsSpan());
+                            return;
+                        }
+
+                        idx++;
+                    }
+
+                    throw new Exception("invalid enum");
+                }
+
+                dbSession.SetFldValue(objId, fld.Id, ReadOnlySpan<byte>.Empty);
+                break;
+            }
             default:
-                dbSession.SetFldValue(objId, fldId, ReadOnlySpan<byte>.Empty);
+                dbSession.SetFldValue(objId, fld.Id, ReadOnlySpan<byte>.Empty);
                 return;
         }
     }
@@ -422,13 +464,4 @@ public enum RefType
     SingleOptional,
     SingleMandatory,
     Multiple
-}
-
-public enum FieldDataType
-{
-    Integer,
-    Decimal,
-    String,
-    DateTime,
-    Boolean
 }

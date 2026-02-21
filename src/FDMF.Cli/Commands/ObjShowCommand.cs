@@ -42,8 +42,8 @@ public static class ObjShowCommand
 
                 foreach (var fld in entity.Value.FieldDefinitions)
                 {
-                    var bytes = session.GetFldValue(objId, Guid.Parse(fld.Id));
-                    var v = EncodingUtils.DecodeScalar(Enum.Parse<FieldDataType>(fld.DataType), bytes);
+                    var bytes = session.GetFldValue(objId, fld.Id);
+                    var v = EncodingUtils.DecodeScalar(fld.DataType, bytes);
                     Console.WriteLine($"{fld.Key}: {v}");
                 }
 
@@ -54,7 +54,7 @@ public static class ObjShowCommand
                     if (rf.RefType == nameof(RefType.Multiple))
                     {
                         int shown = 0;
-                        foreach (var other in session.EnumerateAso(objId, Guid.Parse(rf.Id)))
+                        foreach (var other in session.EnumerateAso(objId, rf.Id))
                         {
                             Console.WriteLine($"  - {other.ObjId} ({ModelLookup.FormatType(session, session.GetTypId(other.ObjId))})");
                             shown++;
@@ -65,7 +65,7 @@ public static class ObjShowCommand
                     }
                     else
                     {
-                        var otherId = session.GetSingleAsoValue(objId, Guid.Parse(rf.Id));
+                        var otherId = session.GetSingleAsoValue(objId, rf.Id);
                         if (!otherId.HasValue)
                         {
                             Console.WriteLine("  (empty)");

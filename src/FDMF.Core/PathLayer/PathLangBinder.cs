@@ -10,6 +10,8 @@ public sealed record PathLangSemanticResult(
 public static class PathLangBinder
 {
     public static Guid CurrentUserFieldGuid = Guid.Parse("7E5BA146-B27E-4F12-8D1B-511BB840EB8D");
+    public static Guid CanViewFieldGuid = Guid.Parse("7E5BA146-B27E-4F12-8D1B-511BB840EB8D");
+    public static Guid CanEditFieldGuid = Guid.Parse("7E5BA146-B27E-4F12-8D1B-511BB840EB8D");
 
     public static PathLangSemanticResult Bind(Model model, DbSession dbSession, IReadOnlyList<AstPredicate> predicates)
     {
@@ -214,8 +216,18 @@ public static class PathLangBinder
                         {
                             if (currentType == User.TypId && fieldKey.Span is "CurrentUser") //special case
                             {
-                                ValidateLiteralType("bool", fc.Value, fc.FieldName.Text);
-                                semantic.FieldByCompare[fc] = CurrentUserFieldGuid; //special guid for CurrentUser field
+                                ValidateLiteralType(FieldDataType.Boolean, fc.Value, fc.FieldName.Text);
+                                semantic.FieldByCompare[fc] = CurrentUserFieldGuid;
+                            }
+                            else if (fieldKey.Span is "CanView")
+                            {
+                                ValidateLiteralType(FieldDataType.Boolean, fc.Value, fc.FieldName.Text);
+                                semantic.FieldByCompare[fc] = CanViewFieldGuid;
+                            }
+                            else if (fieldKey.Span is "CanEdit")
+                            {
+                                ValidateLiteralType(FieldDataType.Boolean, fc.Value, fc.FieldName.Text);
+                                semantic.FieldByCompare[fc] = CanEditFieldGuid;
                             }
                             else
                             {
@@ -308,18 +320,20 @@ public static class PathLangBinder
             Report(PathLangDiagnosticSeverity.Warning, $"Predicate '{predName}' expects {FormatType(targetInputTypId.Value)} but argument may be {FormatType(argTypes)}", predName);
         }
 
-        void ValidateLiteralType(string dataType, AstLiteral lit, TextView at)
+        void ValidateLiteralType(FieldDataType dataType, AstLiteral lit, TextView at)
         {
             if (lit is AstErrorLiteral)
                 return;
 
             bool ok = dataType switch
             {
-                "bool" => lit is AstBoolLiteral,
-                "string" => lit is AstStringLiteral,
-                "long" or "decimal" => lit is AstNumberLiteral,
-                "DateTime" => lit is AstStringLiteral,
-                _ => true,
+                FieldDataType.Boolean => lit is AstBoolLiteral,
+                FieldDataType.String => lit is AstStringLiteral,
+                FieldDataType.Integer or FieldDataType.Decimal => lit is AstNumberLiteral,
+                FieldDataType.DateTime => lit is AstStringLiteral,
+                FieldDataType.Guid => throw new NotImplementedException(),
+                FieldDataType.Enum => throw new NotImplementedException(),
+                _ => throw new NotImplementedException(),
             };
 
             if (!ok)

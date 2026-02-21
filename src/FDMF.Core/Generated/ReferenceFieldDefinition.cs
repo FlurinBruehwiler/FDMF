@@ -31,10 +31,10 @@ public partial struct ReferenceFieldDefinition : ITransactionObject, IEquatable<
     }
 
     [MemoryPackIgnore]
-    public string Id
+    public Guid Id
     {
-        get => Encoding.Unicode.GetString(DbSession.GetFldValue(ObjId, Fields.Id));
-        set => DbSession.SetFldValue(ObjId, Fields.Id, Encoding.Unicode.GetBytes(value));
+        get => MemoryMarshal.Read<Guid>(DbSession.GetFldValue(ObjId, Fields.Id));
+        set => DbSession.SetFldValue(ObjId, Fields.Id, value.AsSpan());
     }
 
     [MemoryPackIgnore]

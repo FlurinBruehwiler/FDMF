@@ -83,7 +83,7 @@ public static class Searcher
                     var fld = session.GetObjFromGuid<FieldDefinition>(fldId)!.Value;
                     if (fld.IsIndexed)
                     {
-                        InsertIndex(Enum.Parse<FieldDataType>(fld.DataType), objId, fldId, dataValue, txn, environment);
+                        InsertIndex(fld.DataType, objId, fldId, dataValue, txn, environment);
                     }
                 }
                 else if (value.AsSpan()[0] == (byte)ValueTyp.Obj)
@@ -106,7 +106,7 @@ public static class Searcher
     {
         var environment = session.DbEnvironment;
         var model = session.GetObjFromGuid<Model>(environment.ModelGuid)!.Value;
-        var fieldsById = model.GetAllFieldDefinitions().ToDictionary(x => Guid.Parse(x.Id), x => x);
+        var fieldsById = model.GetAllFieldDefinitions().ToDictionary(x => x.Id, x => x);
 
         var changeCursor = changeSet.CreateCursor();
         using var baseCursor = txn.CreateCursor(environment.ObjectDb);
@@ -161,7 +161,7 @@ public static class Searcher
                         if (fieldsById.TryGetValue(fldId, out var fieldDefinition) && fieldDefinition.IsIndexed)
                         {
                             var oldValue = v.AsSpan().Slice(1);
-                            switch (Enum.Parse<FieldDataType>(fieldDefinition.DataType))
+                            switch (fieldDefinition.DataType)
                             {
                                 case FieldDataType.String:
                                     var oldValueSpan = Normalize(MemoryMarshal.Cast<byte, char>(oldValue)).AsSpan();
@@ -194,6 +194,10 @@ public static class Searcher
                                 case FieldDataType.Boolean:
                                     RemoveNonStringIndexValue<bool>(oldValue, CustomIndexComparer.Comparison.Boolean, fldId, objId, txn, environment.NonStringSearchIndex);
                                     break;
+                                case FieldDataType.Guid:
+                                    throw new NotImplementedException();
+                                case FieldDataType.Enum:
+                                    throw new NotImplementedException();
                                 default:
                                     throw new ArgumentOutOfRangeException();
                             }
@@ -210,7 +214,7 @@ public static class Searcher
                     if (flag == ValueFlag.AddModify && fieldsById.TryGetValue(fldId, out var newFieldDefinition) && newFieldDefinition.IsIndexed)
                     {
                         var val = value.Slice(1);
-                        InsertIndex(Enum.Parse<FieldDataType>(newFieldDefinition.DataType), objId, fldId, val, txn, environment);
+                        InsertIndex(newFieldDefinition.DataType, objId, fldId, val, txn, environment);
                     }
                 }
             } while (changeCursor.Next().ResultCode == ResultCode.Success);
@@ -539,7 +543,7 @@ public static class Searcher
             {
                 // Not indexed for now.
                 // Returns all objects of the owning entity where the association has no entries.
-                return ExecuteTypeSearch(env, transaction, Guid.Parse(fld!.Value.OwningEntity.Id), objId =>
+                return ExecuteTypeSearch(env, transaction, fld!.Value.OwningEntity.Id, objId =>
                 {
                     Span<byte> key = stackalloc byte[2 * 16];
                     MemoryMarshal.Write(key, objId);
@@ -563,7 +567,7 @@ public static class Searcher
             {
                 // Not indexed for now.
                 // Returns all objects of the owning entity where the association has at least one entry.
-                return ExecuteTypeSearch(env, transaction, Guid.Parse(fld!.Value.OwningEntity.Id), objId =>
+                return ExecuteTypeSearch(env, transaction, fld!.Value.OwningEntity.Id, objId =>
                 {
                     Span<byte> key = stackalloc byte[2 * 16];
                     MemoryMarshal.Write(key, objId);
@@ -622,7 +626,7 @@ public static class Searcher
 
         if (!fld!.Value.IsIndexed)
         {
-            return ExecuteTypeSearch(dbSession.DbEnvironment, transaction, Guid.Parse(fld!.Value.OwningEntity.Id), (objId) =>
+            return ExecuteTypeSearch(dbSession.DbEnvironment, transaction, fld!.Value.OwningEntity.Id, (objId) =>
             {
                 if (MatchNonStringSearch(dbSession.DbEnvironment, transaction, objId, fieldId, from, to))
                 {
@@ -673,7 +677,7 @@ public static class Searcher
         if (!includesDefault)
             return true;
 
-        return AddMissingFieldValues(dbSession.DbEnvironment, transaction, Guid.Parse(fld!.Value.OwningEntity.Id), fieldId, seen!, addResult);
+        return AddMissingFieldValues(dbSession.DbEnvironment, transaction, fld!.Value.OwningEntity.Id, fieldId, seen!, addResult);
     }
 
     private static bool ExecuteTypeSearch(DbEnvironment dbEnvironment, LightningTransaction transaction, Guid typId, Func<Guid, bool> addResult)
@@ -827,7 +831,7 @@ public static class Searcher
 
         if (!fld!.Value.IsIndexed)
         {
-            return ExecuteTypeSearch(dbSession.DbEnvironment, transaction, Guid.Parse(fld!.Value.OwningEntity.Id), objId =>
+            return ExecuteTypeSearch(dbSession.DbEnvironment, transaction, fld!.Value.OwningEntity.Id, objId =>
             {
                 if (MatchBooleanCriterion(dbSession.DbEnvironment, transaction, objId, criterion))
                 {
@@ -865,7 +869,7 @@ public static class Searcher
 
         if (criterion.Value == false)
         {
-            return AddMissingFieldValues(dbSession.DbEnvironment, transaction, Guid.Parse(fld!.Value.OwningEntity.Id), criterion.FieldId, seen!, addResult);
+            return AddMissingFieldValues(dbSession.DbEnvironment, transaction, fld!.Value.OwningEntity.Id, criterion.FieldId, seen!, addResult);
         }
 
         return true;
@@ -877,7 +881,7 @@ public static class Searcher
 
         if (!fld!.Value.IsIndexed)
         {
-            return ExecuteTypeSearch(dbSession.DbEnvironment, transaction, Guid.Parse(fld!.Value.OwningEntity.Id), (objId) =>
+            return ExecuteTypeSearch(dbSession.DbEnvironment, transaction, fld!.Value.OwningEntity.Id, (objId) =>
             {
                 if (MatchStringCriterion(dbSession.DbEnvironment, transaction, objId, criterion))
                 {
@@ -909,7 +913,7 @@ public static class Searcher
 
             if (strValue.Length == 0)
             {
-                return AddMissingFieldValues(dbSession.DbEnvironment, transaction, Guid.Parse(fld!.Value.OwningEntity.Id), criterion.FieldId, seen!, addResult);
+                return AddMissingFieldValues(dbSession.DbEnvironment, transaction, fld!.Value.OwningEntity.Id, criterion.FieldId, seen!, addResult);
             }
 
             return true;

@@ -6,12 +6,16 @@ using Helper = FDMF.SourceGen.Helper;
 var root = Helper.GetRootDir();
 
 //Main
-using var env2 = DbEnvironment.CreateDatabase("temp2");
+using var env2 = DbEnvironment.CreateDatabase("temp2" + Random.Shared.Next());
 
 using (var session = new DbSession(env2))
 {
     var model = session.GetObjFromGuid<Model>(env2.ModelGuid);
+
     ModelGenerator.Generate(model!.Value, Path.Combine(root, "FDMF.Core/Generated"), "FDMF.Core.DatabaseLayer", true);
+
+    //var back = JsonDump.GetJsonDump(session);
+    //File.WriteAllText(Path.Combine(root, "FDMF.Core/Dumps/MetaModel.json"), back);
 }
 
 //Test Data

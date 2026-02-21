@@ -38,10 +38,17 @@ public partial struct FieldDefinition : ITransactionObject, IEquatable<FieldDefi
     }
 
     [MemoryPackIgnore]
-    public string DataType
+    public FieldDataType DataType
     {
-        get => Encoding.Unicode.GetString(DbSession.GetFldValue(ObjId, Fields.DataType));
-        set => DbSession.SetFldValue(ObjId, Fields.DataType, Encoding.Unicode.GetBytes(value));
+        get => MemoryMarshal.Read<FieldDataType>(DbSession.GetFldValue(ObjId, Fields.DataType));
+        set => DbSession.SetFldValue(ObjId, Fields.DataType, value.AsSpan());
+    }
+
+    [MemoryPackIgnore]
+    public string EnumVariants
+    {
+        get => Encoding.Unicode.GetString(DbSession.GetFldValue(ObjId, Guid.Parse("4d45c6c0-1eef-4eba-bab9-1cd3cf3ea49c")));
+        set => DbSession.SetFldValue(ObjId, Guid.Parse("4d45c6c0-1eef-4eba-bab9-1cd3cf3ea49c"), Encoding.Unicode.GetBytes(value));
     }
 
     [MemoryPackIgnore]
@@ -52,10 +59,10 @@ public partial struct FieldDefinition : ITransactionObject, IEquatable<FieldDefi
     }
 
     [MemoryPackIgnore]
-    public string Id
+    public Guid Id
     {
-        get => Encoding.Unicode.GetString(DbSession.GetFldValue(ObjId, Fields.Id));
-        set => DbSession.SetFldValue(ObjId, Fields.Id, Encoding.Unicode.GetBytes(value));
+        get => MemoryMarshal.Read<Guid>(DbSession.GetFldValue(ObjId, Fields.Id));
+        set => DbSession.SetFldValue(ObjId, Fields.Id, value.AsSpan());
     }
 
     [MemoryPackIgnore]

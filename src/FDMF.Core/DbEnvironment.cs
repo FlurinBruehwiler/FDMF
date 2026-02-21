@@ -172,6 +172,7 @@ public sealed class DbEnvironment : IDisposable
         var fd_fld_id = Guid.Parse("f91613e2-a9f9-4e3b-96e3-38650319dc0c");
         var fd_fld_dataType = Guid.Parse("b4f55a8c-6f73-41bc-b051-cbaeb18b0390");
         var fd_fld_isIndexed = Guid.Parse("2e699a43-98b9-42f7-a26c-20256305b7cb");
+        var fd_fld_enumVariants = Guid.Parse("4d45c6c0-1eef-4eba-bab9-1cd3cf3ea49c");
 
         // FieldDefinition reference fields
         var fd_aso_owningEntity = Guid.Parse("f097fe25-1d11-47b3-a02c-0072a781a528");
@@ -207,14 +208,16 @@ public sealed class DbEnvironment : IDisposable
             session.CreateAso(entityId, ed_aso_model, baseModelId, m_aso_entityDefinitions);
         }
 
-        void CreateFieldDefinition(Guid fieldId, string key, string dataType, bool isIndexed, Guid owningEntity)
+        void CreateFieldDefinition(Guid fieldId, string key, FieldDataType fieldDataType, bool isIndexed, Guid owningEntity, string enumVariants = "")
         {
             session.CreateObj(typFieldDefinition, fieldId);
             SetString(session, fieldId, fd_fld_key, key);
             SetString(session, fieldId, fd_fld_name, key);
             SetString(session, fieldId, fd_fld_id, fieldId.ToString());
-            SetString(session, fieldId, fd_fld_dataType, dataType);
+            session.SetFldValue(fieldId, fd_fld_dataType, fieldDataType.AsSpan());
             SetBool(session, fieldId, fd_fld_isIndexed, isIndexed);
+            if(enumVariants != "")
+                SetString(session, fieldId, fd_fld_enumVariants, enumVariants);
 
             // Link field definition to owning entity definition.
             session.CreateAso(fieldId, fd_aso_owningEntity, owningEntity, ed_aso_fieldDefinitions);
@@ -247,25 +250,26 @@ public sealed class DbEnvironment : IDisposable
 
         // 3) Create field definitions (scalars) for each entity.
         // Model
-        CreateFieldDefinition(m_fld_name, "Name", "String", false, typModel);
+        CreateFieldDefinition(m_fld_name, "Name", FieldDataType.String, false, typModel);
 
         // EntityDefinition
-        CreateFieldDefinition(ed_fld_key, "Key", "String", false, typEntityDefinition);
-        CreateFieldDefinition(ed_fld_name, "Name", "String", false, typEntityDefinition);
-        CreateFieldDefinition(ed_fld_id, "Id", "String", false, typEntityDefinition);
+        CreateFieldDefinition(ed_fld_key, "Key", FieldDataType.String, false, typEntityDefinition);
+        CreateFieldDefinition(ed_fld_name, "Name", FieldDataType.String, false, typEntityDefinition);
+        CreateFieldDefinition(ed_fld_id, "Id", FieldDataType.Guid, false, typEntityDefinition);
 
         // FieldDefinition
-        CreateFieldDefinition(fd_fld_key, "Key", "String", false, typFieldDefinition);
-        CreateFieldDefinition(fd_fld_name, "Name", "String", false, typFieldDefinition);
-        CreateFieldDefinition(fd_fld_id, "Id", "String", false, typFieldDefinition);
-        CreateFieldDefinition(fd_fld_dataType, "DataType", "String", false, typFieldDefinition);
-        CreateFieldDefinition(fd_fld_isIndexed, "IsIndexed", "Boolean", false, typFieldDefinition);
+        CreateFieldDefinition(fd_fld_key, "Key", FieldDataType.String, false, typFieldDefinition);
+        CreateFieldDefinition(fd_fld_name, "Name", FieldDataType.String, false, typFieldDefinition);
+        CreateFieldDefinition(fd_fld_id, "Id", FieldDataType.Guid, false, typFieldDefinition);
+        CreateFieldDefinition(fd_fld_dataType, "DataType", FieldDataType.String, false, typFieldDefinition, "Integer,Decimal,String,DateTime,Boolean,Enum,Guid");
+        CreateFieldDefinition(fd_fld_isIndexed, "IsIndexed", FieldDataType.Boolean, false, typFieldDefinition);
+        CreateFieldDefinition(fd_fld_enumVariants, "EnumVariants", FieldDataType.String, false, typFieldDefinition);
 
         // ReferenceFieldDefinition
-        CreateFieldDefinition(rfd_fld_key, "Key", "String", false, typReferenceFieldDefinition);
-        CreateFieldDefinition(rfd_fld_name, "Name", "String", false, typReferenceFieldDefinition);
-        CreateFieldDefinition(rfd_fld_id, "Id", "String", false, typReferenceFieldDefinition);
-        CreateFieldDefinition(rfd_fld_refType, "RefType", "String", false, typReferenceFieldDefinition);
+        CreateFieldDefinition(rfd_fld_key, "Key", FieldDataType.String, false, typReferenceFieldDefinition);
+        CreateFieldDefinition(rfd_fld_name, "Name", FieldDataType.String, false, typReferenceFieldDefinition);
+        CreateFieldDefinition(rfd_fld_id, "Id", FieldDataType.Guid, false, typReferenceFieldDefinition);
+        CreateFieldDefinition(rfd_fld_refType, "RefType", FieldDataType.String, false, typReferenceFieldDefinition);
 
         // 4) Create reference field definitions.
         // ModelDefinition
