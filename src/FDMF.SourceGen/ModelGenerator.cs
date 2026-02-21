@@ -7,14 +7,18 @@ namespace FDMF.SourceGen;
 
 public static class ModelGenerator
 {
-    public static void Generate(Model model, string targetDir, string targetNamespace)
+    public static void Generate(Model model, string targetDir, string targetNamespace, bool includeMetaModel)
     {
+        // Directory.Delete(targetDir, recursive: true);
         Directory.CreateDirectory(targetDir);
 
         var @namespace = targetNamespace;
 
         foreach (var entity in model.GetAllEntityDefinitions())
         {
+            if(!includeMetaModel && (entity.ObjId == EntityDefinition.TypId || entity.ObjId == FieldDefinition.TypId || entity.ObjId == ReferenceFieldDefinition.TypId || entity.ObjId == Model.TypId))
+                continue;
+
             var sourceBuilder = new SourceBuilder();
 
             sourceBuilder.AppendLine("// ReSharper disable All");

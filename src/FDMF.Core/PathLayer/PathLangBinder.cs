@@ -30,8 +30,6 @@ public static class PathLangBinder
         foreach (var p in predicates)
         {
             var inputTypId = predicateInputTypIdByName[p.Name.Text.Span];
-            if (inputTypId == null)
-                Report(PathLangDiagnosticSeverity.Error, $"Unknown type '{p.InputType.Text}'", p.InputType.Text);
 
             semantic.InputTypIdByPredicate[p] = inputTypId;
 
@@ -53,8 +51,18 @@ public static class PathLangBinder
                 Value = typeName.ToString()
             });
 
-            if (r.Count != 1)
+            //in case there are multiple
+            if (r.Count > 1)
+            {
+                Report(PathLangDiagnosticSeverity.Error, $"There are multiple types with the key '{typeName.Span}': {string.Join(", ", r.Select(x => x.Id))}", typeName);
                 return null;
+            }
+
+            if (r.Count == 0)
+            {
+                Report(PathLangDiagnosticSeverity.Error, $"Unknown type '{typeName}'", typeName);
+                return null;
+            }
 
             return r[0].ObjId;
         }
@@ -194,8 +202,6 @@ public static class PathLangBinder
                     if (fc.TypeGuard is not null)
                     {
                         guardTypId = ResolveTypeName(fc.TypeGuard.Value.Text);
-                        if (guardTypId == null)
-                            Report(PathLangDiagnosticSeverity.Error, $"Unknown type '{fc.TypeGuard.Value.Text}'", fc.TypeGuard.Value.Text);
                     }
 
                     semantic.TypeGuardTypIdByCompare[fc] = guardTypId;

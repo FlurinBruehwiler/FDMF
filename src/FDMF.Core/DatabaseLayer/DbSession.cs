@@ -126,6 +126,11 @@ public sealed class DbSession : IDisposable
                 var k = current.Key;
                 var v = current.Value;
 
+                if (k.Length < 16)
+                {
+                    Logging.WaitForDebugger();
+                }
+
                 if (!k.Slice(0, 16).SequenceEqual(prefix))
                     break;
 

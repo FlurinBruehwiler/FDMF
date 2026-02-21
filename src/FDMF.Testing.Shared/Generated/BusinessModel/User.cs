@@ -77,8 +77,8 @@ public partial struct User : ITransactionObject, IEquatable<User>
     public override int GetHashCode() => HashCode.Combine(DbSession, ObjId);
     public override string ToString() => ObjId.ToString();
 
-    ///3777d451-b036-4772-9358-5a67ab44763b
-    public static Guid TypId { get; } = new Guid([81, 212, 119, 55, 54, 176, 114, 71, 147, 88, 90, 103, 171, 68, 118, 59]);
+    ///095433D0-4E74-471D-9B11-AEA9538A86CC
+    public static Guid TypId { get; } = new Guid([208, 51, 84, 9, 116, 78, 29, 71, 155, 17, 174, 169, 83, 138, 134, 204]);
 
     public static class Fields
     {

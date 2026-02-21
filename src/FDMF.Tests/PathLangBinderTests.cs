@@ -4,6 +4,7 @@ using FDMF.Core.PathLayer;
 using FDMF.Testing.Shared;
 using FDMF.Testing.Shared.BusinessModelModel;
 using FDMF.Testing.Shared.TestModelModel;
+using User = FDMF.Testing.Shared.BusinessModelModel.User;
 
 namespace FDMF.Tests;
 

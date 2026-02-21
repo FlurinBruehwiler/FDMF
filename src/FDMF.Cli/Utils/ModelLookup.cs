@@ -14,12 +14,12 @@ public static class ModelLookup
             }
         }
 
-        foreach (var ped in entityDefinition.Parents)
-        {
-            var r = GetRefFld(ped, fldKey);
-            if (r != null)
-                return r;
-        }
+        // foreach (var ped in entityDefinition.Parents)
+        // {
+        //     var r = GetRefFld(ped, fldKey);
+        //     if (r != null)
+        //         return r;
+        // }
 
         return null;
     }
@@ -34,12 +34,12 @@ public static class ModelLookup
             }
         }
 
-        foreach (var ped in entityDefinition.Parents)
-        {
-            var r = GetFld(ped, fldKey);
-            if (r != null)
-                return r;
-        }
+        // foreach (var ped in entityDefinition.Parents)
+        // {
+        //     var r = GetFld(ped, fldKey);
+        //     if (r != null)
+        //         return r;
+        // }
 
         return null;
     }

@@ -73,16 +73,19 @@ public sealed class DbSessionTests
     [Fact]
     public void CreateObj_With_FixedId_Can_Be_Loaded_And_Deleted()
     {
-        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
-        using var session = new DbSession(env);
+        for (int i = 0; i < 100; i++)
+        {
+            using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetTestModelDumpFile());
+            using var session = new DbSession(env);
 
-        var id = Guid.NewGuid();
-        var created = session.CreateObj(TestingFolder.TypId, fixedId: id);
-        Assert.Equal(id, created);
-        Assert.Equal(TestingFolder.TypId, session.GetTypId(id));
+            var id = Guid.NewGuid();
+            var created = session.CreateObj(TestingFolder.TypId, fixedId: id);
+            Assert.Equal(id, created);
+            Assert.Equal(TestingFolder.TypId, session.GetTypId(id));
 
-        session.DeleteObj(id);
-        Assert.Equal(Guid.Empty, session.GetTypId(id));
+            session.DeleteObj(id);
+            Assert.Equal(Guid.Empty, session.GetTypId(id));
+        }
     }
 
     [Fact]
