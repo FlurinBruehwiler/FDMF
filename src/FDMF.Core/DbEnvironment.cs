@@ -187,6 +187,11 @@ public sealed class DbEnvironment : IDisposable
         var rfd_aso_owningEntity = Guid.Parse("500e3a9c-c469-4585-a7c4-e307dc295d88");
         var rfd_aso_otherReferenceFields = Guid.Parse("50ac96bd-7082-4821-95fa-57e9040246ab");
 
+        static void SetGuid(DbSession s, Guid objId, Guid fldId, Guid value)
+        {
+            s.SetFldValue(objId, fldId, value.AsSpan());
+        }
+
         static void SetString(DbSession s, Guid objId, Guid fldId, string value)
         {
             s.SetFldValue(objId, fldId, Encoding.Unicode.GetBytes(value));
@@ -202,7 +207,7 @@ public sealed class DbEnvironment : IDisposable
             session.CreateObj(typEntityDefinition, entityId);
             SetString(session, entityId, ed_fld_key, key);
             SetString(session, entityId, ed_fld_name, key);
-            SetString(session, entityId, ed_fld_id, entityId.ToString());
+            SetGuid(session, entityId, ed_fld_id, entityId);
 
             // Link entity definition to the base model instance.
             session.CreateAso(entityId, ed_aso_model, baseModelId, m_aso_entityDefinitions);
@@ -213,7 +218,7 @@ public sealed class DbEnvironment : IDisposable
             session.CreateObj(typFieldDefinition, fieldId);
             SetString(session, fieldId, fd_fld_key, key);
             SetString(session, fieldId, fd_fld_name, key);
-            SetString(session, fieldId, fd_fld_id, fieldId.ToString());
+            SetGuid(session, fieldId, fd_fld_id, fieldId);
             session.SetFldValue(fieldId, fd_fld_dataType, fieldDataType.AsSpan());
             SetBool(session, fieldId, fd_fld_isIndexed, isIndexed);
             if(enumVariants != "")
@@ -228,7 +233,7 @@ public sealed class DbEnvironment : IDisposable
             session.CreateObj(typReferenceFieldDefinition, refFieldId);
             SetString(session, refFieldId, rfd_fld_key, key);
             SetString(session, refFieldId, rfd_fld_name, key);
-            SetString(session, refFieldId, rfd_fld_id, refFieldId.ToString());
+            SetGuid(session, refFieldId, rfd_fld_id, refFieldId);
             SetString(session, refFieldId, rfd_fld_refType, refType);
 
             // Link ref field definition to owning entity definition.
@@ -261,7 +266,7 @@ public sealed class DbEnvironment : IDisposable
         CreateFieldDefinition(fd_fld_key, "Key", FieldDataType.String, false, typFieldDefinition);
         CreateFieldDefinition(fd_fld_name, "Name", FieldDataType.String, false, typFieldDefinition);
         CreateFieldDefinition(fd_fld_id, "Id", FieldDataType.Guid, false, typFieldDefinition);
-        CreateFieldDefinition(fd_fld_dataType, "DataType", FieldDataType.String, false, typFieldDefinition, "Integer,Decimal,String,DateTime,Boolean,Enum,Guid");
+        CreateFieldDefinition(fd_fld_dataType, "DataType", FieldDataType.Enum, false, typFieldDefinition, "Integer,Decimal,String,DateTime,Boolean,Enum,Guid");
         CreateFieldDefinition(fd_fld_isIndexed, "IsIndexed", FieldDataType.Boolean, false, typFieldDefinition);
         CreateFieldDefinition(fd_fld_enumVariants, "EnumVariants", FieldDataType.String, false, typFieldDefinition);
 

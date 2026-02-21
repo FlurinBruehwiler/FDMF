@@ -47,8 +47,8 @@ public partial struct FieldDefinition : ITransactionObject, IEquatable<FieldDefi
     [MemoryPackIgnore]
     public string EnumVariants
     {
-        get => Encoding.Unicode.GetString(DbSession.GetFldValue(ObjId, Guid.Parse("4d45c6c0-1eef-4eba-bab9-1cd3cf3ea49c")));
-        set => DbSession.SetFldValue(ObjId, Guid.Parse("4d45c6c0-1eef-4eba-bab9-1cd3cf3ea49c"), Encoding.Unicode.GetBytes(value));
+        get => Encoding.Unicode.GetString(DbSession.GetFldValue(ObjId, Fields.EnumVariants));
+        set => DbSession.SetFldValue(ObjId, Fields.EnumVariants, Encoding.Unicode.GetBytes(value));
     }
 
     [MemoryPackIgnore]
@@ -90,6 +90,8 @@ public partial struct FieldDefinition : ITransactionObject, IEquatable<FieldDefi
         public static readonly Guid IsIndexed = new Guid([67, 154, 105, 46, 185, 152, 247, 66, 162, 108, 32, 37, 99, 5, 183, 203]);
         ///b4f55a8c-6f73-41bc-b051-cbaeb18b0390
         public static readonly Guid DataType = new Guid([140, 90, 245, 180, 115, 111, 188, 65, 176, 81, 203, 174, 177, 139, 3, 144]);
+        ///4d45c6c0-1eef-4eba-bab9-1cd3cf3ea49c
+        public static readonly Guid EnumVariants = new Guid([192, 198, 69, 77, 239, 30, 186, 78, 186, 185, 28, 211, 207, 62, 164, 156]);
         ///8a5d90d2-1b1c-428e-a010-9ae7d603dd30
         public static readonly Guid Key = new Guid([210, 144, 93, 138, 28, 27, 142, 66, 160, 16, 154, 231, 214, 3, 221, 48]);
         ///f91613e2-a9f9-4e3b-96e3-38650319dc0c
