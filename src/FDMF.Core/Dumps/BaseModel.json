@@ -4,6 +4,7 @@
   "entities": {
     "095433D0-4E74-471D-9B11-AEA9538A86CC": {
       "$type": "c15f876f-4f74-4034-9acb-03bc3b521e81",
+      "Id": "095433D0-4E74-471D-9B11-AEA9538A86CC",
       "Key": "User",
       "Model": "8F4D2969-355F-46A3-8892-D86980A80475",
       "FieldDefinitions": [

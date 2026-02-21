@@ -27,8 +27,15 @@ public sealed class DbEnvironment : IDisposable
 
         var env = OpenInternal(dbName, create: true);
 
-        InsertBaseModel(env);
-        
+        ImportMetaModel(env);
+
+        //import base model
+        using (var session = new DbSession(env))
+        {
+            JsonDump.FromJson(EmbeddedResources.BaseModel, session);
+            session.Commit();
+        }
+
         if (dumpFile != "")
         {
             // Importing a dump can be large; use a larger arena so the initial commit
@@ -125,7 +132,7 @@ public sealed class DbEnvironment : IDisposable
         return env;
     }
 
-    private static void InsertBaseModel(DbEnvironment dbEnvironment)
+    private static void ImportMetaModel(DbEnvironment dbEnvironment)
     {
         using var session = new DbSession(dbEnvironment);
 
@@ -274,14 +281,14 @@ public sealed class DbEnvironment : IDisposable
         // EntityDefinition
         var rf_entity_fieldDefinitions = Guid.Parse("8dc642e4-af58-403a-bed2-ce41baa95b21");
         var rf_entity_referenceFieldDefinitions = Guid.Parse("06950fac-de4f-487e-aa78-7095909805e4");
-        var rf_entity_parents = Guid.Parse("15928c28-398d-4caa-97d1-7c01e9020d9f");
-        var rf_entity_children = Guid.Parse("232c2342-682d-4526-a5fd-f943830d7bef");
+        //var rf_entity_parents = Guid.Parse("15928c28-398d-4caa-97d1-7c01e9020d9f");
+        //var rf_entity_children = Guid.Parse("232c2342-682d-4526-a5fd-f943830d7bef");
 
         CreateReferenceFieldDefinition(rf_entity_model, "Model", "SingleMandatory", typEntityDefinition, rf_model_entityDefinitions);
         CreateReferenceFieldDefinition(rf_entity_fieldDefinitions, "FieldDefinitions", "Multiple", typEntityDefinition, fd_aso_owningEntity);
         CreateReferenceFieldDefinition(rf_entity_referenceFieldDefinitions, "ReferenceFieldDefinitions", "Multiple", typEntityDefinition, rfd_aso_owningEntity);
-        CreateReferenceFieldDefinition(rf_entity_parents, "Parents", "Multiple", typEntityDefinition, rf_entity_children);
-        CreateReferenceFieldDefinition(rf_entity_children, "Children", "Multiple", typEntityDefinition, rf_entity_parents);
+        //CreateReferenceFieldDefinition(rf_entity_parents, "Parents", "Multiple", typEntityDefinition, rf_entity_children);
+        //CreateReferenceFieldDefinition(rf_entity_children, "Children", "Multiple", typEntityDefinition, rf_entity_parents);
 
         // FieldDefinition (inverse for rf_entity_fieldDefinitions)
         CreateReferenceFieldDefinition(fd_aso_owningEntity, "OwningEntity", "SingleMandatory", typFieldDefinition, rf_entity_fieldDefinitions);

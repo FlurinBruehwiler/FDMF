@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace FDMF.Core.DatabaseLayer;
 
@@ -100,10 +101,8 @@ public static class JsonDump
 
         var model = dbSession.GetObjFromGuid<Model>(dbSession.CreateObj(Model.TypId, modelGuid))!.Value;
 
-        if (doc.RootElement.TryGetProperty("entities", out var entities) && entities.ValueKind == JsonValueKind.Object)
-            ParseEntities(dbSession, entities, model);
-
-        if (doc.RootElement.TryGetProperty("importedModels", out var importedModels) && entities.ValueKind == JsonValueKind.Array)
+        bool hasImportedModel = false;
+        if (doc.RootElement.TryGetProperty("importedModels", out var importedModels) && importedModels.ValueKind == JsonValueKind.Array)
         {
             foreach (var importedModelGuid in importedModels.EnumerateArray())
             {
@@ -111,18 +110,36 @@ public static class JsonDump
                 {
                     var importedModel = dbSession.GetObjFromGuid<Model>(guid)!.Value;
                     model.ImportedModels.Add(importedModel);
+                    hasImportedModel = true;
                 }
             }
         }
 
+        //if there wasn't an imported model, we import the BaseModel
+        if (!hasImportedModel)
+        {
+            var baseModel = dbSession.GetObjFromGuid<Model>(Guid.Parse("8F4D2969-355F-46A3-8892-D86980A80475"))!.Value;
+            model.ImportedModels.Add(baseModel);
+        }
+
+        if (doc.RootElement.TryGetProperty("entities", out var entities) && entities.ValueKind == JsonValueKind.Object)
+            ParseEntities(dbSession, entities, model);
+
         return model;
     }
 
-    private static void ParseEntities(DbSession dbSession, JsonElement entities, Model model1)
+    private static bool TryGetModelType(Guid guid)
     {
-        //we would actually need to first discover the new entities that are defined
+        return guid == EntityDefinition.TypId || guid == FieldDefinition.TypId || guid == ReferenceFieldDefinition.TypId;
+    }
 
-        // Pass 1, so: ensure all objects exist, and types match.
+    private static void ParseEntities(DbSession dbSession, JsonElement entities, Model model)
+    {
+        var _ = model.GetAllEntityDefinitions().ToDictionary(x => Guid.Parse(x.Id), x => x);
+
+        //todo we would actually need to first discover the new entities that are defined
+
+        // Pass 1 create all objects
         foreach (var entityProp in entities.EnumerateObject())
         {
             if (!Guid.TryParse(entityProp.Name, out var objId))
@@ -147,10 +164,19 @@ public static class JsonDump
                 continue;
             }
 
+            if(model.ObjId == objId)
+                continue; //model was created previously
+
             var existingTyp = dbSession.GetTypId(objId);
             if (existingTyp == Guid.Empty)
             {
-                CreateObjWithId(dbSession, objId, typId);
+                //we check later if the type actually exists, because at this point the type might not exist
+                dbSession.CreateObj(typId, objId);
+
+                if (TryGetModelType(typId))
+                {
+                    FillFieldsAndAssocs(dbSession, objId, entityProp.Value, dbSession.GetObjFromGuid<EntityDefinition>(typId)!.Value);
+                }
             }
             else if (existingTyp != typId)
             {
@@ -158,8 +184,7 @@ public static class JsonDump
             }
         }
 
-        var model = dbSession.GetObjFromGuid<Model>(dbSession.DbEnvironment.ModelGuid);
-        var entityById = model!.Value.GetAllEntityDefinitions().ToDictionary(x => Guid.Parse(x.Id), x => x);
+        var entityById = model.GetAllEntityDefinitions().ToDictionary(x => Guid.Parse(x.Id), x => x);
 
         //TODO: better error handling
 
@@ -185,6 +210,9 @@ public static class JsonDump
             if (!Guid.TryParse(typeProp.GetString(), out var typId))
                 continue;
 
+            if(TryGetModelType(typId))
+                continue;
+
             if (!entityById.TryGetValue(typId, out var entity))
                 continue;
 
@@ -192,91 +220,80 @@ public static class JsonDump
             if (dbSession.GetTypId(objId) != typId)
                 continue;
 
-            //check that all properties are correct
-            foreach (var jsonProperty in entityJson.EnumerateObject())
-            {
-                if (jsonProperty.NameEquals("$type"))
-                    continue;
-
-                if (entity.FieldDefinitions.All(x => x.Key != jsonProperty.Name) && entity.ReferenceFieldDefinitions.All(x => x.Key != jsonProperty.Name))
-                {
-                    Logging.Log(LogFlags.Info, $"There is no field with the key {jsonProperty.Name} on the type {entity.Key}"); //todo inheritance
-                }
-            }
-
-            foreach (var field in entity.FieldDefinitions)
-            {
-                if (entityJson.TryGetProperty(field.Key, out var value))
-                {
-                    SetScalarFieldFromJson(dbSession, objId, Guid.Parse(field.Id), Enum.Parse<FieldDataType>(field.DataType), value);
-                }
-                else
-                {
-                    // Match dump semantics: missing means "unset".
-                    dbSession.SetFldValue(objId, Guid.Parse(field.Id), ReadOnlySpan<byte>.Empty);
-                }
-            }
-
-            foreach (var refField in entity.ReferenceFieldDefinitions)
-            {
-                var fldIdA = refField.Id;
-                var fldIdB = refField.OtherReferenceFields;
-
-                if (!entityJson.TryGetProperty(refField.Key, out var value) || value.ValueKind == JsonValueKind.Null)
-                {
-                    // dbSession.RemoveAllAso(objId, Guid.Parse(fldIdA));
-                    continue;
-                }
-
-                // Always clear existing connections first so the DB matches the json.
-                //dbSession.RemoveAllAso(objId, Guid.Parse(fldIdA));
-
-                if (refField.RefType == nameof(RefType.Multiple))
-                {
-                    if (value.ValueKind == JsonValueKind.Array)
-                    {
-                        foreach (var item in value.EnumerateArray())
-                        {
-                            if (item.ValueKind != JsonValueKind.String)
-                                continue;
-
-                            if (Guid.TryParse(item.GetString(), out var otherObjId))
-                                dbSession.CreateAso(objId, Guid.Parse(fldIdA), otherObjId, Guid.Parse(fldIdB.Id));
-                        }
-                    }
-                    else if (value.ValueKind == JsonValueKind.String)
-                    {
-                        if (Guid.TryParse(value.GetString(), out var otherObjId))
-                            dbSession.CreateAso(objId, Guid.Parse(fldIdA), otherObjId, Guid.Parse(fldIdB.Id));
-                    }
-
-                    continue;
-                }
-
-                // SingleOptional / SingleMandatory
-                if (value.ValueKind == JsonValueKind.String && Guid.TryParse(value.GetString(), out var singleId))
-                {
-                    if (singleId != Guid.Empty)
-                        dbSession.CreateAso(objId, Guid.Parse(fldIdA), singleId, Guid.Parse(fldIdB.Id));
-                }
-            }
+            FillFieldsAndAssocs(dbSession, objId, entityJson, entity);
         }
     }
 
-    private static void CreateObjWithId(DbSession dbSession, Guid objId, Guid typId)
+    private static void FillFieldsAndAssocs(DbSession dbSession, Guid objId, JsonElement entityJson, EntityDefinition entity)
     {
-        var val = new ObjValue
+        //check that all properties are correct
+        foreach (var jsonProperty in entityJson.EnumerateObject())
         {
-            TypId = typId,
-            ValueTyp = ValueTyp.Obj
-        };
+            if (jsonProperty.NameEquals("$type"))
+                continue;
 
-        var keyBuf = MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref objId, 1));
-        var valueBuf = MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref val, 1));
+            if (entity.FieldDefinitions.All(x => x.Key != jsonProperty.Name) && entity.ReferenceFieldDefinitions.All(x => x.Key != jsonProperty.Name))
+            {
+                Logging.Log(LogFlags.Info, $"There is no field with the key {jsonProperty.Name} on the type {entity.Key}"); //todo inheritance
+            }
+        }
 
-        var result = dbSession.Store.Put(keyBuf, valueBuf);
-        if (result != ResultCode.Success)
-            throw new InvalidOperationException($"Failed creating object {objId} ({typId}).");
+        foreach (var field in entity.FieldDefinitions)
+        {
+            if (entityJson.TryGetProperty(field.Key, out var value))
+            {
+                SetScalarFieldFromJson(dbSession, objId, Guid.Parse(field.Id), Enum.Parse<FieldDataType>(field.DataType), value);
+            }
+            else
+            {
+                // Match dump semantics: missing means "unset".
+                dbSession.SetFldValue(objId, Guid.Parse(field.Id), ReadOnlySpan<byte>.Empty);
+            }
+        }
+
+        foreach (var refField in entity.ReferenceFieldDefinitions)
+        {
+            var fldIdA = refField.Id;
+            var fldIdB = refField.OtherReferenceFields;
+
+            if (!entityJson.TryGetProperty(refField.Key, out var value) || value.ValueKind == JsonValueKind.Null)
+            {
+                // dbSession.RemoveAllAso(objId, Guid.Parse(fldIdA));
+                continue;
+            }
+
+            // Always clear existing connections first so the DB matches the json.
+            //dbSession.RemoveAllAso(objId, Guid.Parse(fldIdA));
+
+            if (refField.RefType == nameof(RefType.Multiple))
+            {
+                if (value.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in value.EnumerateArray())
+                    {
+                        if (item.ValueKind != JsonValueKind.String)
+                            continue;
+
+                        if (Guid.TryParse(item.GetString(), out var otherObjId))
+                            dbSession.CreateAso(objId, Guid.Parse(fldIdA), otherObjId, Guid.Parse(fldIdB.Id));
+                    }
+                }
+                else if (value.ValueKind == JsonValueKind.String)
+                {
+                    if (Guid.TryParse(value.GetString(), out var otherObjId))
+                        dbSession.CreateAso(objId, Guid.Parse(fldIdA), otherObjId, Guid.Parse(fldIdB.Id));
+                }
+
+                continue;
+            }
+
+            // SingleOptional / SingleMandatory
+            if (value.ValueKind == JsonValueKind.String && Guid.TryParse(value.GetString(), out var singleId))
+            {
+                if (singleId != Guid.Empty)
+                    dbSession.CreateAso(objId, Guid.Parse(fldIdA), singleId, Guid.Parse(fldIdB.Id));
+            }
+        }
     }
 
     private static void SetScalarFieldFromJson(DbSession dbSession, Guid objId, Guid fldId, FieldDataType type, JsonElement value)

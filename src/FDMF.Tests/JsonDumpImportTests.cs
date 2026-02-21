@@ -8,6 +8,21 @@ namespace FDMF.Tests;
 public sealed class JsonDumpImportTests
 {
     [Fact]
+    public void ImportBaseModel()
+    {
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory());
+
+        using var session = new DbSession(env, readOnly: true);
+
+        var entityDefinitions = Searcher.Search<EntityDefinition>(session);
+        Assert.Contains(entityDefinitions, e => e.Key == "Model");
+        Assert.Contains(entityDefinitions, e => e.Key == "EntityDefinition");
+        Assert.Contains(entityDefinitions, e => e.Key == "FieldDefinition");
+        Assert.Contains(entityDefinitions, e => e.Key == "ReferenceFieldDefinition");
+        Assert.Contains(entityDefinitions, e => e.Key == "User");
+    }
+
+    [Fact]
     public void Create_EmptyDb_And_Import_From_Dump()
     {
         using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory());

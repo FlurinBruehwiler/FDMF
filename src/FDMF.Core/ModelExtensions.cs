@@ -16,14 +16,14 @@ public static class ModelExtensions
 
             void AddFromModel(Model mdl)
             {
-                foreach (var ed in mdl.EntityDefinitions)
-                {
-                    result.Add(ed);
-                }
-
                 foreach (var importedModel in mdl.ImportedModels)
                 {
                     AddFromModel(importedModel);
+                }
+
+                foreach (var ed in mdl.EntityDefinitions)
+                {
+                    result.Add(ed);
                 }
             }
         }

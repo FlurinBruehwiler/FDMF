@@ -2,7 +2,7 @@
 
 public static class EmbeddedResources
 {
-    public static string MetaModel { get; } = ReadEmbeddedResource("Core.Dumps.MetaModel.json");
+    public static string BaseModel { get; } = ReadEmbeddedResource("FDMF.Core.Dumps.BaseModel.json");
 
     private static string ReadEmbeddedResource(string resourceName)
     {
