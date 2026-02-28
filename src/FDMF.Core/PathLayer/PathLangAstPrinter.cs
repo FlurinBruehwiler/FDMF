@@ -182,6 +182,11 @@ public static class PathLangAstPrinter
                 WriteLiteral(sb, pc.Value, indent + 2, includeSpans);
                 return;
 
+            case AstTypeTestCondition tt:
+                Line(sb, indent, "TypeTest");
+                Line(sb, indent + 1, $"Type: {FormatIdent(tt.TypeName, includeSpans)}");
+                return;
+
             default:
                 Line(sb, indent, c.GetType().Name);
                 return;

@@ -64,6 +64,30 @@ public sealed class PathLangParserTests(ITestOutputHelper outputHelper)
     }
 
     [Fact]
+    public void ParsePredicate_TypeTest_Filter()
+    {
+        var src = "P(Document): this[$(Person)]";
+        var result = PathLangParser.Parse(src);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
+
+        var actual = PathLangAstPrinter.PrintProgram(result.Predicates, false);
+        var expected = """
+                       Predicate P(Document)
+                         Body:
+                           FilterExpr
+                             Source:
+                               This
+                             Filter:
+                               [
+                                 TypeTest
+                                   Type: Person
+                               ]
+                       """;
+
+        AssertEqual(expected, actual);
+    }
+
+    [Fact]
     public void Parse_Repeat_Predicate()
     {
       var src = "RepeatPredicate(Document): this->hallo[$.someProp=true]->repeat(->bello[$.someProp2=true])[$.someProp3=true]->end";

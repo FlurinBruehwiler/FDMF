@@ -12,7 +12,7 @@ public static class PathEvaluation
     {
         var type = semanticModel.InputTypIdByPredicate[predicate]; //todo error handling
 
-        if (session.GetTypId(thisObj) != type) //todo inheritance
+        if (!GeneratedCodeHelper.IsAssignableFrom(session, type ?? Guid.Empty, session.GetTypId(thisObj)))
         {
             throw new Exception("error"); //todo error handling
         }
@@ -103,6 +103,12 @@ public static class PathEvaluation
                         return CheckCondition(astConditionBinary.Left, obj, type) || CheckCondition(astConditionBinary.Right, obj, type);
                     break;
                 case AstFieldCompareCondition astFieldCompareCondition:
+                    if (semanticModel.TypeGuardTypIdByCompare.TryGetValue(astFieldCompareCondition, out var tg) && tg.HasValue)
+                    {
+                        if (!GeneratedCodeHelper.IsAssignableFrom(session, tg.Value, session.GetTypId(obj)))
+                            return false;
+                    }
+
                     var fld = semanticModel.FieldByCompare[astFieldCompareCondition];
 
                     ReadOnlySpan<byte> actualValue;
@@ -134,7 +140,7 @@ public static class PathEvaluation
                                 //todo
                                 break;
                             case AstStringLiteral astStringLiteral:
-                                r = Encoding.Unicode.GetString(actualValue).SequenceEqual(astStringLiteral.Raw.Span);
+                                r = Encoding.Unicode.GetString(actualValue).AsSpan().SequenceEqual(astStringLiteral.Raw.Span);
                                 break;
                             default:
                                 throw new ArgumentOutOfRangeException();
@@ -142,6 +148,12 @@ public static class PathEvaluation
                     }
 
                     return astFieldCompareCondition.Op == AstCompareOp.Equals ? r : !r;
+
+                case AstTypeTestCondition tt:
+                    if (!semanticModel.TypeTestTypIdByCondition.TryGetValue(tt, out var guardTypId) || !guardTypId.HasValue)
+                        return false;
+
+                    return GeneratedCodeHelper.IsAssignableFrom(session, guardTypId.Value, session.GetTypId(obj));
                 case AstPredicateCompareCondition astPredicateCompareCondition:
                     break;
                 default:

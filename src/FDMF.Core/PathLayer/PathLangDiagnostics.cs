@@ -31,6 +31,8 @@ public sealed class PathLangSemanticModel
 
     public Dictionary<AstFieldCompareCondition, Guid?> TypeGuardTypIdByCompare { get; } = new();
 
+    public Dictionary<AstTypeTestCondition, Guid?> TypeTestTypIdByCondition { get; } = new();
+
     public Dictionary<AstPredicateCallExpr, Guid?> TargetInputTypIdByPredicateCall { get; } = new();
     public Dictionary<AstPredicateCompareCondition, Guid?> TargetInputTypIdByPredicateCompare { get; } = new();
 }

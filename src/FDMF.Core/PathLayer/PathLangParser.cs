@@ -366,7 +366,13 @@ public sealed class PathLangParser
             Next();
             var typeTok = Expect(TokenKind.Identifier);
             typeGuard = new AstIdent(typeTok.Text);
-            Expect(TokenKind.RParen, TokenKind.Dot, TokenKind.Identifier, TokenKind.Equals, TokenKind.NotEquals, TokenKind.RBracket);
+            Expect(TokenKind.RParen, TokenKind.Dot, TokenKind.Identifier, TokenKind.Equals, TokenKind.NotEquals, TokenKind.RBracket, TokenKind.KeywordAnd, TokenKind.KeywordOr, TokenKind.EndOfFile);
+        }
+
+        // Type test: $(Type)
+        if (typeGuard is not null && _current.Kind != TokenKind.Dot)
+        {
+            return new AstTypeTestCondition(typeGuard.Value, TextView.From(s, _prev.Text));
         }
 
         Expect(TokenKind.Dot, TokenKind.Identifier, TokenKind.Equals, TokenKind.NotEquals, TokenKind.RBracket);

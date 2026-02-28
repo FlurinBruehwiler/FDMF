@@ -3,6 +3,7 @@ using FDMF.Core.DatabaseLayer;
 using FDMF.Core.PathLayer;
 using FDMF.Testing.Shared;
 using FDMF.Testing.Shared.BusinessModelModel;
+using FDMF.Testing.Shared.InheritanceModelModel;
 using FDMF.Testing.Shared.TestModelModel;
 using User = FDMF.Testing.Shared.BusinessModelModel.User;
 
@@ -233,5 +234,38 @@ public sealed class PathLangBinderTests
 
         Assert.Empty(bind.Diagnostics);
     }
-}
 
+    [Fact]
+    public void Bind_TypeTest_Narrows_Type_For_Subtype_FieldAccess()
+    {
+        using var env = DbEnvironment.CreateDatabase(dbName: TempDbHelper.GetTempDbDirectory(), dumpFile: TempDbHelper.GetInheritanceModelDumpFile());
+        using var session = new DbSession(env, readOnly: true);
+
+        var model = session.GetObjFromGuid<Model>(env.ModelGuid);
+        Assert.NotNull(model);
+
+        var src = "P(Group): this->Items[$(ChildItem) AND $.ChildValue=42]";
+        var parse = PathLangParser.Parse(src);
+        Assert.DoesNotContain(parse.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
+
+        var bind = PathLangBinder.Bind(model.Value, session, parse.Predicates);
+        Assert.DoesNotContain(bind.Diagnostics, d => d.Severity == PathLangDiagnosticSeverity.Error);
+
+        var pred = Assert.Single(parse.Predicates);
+        Assert.Equal(Group.TypId, bind.SemanticModel.InputTypIdByPredicate[pred]);
+
+        var path = Assert.IsType<AstPathExpr>(pred.Body);
+        var step = Assert.Single(path.Steps);
+        Assert.Equal(Group.Fields.Items, bind.SemanticModel.AssocByPathStep[step]);
+
+        var and = Assert.IsType<AstConditionBinary>(step.Filter!.Condition);
+
+        var typeTest = and.Left as AstTypeTestCondition ?? and.Right as AstTypeTestCondition;
+        Assert.NotNull(typeTest);
+        Assert.Equal(ChildItem.TypId, bind.SemanticModel.TypeTestTypIdByCondition[typeTest!]);
+
+        var fieldCompare = and.Left as AstFieldCompareCondition ?? and.Right as AstFieldCompareCondition;
+        Assert.NotNull(fieldCompare);
+        Assert.Equal(ChildItem.Fields.ChildValue, bind.SemanticModel.FieldByCompare[fieldCompare!]);
+    }
+}

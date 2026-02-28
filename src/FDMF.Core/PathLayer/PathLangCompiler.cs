@@ -102,6 +102,13 @@ public sealed record AstPredicateCompareCondition(
     TextView Range
 ) : AstCondition(Range);
 
+// Type test:
+// - $(Type)
+public sealed record AstTypeTestCondition(
+    AstIdent TypeName,
+    TextView Range
+) : AstCondition(Range);
+
 public abstract record AstLiteral(TextView Range) : AstNode(Range);
 
 // Inserted by the parser when it encounters invalid syntax.

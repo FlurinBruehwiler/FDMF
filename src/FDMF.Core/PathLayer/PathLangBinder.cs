@@ -166,6 +166,10 @@ public static class PathLangBinder
 
                     semantic.AssocByPathStep[step] = assoc.ObjId;
                     type = assoc.OtherReferenceFields.OwningEntity.ObjId;
+
+                    if (step.Filter is not null)
+                        type = BindFilter(step.Filter, thisType, type);
+
                     semantic.PossibleTypesByExpr[step] = type;
                 }
                 else if (step is AstRepeatStep repeatStep)
@@ -176,16 +180,20 @@ public static class PathLangBinder
                     {
                         Report(PathLangDiagnosticSeverity.Error, $"Start and end of steps in repeat expr need to have the same type", repeatStep.Range);
                     }
-                }
 
-                if (step.Filter is not null)
-                    BindFilter(step.Filter, thisType, type);
+                    if (step.Filter is not null)
+                        type = BindFilter(step.Filter, thisType, type);
+
+                    semantic.PossibleTypesByExpr[step] = type;
+                }
             }
         }
 
-        void BindFilter(AstFilter filter, Guid thisTypes, Guid currentTypes)
+        Guid BindFilter(AstFilter filter, Guid thisTypes, Guid currentTypes)
         {
-            BindCondition(filter.Condition, thisTypes, currentTypes);
+            var narrowed = ComputeNarrowedType(filter.Condition, currentTypes);
+            BindCondition(filter.Condition, thisTypes, narrowed);
+            return narrowed;
         }
 
         void BindCondition(AstCondition condition, Guid thisTypes, Guid currentType)
@@ -196,6 +204,13 @@ public static class PathLangBinder
                     BindCondition(bin.Left, thisTypes, currentType);
                     BindCondition(bin.Right, thisTypes, currentType);
                     return;
+
+                case AstTypeTestCondition tt:
+                {
+                    var guardTypId = ResolveTypeName(tt.TypeName.Text);
+                    semantic.TypeTestTypIdByCondition[tt] = guardTypId;
+                    return;
+                }
 
                 case AstFieldCompareCondition fc:
                 {
@@ -279,34 +294,116 @@ public static class PathLangBinder
 
         ReferenceFieldDefinition? GetAso(Guid ed, ReadOnlySpan<char> key)
         {
-            if (dbSession.GetObjFromGuid<EntityDefinition>(ed) is {} entityDefinition)
+            if (dbSession.GetObjFromGuid<EntityDefinition>(ed) is not {} entityDefinition)
+                return null;
+
+            var seen = new HashSet<Guid>();
+            while (true)
             {
+                if (!seen.Add(entityDefinition.ObjId))
+                    return null;
+
                 foreach (var fld in entityDefinition.ReferenceFieldDefinitions)
                 {
                     if (fld.Key.AsSpan().SequenceEqual(key))
-                    {
                         return fld;
-                    }
                 }
-            }
 
-            return null;
+                if (!entityDefinition.Parent.HasValue)
+                    return null;
+
+                entityDefinition = entityDefinition.Parent.Value;
+            }
         }
 
         FieldDefinition? GetFld(Guid ed, ReadOnlySpan<char> key)
         {
-            if (dbSession.GetObjFromGuid<EntityDefinition>(ed) is {} entityDefinition)
+            if (dbSession.GetObjFromGuid<EntityDefinition>(ed) is not {} entityDefinition)
+                return null;
+
+            var seen = new HashSet<Guid>();
+            while (true)
             {
+                if (!seen.Add(entityDefinition.ObjId))
+                    return null;
+
                 foreach (var fld in entityDefinition.FieldDefinitions)
                 {
                     if (fld.Key.AsSpan().SequenceEqual(key))
-                    {
                         return fld;
-                    }
+                }
+
+                if (!entityDefinition.Parent.HasValue)
+                    return null;
+
+                entityDefinition = entityDefinition.Parent.Value;
+            }
+        }
+
+        Guid ComputeNarrowedType(AstCondition condition, Guid currentType)
+        {
+            if (currentType == Guid.Empty)
+                return currentType;
+
+            if (ContainsOr(condition))
+                return currentType;
+
+            var narrowed = currentType;
+
+            foreach (var guard in EnumerateGuards(condition))
+            {
+                var guardTypId = ResolveTypeName(guard);
+                if (!guardTypId.HasValue || guardTypId.Value == Guid.Empty)
+                    continue;
+
+                // guardTypId must be compatible with current type.
+                if (FDMF.Core.GeneratedCodeHelper.IsAssignableFrom(dbSession, narrowed, guardTypId.Value))
+                {
+                    // guard is more derived (or same)
+                    narrowed = guardTypId.Value;
+                }
+                else if (FDMF.Core.GeneratedCodeHelper.IsAssignableFrom(dbSession, guardTypId.Value, narrowed))
+                {
+                    // guard is a base type (no narrowing)
+                }
+                else
+                {
+                    Report(PathLangDiagnosticSeverity.Error, $"Type guard '{guard.Span}' is not compatible with current type {FormatType(narrowed)}", guard);
                 }
             }
 
-            return null;
+            return narrowed;
+
+            bool ContainsOr(AstCondition c)
+            {
+                return c switch
+                {
+                    AstConditionBinary b when b.Op == AstConditionOp.Or => true,
+                    AstConditionBinary b => ContainsOr(b.Left) || ContainsOr(b.Right),
+                    _ => false
+                };
+            }
+
+            IEnumerable<TextView> EnumerateGuards(AstCondition c)
+            {
+                switch (c)
+                {
+                    case AstConditionBinary b:
+                        foreach (var x in EnumerateGuards(b.Left))
+                            yield return x;
+                        foreach (var x in EnumerateGuards(b.Right))
+                            yield return x;
+                        yield break;
+                    case AstTypeTestCondition tt:
+                        yield return tt.TypeName.Text;
+                        yield break;
+                    case AstFieldCompareCondition fc when fc.TypeGuard is not null:
+                        yield return fc.TypeGuard.Value.Text;
+                        yield break;
+                    default:
+                        yield break;
+                }
+            }
         }
 
         void ValidatePredicateArgType(TextView predName, Guid? targetInputTypId, Guid argTypes)
