@@ -6,33 +6,11 @@ using FDMF.Core.Generated;
 
 namespace FDMF.Client;
 
-public sealed class ClientState
-{
-    public required Channel<Stream> MessagesToSend;
-    public required Dictionary<Guid, PendingRequest> PendingRequests;
-    public required IServerProcedures ServerProcedures;
-}
-
 public static class Connection
 {
-    public static ClientState CreateClientState()
-    {
-        var messages = Channel.CreateBounded<Stream>(100);
-        var pendingRequests = new Dictionary<Guid, PendingRequest>();
-
-        return new ClientState
-        {
-            MessagesToSend = messages,
-            PendingRequests = pendingRequests,
-            ServerProcedures = new GeneratedServerProcedures(messages, pendingRequests)
-        };
-    }
-
-    public static async Task ConnectRemote(IClientProcedures clientProcedures, ClientState clientState)
+    public static async Task ConnectRemote(IClientProcedures clientProcedures, Dictionary<Guid,PendingRequest> callbacks)
     {
         var wsWrapper = new WebSocketWrapper();
-
-        Helper.FireAndForget(SendMessages(clientState.MessagesToSend, wsWrapper));
 
         while (true)
         {
@@ -51,40 +29,13 @@ public static class Connection
             Logging.Log(LogFlags.Info, "Connected!");
             wsWrapper.CurrentWebSocket = ws;
 
-            await NetworkingClient.ProcessMessagesForWebSocket(ws, clientState.MessagesToSend, clientProcedures, clientState.PendingRequests);
+            var messageHandler = new WebSocketMessageHandler(ws);
+
+            await NetworkingClient.ProcessMessagesForWebSocket(ws, messageHandler, clientProcedures, callbacks);
 
             wsWrapper.CurrentWebSocket = null;
 
             Console.WriteLine("Disconnected!");
-        }
-    }
-
-    private static async Task SendMessages(Channel<Stream> messages, WebSocketWrapper webSocket)
-    {
-        await foreach (var message in messages.Reader.ReadAllAsync())
-        {
-            while (true)
-            {
-                if (webSocket.CurrentWebSocket is { State: WebSocketState.Open })
-                {
-                    try
-                    {
-                        message.Seek(0, SeekOrigin.Begin);
-                        await using var stream = WebSocketStream.CreateWritableMessageStream(webSocket.CurrentWebSocket, WebSocketMessageType.Binary);
-                        await message.CopyToAsync(stream);
-
-                        break; //next message
-                    }
-                    catch (Exception e)
-                    {
-                        Logging.Log(LogFlags.Info, $"Connection closed {e.Message}");
-                    }
-                }
-                else
-                {
-                    await Task.Delay(100);
-                }
-            }
         }
     }
 }

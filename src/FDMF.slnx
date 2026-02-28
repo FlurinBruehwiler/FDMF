@@ -18,6 +18,7 @@
   <Project Path="FDMF.Cli/FDMF.Cli.csproj" />
   <Project Path="FDMF.Client/FDMF.Client.csproj" />
   <Project Path="FDMF.Core/FDMF.Core.csproj" />
+  <Project Path="FDMF.PluginProcess/FDMF.PluginProcess.csproj" />
   <Project Path="FDMF.SourceGen/FDMF.SourceGen.csproj" />
   <Project Path="FDMF.Testing.Performance/FDMF.Testing.Performance.csproj" />
   <Project Path="FDMF.Testing.Shared/FDMF.Testing.Shared.csproj" />

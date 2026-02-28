@@ -12,12 +12,7 @@ Logging.LogFlags = LogFlags.Error;
 
 var clientProcedures = new ClientProcedures();
 
-var state = Connection.CreateClientState();
+Dictionary<Guid, PendingRequest> callbacks = [];
 
-Helper.FireAndForget(Connection.ConnectRemote(clientProcedures, state));
+Helper.FireAndForget(Connection.ConnectRemote(clientProcedures, callbacks));
 
-while (true)
-{
-    var res = await state.ServerProcedures.GetStatus(1, 2);
-    Logging.Log(LogFlags.Info, res.ToString());
-}

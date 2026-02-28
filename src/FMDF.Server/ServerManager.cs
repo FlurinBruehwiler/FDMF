@@ -13,6 +13,7 @@ public sealed class ConnectedClient
     public required IClientProcedures ClientProcedures;
 }
 
+
 public sealed class ServerManager
 {
     public List<ConnectedClient> ConnectedClients = [];
@@ -57,46 +58,27 @@ public sealed class ServerManager
 
                 Logging.Log(LogFlags.Info, "FDMF.Client connected!");
 
-                var messagesToSend = Channel.CreateBounded<Stream>(100);
+                var handler = new WebSocketMessageHandler(wsContext.WebSocket);
 
                 var connectedClient = new ConnectedClient
                 {
-                    ClientProcedures = new GeneratedClientProcedures(messagesToSend, Callbacks)
+                    ClientProcedures = new GeneratedClientProcedures(handler, Callbacks)
                 };
 
                 ConnectedClients.Add(connectedClient);
 
-                _ = NetworkingClient.ProcessMessagesForWebSocket(wsContext.WebSocket, messagesToSend, new ServerProceduresImpl(connectedClient), Callbacks).ContinueWith(x =>
+                _ = NetworkingClient.ProcessMessagesForWebSocket(wsContext.WebSocket, handler, new ServerProceduresImpl(connectedClient), Callbacks).ContinueWith(x =>
                 {
                     if(x.Exception != null)
                         Logging.LogException(x.Exception);
 
                     ConnectedClients.Remove(connectedClient);
                 });
-
-                Helper.FireAndForget(SendMessages(messagesToSend, wsContext.WebSocket));
             }
             else
             {
                 context.Response.StatusCode = 400;
                 context.Response.Close();
-            }
-        }
-    }
-
-    public static async Task SendMessages (Channel<Stream> messagesToSend, WebSocket ws)
-    {
-        await foreach (var message in messagesToSend.Reader.ReadAllAsync())
-        {
-            try
-            {
-                message.Seek(0, SeekOrigin.Begin);
-                await using var stream = WebSocketStream.CreateWritableMessageStream(ws, WebSocketMessageType.Binary);
-                await message.CopyToAsync(stream);
-            }
-            catch (Exception e)
-            {
-                Logging.Log(LogFlags.Info, $"Connection closed {e.Message}");
             }
         }
     }

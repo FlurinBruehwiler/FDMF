@@ -21,6 +21,28 @@ public sealed class ServiceProvider : IServiceProvider
     }
 }
 
+public class WebSocketMessageHandler(WebSocket ws) : IMessageHandler
+{
+    public void SendMessage(ReadOnlyMemory<byte> data)
+    {
+        try
+        {
+            using var stream = WebSocketStream.CreateWritableMessageStream(ws, WebSocketMessageType.Binary);
+            stream.Write(data.Span);
+        }
+        catch (Exception e)
+        {
+            Logging.Log(LogFlags.Info, $"Connection closed {e.Message}");
+        }
+    }
+}
+
+
+public interface IMessageHandler
+{
+    public void SendMessage(ReadOnlyMemory<byte> data);
+}
+
 public static class NetworkingClient
 {
     public static Task<T> WaitForResponse<T>(Dictionary<Guid, PendingRequest> callbacks, Guid guid)
@@ -36,7 +58,7 @@ public static class NetworkingClient
         return tsc.Task;
     }
 
-    public static Guid SendRequest(Channel<Stream> sendMessage, string methodName, object[] parameters, bool isNotification)
+    public static Guid SendRequest(IMessageHandler messageHandler, string methodName, object[] parameters, bool isNotification)
     {
         var requestGuid = Guid.NewGuid();
 
@@ -64,7 +86,7 @@ public static class NetworkingClient
             writer.Write(data);
         }
 
-        _ = sendMessage.Writer.WriteAsync(memStream); //not awaited, not sure if this is correct...
+        messageHandler.SendMessage(memStream.ToArray());
 
         return requestGuid;
     }
@@ -74,7 +96,7 @@ public static class NetworkingClient
         ServiceProvider = new ServiceProvider()
     };
 
-    public static async Task ProcessMessagesForWebSocket(WebSocket webSocket, Channel<Stream> messagesToSend, object messageHandler, Dictionary<Guid, PendingRequest> callbacks)
+    public static async Task ProcessMessagesForWebSocket(WebSocket webSocket, IMessageHandler handler, object messageHandler, Dictionary<Guid, PendingRequest> callbacks)
     {
         while (webSocket.State == WebSocketState.Open)
         {
@@ -126,7 +148,7 @@ public static class NetworkingClient
                                 if (returnObject.GetType().IsAssignableTo(typeof(Task)))
                                 {
                                     var returnTask = (Task)returnObject;
-                                    returnTask.ContinueWith(async t =>
+                                    returnTask.ContinueWith(t =>
                                     {
                                         try
                                         {
@@ -148,7 +170,7 @@ public static class NetworkingClient
                                                 res.AsSpan().CopyTo(response.AsSpan(17));
 
                                                 //wow, this is code is so bad, please rewrite everything
-                                                await messagesToSend.Writer.WriteAsync(new MemoryStream(response));
+                                                handler.SendMessage(response);
                                             }
                                             else
                                             {
