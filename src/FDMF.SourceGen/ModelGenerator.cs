@@ -29,6 +29,7 @@ public static class ModelGenerator
             sourceBuilder.AppendLine("using MemoryPack;");
             sourceBuilder.AppendLine("using FDMF.Core;");
             sourceBuilder.AppendLine("using FDMF.Core.DatabaseLayer;");
+            sourceBuilder.AppendLine("#pragma warning disable CS0612 // Type or member is obsolete");
             sourceBuilder.AppendLine();
 
             sourceBuilder.AppendLine($"namespace {@namespace};");

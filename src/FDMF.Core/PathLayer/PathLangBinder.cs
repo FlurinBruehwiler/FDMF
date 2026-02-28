@@ -357,12 +357,12 @@ public static class PathLangBinder
                     continue;
 
                 // guardTypId must be compatible with current type.
-                if (FDMF.Core.GeneratedCodeHelper.IsAssignableFrom(dbSession, narrowed, guardTypId.Value))
+                if (GeneratedCodeHelper.IsAssignableFrom(dbSession, narrowed, guardTypId.Value))
                 {
                     // guard is more derived (or same)
                     narrowed = guardTypId.Value;
                 }
-                else if (FDMF.Core.GeneratedCodeHelper.IsAssignableFrom(dbSession, guardTypId.Value, narrowed))
+                else if (GeneratedCodeHelper.IsAssignableFrom(dbSession, guardTypId.Value, narrowed))
                 {
                     // guard is a base type (no narrowing)
                 }

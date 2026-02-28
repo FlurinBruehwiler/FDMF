@@ -4,6 +4,7 @@ using System.Text;
 using MemoryPack;
 using FDMF.Core;
 using FDMF.Core.DatabaseLayer;
+#pragma warning disable CS0612 // Type or member is obsolete
 
 namespace FDMF.Testing.Shared.TestModelModel;
 

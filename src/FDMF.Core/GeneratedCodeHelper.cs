@@ -3,8 +3,6 @@ using FDMF.Core.DatabaseLayer;
 
 namespace FDMF.Core;
 
-
-
 public static class GeneratedCodeHelper
 {
     public static bool IsAssignableFrom(DbSession dbSession, Guid baseTypId, Guid derivedTypId)
@@ -35,12 +33,6 @@ public static class GeneratedCodeHelper
 
         // Cycle in inheritance graph.
         return false;
-    }
-
-    public static bool CanCastTo(DbSession dbSession, Guid objId, Guid targetTypId)
-    {
-        var actualTypId = dbSession.GetTypId(objId);
-        return IsAssignableFrom(dbSession, targetTypId, actualTypId);
     }
 
     public static T? GetNullableAssoc<T>(DbSession dbSession, Guid objId, Guid fldId) where T : struct, ITransactionObject

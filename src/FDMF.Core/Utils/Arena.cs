@@ -54,7 +54,7 @@ public sealed unsafe class Arena : IDisposable
 
     public Arena(int capacityInBytes)
     {
-        capacityInBytes = AlignToUpper(capacityInBytes, System.Environment.SystemPageSize);
+        capacityInBytes = AlignToUpper(capacityInBytes, Environment.SystemPageSize);
         BasePtr = Platform.Reserve((nuint)capacityInBytes);
 
         if (BasePtr == null)
@@ -147,7 +147,7 @@ public sealed unsafe class Arena : IDisposable
         if (requestedOffset <= Committed)
             return;
 
-        int pageSize = System.Environment.SystemPageSize;
+        int pageSize = Environment.SystemPageSize;
 
         int newCommitSize = AlignToUpper(requestedOffset - Committed, pageSize);
 

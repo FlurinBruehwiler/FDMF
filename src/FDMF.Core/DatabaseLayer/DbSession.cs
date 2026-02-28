@@ -452,7 +452,7 @@ public sealed class DbSession : IDisposable
         val = default!;
 
         var actualTypId = GetTypId(objId);
-        if (FDMF.Core.GeneratedCodeHelper.IsAssignableFrom(this, T.TypId, actualTypId))
+        if (GeneratedCodeHelper.IsAssignableFrom(this, T.TypId, actualTypId))
         {
             val = new T
             {

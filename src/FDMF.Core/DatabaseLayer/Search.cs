@@ -315,9 +315,9 @@ public static class Searcher
                 return true;
             case SearchQuery searchQuery:
                 if (searchQuery.SearchCriterion == null)
-                    return FDMF.Core.GeneratedCodeHelper.IsAssignableFrom(dbSession, searchQuery.TypId, dbSession.GetTypId(obj));
+                    return GeneratedCodeHelper.IsAssignableFrom(dbSession, searchQuery.TypId, dbSession.GetTypId(obj));
 
-                if (!FDMF.Core.GeneratedCodeHelper.IsAssignableFrom(dbSession, searchQuery.TypId, dbSession.GetTypId(obj)))
+                if (!GeneratedCodeHelper.IsAssignableFrom(dbSession, searchQuery.TypId, dbSession.GetTypId(obj)))
                     return false;
                 return MatchCriterion(dbSession, searchQuery.SearchCriterion, obj);
             case StringCriterion stringCriterion:
@@ -348,7 +348,7 @@ public static class Searcher
                 // Use the inner criterion for candidate generation (indexes), but still enforce the type constraint.
                 return SearchInternal(dbSession, searchQuery.SearchCriterion, guid =>
                 {
-                    if (FDMF.Core.GeneratedCodeHelper.IsAssignableFrom(dbSession, searchQuery.TypId, dbSession.GetTypId(guid)))
+                    if (GeneratedCodeHelper.IsAssignableFrom(dbSession, searchQuery.TypId, dbSession.GetTypId(guid)))
                         return addResult(guid);
 
                     return true;
