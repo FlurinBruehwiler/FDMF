@@ -41,6 +41,7 @@
       "Name": "Document",
       "Id": "40d51f0a-31f0-4a04-9d16-77f454fd914e",
       "Model": "e166943a-b841-4523-a513-8cb9510dea7e",
+      "Parent": "8a047a4b-d907-46c7-8d27-1c8b04ceae77",
       "FieldDefinitions": [
         "3d50a185-4c99-43ab-9e18-0398aedbfa49",
         "542d76bd-5a9d-450c-8eda-d4a76eba4b58",
@@ -83,6 +84,7 @@
       "Name": "Session",
       "Id": "3c498c35-ec98-4705-9c3e-442588838f4e",
       "Model": "e166943a-b841-4523-a513-8cb9510dea7e",
+      "Parent": "8a047a4b-d907-46c7-8d27-1c8b04ceae77",
       "FieldDefinitions": [
         "7c8e8231-f6ed-4738-9a02-c3855d262cde",
         "7adfd10f-1b04-464f-81e3-875fc5148f1d",

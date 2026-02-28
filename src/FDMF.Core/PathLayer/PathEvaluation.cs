@@ -1,7 +1,9 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using FDMF.Core.DatabaseLayer;
+using System.Globalization;
+using System.Runtime.CompilerServices;
 
 namespace FDMF.Core.PathLayer;
 
@@ -131,15 +133,40 @@ public static class PathEvaluation
                     {
                         actualValue = session.GetFldValue(obj, fld);
 
+                        if (actualValue.Length == 0)
+                            return astFieldCompareCondition.Op == AstCompareOp.NotEquals;
+
+                        var fieldDef = session.GetObjFromGuid<FieldDefinition>(fld);
+                        var fieldType = fieldDef?.DataType ?? FieldDataType.String;
+
                         switch (astFieldCompareCondition.Value)
                         {
                             case AstBoolLiteral astBoolLiteral:
+                                if (fieldType != FieldDataType.Boolean || actualValue.Length < Unsafe.SizeOf<bool>())
+                                    return false;
                                 r = MemoryMarshal.Read<bool>(actualValue) == astBoolLiteral.Value;
                                 break;
                             case AstNumberLiteral astNumberLiteral:
-                                //todo
+                                if (fieldType == FieldDataType.Integer)
+                                {
+                                    if (!long.TryParse(astNumberLiteral.Raw.Span, NumberStyles.Integer, CultureInfo.InvariantCulture, out var expected) || actualValue.Length < Unsafe.SizeOf<long>())
+                                        return false;
+                                    r = MemoryMarshal.Read<long>(actualValue) == expected;
+                                }
+                                else if (fieldType == FieldDataType.Decimal)
+                                {
+                                    if (!decimal.TryParse(astNumberLiteral.Raw.Span, NumberStyles.Number, CultureInfo.InvariantCulture, out var expected) || actualValue.Length < Unsafe.SizeOf<decimal>())
+                                        return false;
+                                    r = MemoryMarshal.Read<decimal>(actualValue) == expected;
+                                }
+                                else
+                                {
+                                    return false;
+                                }
                                 break;
                             case AstStringLiteral astStringLiteral:
+                                if (fieldType != FieldDataType.String)
+                                    return false;
                                 r = Encoding.Unicode.GetString(actualValue).AsSpan().SequenceEqual(astStringLiteral.Raw.Span);
                                 break;
                             default:

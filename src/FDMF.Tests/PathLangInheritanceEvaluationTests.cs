@@ -31,8 +31,10 @@ public sealed class PathLangInheritanceEvaluationTests
 
         Assert.False(PathEvaluation.Evaluate(session, group.ObjId, pred, bind.SemanticModel, currentUser: Guid.Empty));
 
-        _ = new ChildItem(session) { BaseName = "child", ChildValue = 42, Group = group };
+        _ = new ChildItem(session) { BaseName = "child", ChildValue = 41, Group = group };
+        Assert.False(PathEvaluation.Evaluate(session, group.ObjId, pred, bind.SemanticModel, currentUser: Guid.Empty));
 
+        _ = new ChildItem(session) { BaseName = "child2", ChildValue = 42, Group = group };
         Assert.True(PathEvaluation.Evaluate(session, group.ObjId, pred, bind.SemanticModel, currentUser: Guid.Empty));
     }
 }
