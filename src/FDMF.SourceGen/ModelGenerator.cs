@@ -47,14 +47,20 @@ public static class ModelGenerator
                 if (field.DataType != FieldDataType.Enum)
                     continue;
 
-                var enumDef = field.Enum;
+                var enumDefOpt = field.Enum;
+                if (!enumDefOpt.HasValue)
+                    throw new Exception($"Enum-typed field '{field.Key}' is missing EnumDefinition association");
+
+                var enumDef = enumDefOpt.Value;
                 if (string.IsNullOrWhiteSpace(enumDef.Name))
                     throw new Exception($"Enum-typed field '{field.Key}' is missing EnumDefinition name");
 
-                if (!enumNameToVariants.TryAdd(enumDef.Name, enumDef.Variants))
+                var enumName = SanitizeIdentifier(enumDef.Name);
+
+                if (!enumNameToVariants.TryAdd(enumName, enumDef.Variants))
                 {
-                    if (!string.Equals(enumNameToVariants[enumDef.Name], enumDef.Variants, StringComparison.Ordinal))
-                        throw new Exception($"Conflicting enum variants for '{enumDef.Name}'");
+                    if (!string.Equals(enumNameToVariants[enumName], enumDef.Variants, StringComparison.Ordinal))
+                        throw new Exception($"Conflicting enum variants for '{enumName}'");
                 }
             }
         }
@@ -126,7 +132,17 @@ public static class ModelGenerator
 
             foreach (var field in entity.FieldDefinitions)
             {
-                var enumTypeName = field.DataType == FieldDataType.Enum ? field.Enum.Name : string.Empty;
+                string? enumTypeName = null;
+                if (field.DataType == FieldDataType.Enum)
+                {
+                    var enumDefOpt = field.Enum;
+                    if (!enumDefOpt.HasValue)
+                        throw new Exception($"Enum-typed field '{field.Key}' is missing EnumDefinition association");
+
+                    enumTypeName = SanitizeIdentifier(enumDefOpt.Value.Name);
+                    if (string.IsNullOrWhiteSpace(enumTypeName))
+                        throw new Exception($"Enum-typed field '{field.Key}' is missing EnumDefinition name");
+                }
 
                 var dataType = field.DataType switch
                 {
@@ -136,7 +152,7 @@ public static class ModelGenerator
                     FieldDataType.DateTime => "DateTime",
                     FieldDataType.Boolean => "bool",
                     FieldDataType.Guid => "Guid",
-                    FieldDataType.Enum => enumTypeName,
+                    FieldDataType.Enum => enumTypeName!,
                     _ => throw new ArgumentOutOfRangeException()
                 };
 
