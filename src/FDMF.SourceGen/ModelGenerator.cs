@@ -14,79 +14,9 @@ public static class ModelGenerator
 
         var @namespace = targetNamespace;
 
-        static List<EntityDefinition> GetAllEntityDefinitions(Model root)
-        {
-            var result = new List<EntityDefinition>();
-            var seenModels = new HashSet<Guid>();
+        HashSet<EnumDefinition> enumsToGenerate = [];
 
-            AddFromModel(root);
-            return result;
-
-            void AddFromModel(Model mdl)
-            {
-                if (!seenModels.Add(mdl.ObjId))
-                    return;
-
-                foreach (var importedModel in mdl.ImportedModels)
-                    AddFromModel(importedModel);
-
-                foreach (var ed in mdl.EntityDefinitions)
-                    result.Add(ed);
-            }
-        }
-
-        // Generate C# enums for any EnumDefinition used by fields.
-        var enumNameToVariants = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var entity in GetAllEntityDefinitions(model))
-        {
-            if (!includeMetaModel && (entity.ObjId == EntityDefinition.TypId || entity.ObjId == FieldDefinition.TypId || entity.ObjId == ReferenceFieldDefinition.TypId || entity.ObjId == Model.TypId))
-                continue;
-
-            foreach (var field in entity.FieldDefinitions)
-            {
-                if (field.DataType != FieldDataType.Enum)
-                    continue;
-
-                var enumDefOpt = field.Enum;
-                if (!enumDefOpt.HasValue)
-                    throw new Exception($"Enum-typed field '{field.Key}' is missing EnumDefinition association");
-
-                var enumDef = enumDefOpt.Value;
-                if (string.IsNullOrWhiteSpace(enumDef.Name))
-                    throw new Exception($"Enum-typed field '{field.Key}' is missing EnumDefinition name");
-
-                var enumName = SanitizeIdentifier(enumDef.Name);
-
-                if (!enumNameToVariants.TryAdd(enumName, enumDef.Variants))
-                {
-                    if (!string.Equals(enumNameToVariants[enumName], enumDef.Variants, StringComparison.Ordinal))
-                        throw new Exception($"Conflicting enum variants for '{enumName}'");
-                }
-            }
-        }
-
-        foreach (var (enumName, variantsRaw) in enumNameToVariants)
-        {
-            var enumBuilder = new SourceBuilder();
-            enumBuilder.AppendLine($"namespace {@namespace};");
-            enumBuilder.AppendLine();
-            enumBuilder.AppendLine($"public enum {enumName}");
-            enumBuilder.AppendLine("{");
-            enumBuilder.AddIndent();
-
-            foreach (var v in variantsRaw.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
-            {
-                enumBuilder.AppendLine($"{SanitizeIdentifier(v)},");
-            }
-
-            enumBuilder.RemoveIndent();
-            enumBuilder.AppendLine("}");
-
-            var enumPath = Path.Combine(targetDir, $"{enumName}.cs");
-            File.WriteAllText(enumPath, enumBuilder.ToString());
-        }
-
-        foreach (var entity in GetAllEntityDefinitions(model))
+        foreach (var entity in model.GetAllEntityDefinitions())
         {
             if(!includeMetaModel && (entity.ObjId == EntityDefinition.TypId || entity.ObjId == FieldDefinition.TypId || entity.ObjId == ReferenceFieldDefinition.TypId || entity.ObjId == Model.TypId))
                 continue;
@@ -135,13 +65,8 @@ public static class ModelGenerator
                 string? enumTypeName = null;
                 if (field.DataType == FieldDataType.Enum)
                 {
-                    var enumDefOpt = field.Enum;
-                    if (!enumDefOpt.HasValue)
-                        throw new Exception($"Enum-typed field '{field.Key}' is missing EnumDefinition association");
-
-                    enumTypeName = SanitizeIdentifier(enumDefOpt.Value.Name);
-                    if (string.IsNullOrWhiteSpace(enumTypeName))
-                        throw new Exception($"Enum-typed field '{field.Key}' is missing EnumDefinition name");
+                    enumTypeName = field.Enum!.Value.Name;
+                    enumsToGenerate.Add(field.Enum!.Value);
                 }
 
                 var dataType = field.DataType switch
@@ -261,29 +186,27 @@ public static class ModelGenerator
             var generatedPath = Path.Combine(targetDir, $"{entity.Key}.cs");
             File.WriteAllText(generatedPath, sourceBuilder.ToString());
         }
-    }
 
-    private static string SanitizeIdentifier(string raw)
-    {
-        if (string.IsNullOrWhiteSpace(raw))
-            return "_";
-
-        Span<char> buf = stackalloc char[raw.Length];
-        var len = 0;
-        foreach (var ch in raw)
+        foreach (var enumDefinition in enumsToGenerate)
         {
-            if (char.IsLetterOrDigit(ch) || ch == '_')
-                buf[len++] = ch;
-            else
-                buf[len++] = '_';
+            var enumBuilder = new SourceBuilder();
+            enumBuilder.AppendLine($"namespace {@namespace};");
+            enumBuilder.AppendLine();
+            enumBuilder.AppendLine($"public enum {enumDefinition.Name}");
+            enumBuilder.AppendLine("{");
+            enumBuilder.AddIndent();
+
+            foreach (var v in enumDefinition.Variants.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            {
+                enumBuilder.AppendLine($"{v},");
+            }
+
+            enumBuilder.RemoveIndent();
+            enumBuilder.AppendLine("}");
+
+            var enumPath = Path.Combine(targetDir, $"{enumDefinition.Name}.cs");
+            File.WriteAllText(enumPath, enumBuilder.ToString());
         }
-
-        var s = new string(buf.Slice(0, len));
-
-        if (char.IsDigit(s[0]))
-            s = "_" + s;
-
-        return s;
     }
 
     public static string GetGuidLiteral(Guid guid)
