@@ -72,6 +72,29 @@ public partial struct FieldDefinition : ITransactionObject, IEquatable<FieldDefi
         set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.OwningEntity, value.ObjId, FDMF.Core.DatabaseLayer.EntityDefinition.Fields.FieldDefinitions);
     }
 
+
+    public static implicit operator RootEntity(FieldDefinition value) => new RootEntity { DbSession = value.DbSession, ObjId = value.ObjId };
+
+    public static explicit operator FieldDefinition(RootEntity value)
+    {
+        var actual = value.DbSession.GetTypId(value.ObjId);
+        if (!GeneratedCodeHelper.IsAssignableFrom(value.DbSession, TypId, actual))
+            throw new System.InvalidCastException("Cannot cast 'RootEntity' to 'FieldDefinition'");
+        return new FieldDefinition { DbSession = value.DbSession, ObjId = value.ObjId };
+    }
+
+    public static bool TryCastFrom(RootEntity value, out FieldDefinition result)
+    {
+        var actual = value.DbSession.GetTypId(value.ObjId);
+        if (GeneratedCodeHelper.IsAssignableFrom(value.DbSession, TypId, actual))
+        {
+            result = new FieldDefinition { DbSession = value.DbSession, ObjId = value.ObjId };
+            return true;
+        }
+        result = default;
+        return false;
+    }
+
     public static bool operator ==(FieldDefinition a, FieldDefinition b) => a.DbSession == b.DbSession && a.ObjId == b.ObjId;
     public static bool operator !=(FieldDefinition a, FieldDefinition b) => a.DbSession != b.DbSession || a.ObjId != b.ObjId;
     public bool Equals(FieldDefinition other) => this == other;

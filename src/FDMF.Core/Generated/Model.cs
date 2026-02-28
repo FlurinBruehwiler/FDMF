@@ -39,6 +39,29 @@ public partial struct Model : ITransactionObject, IEquatable<Model>
     [MemoryPackIgnore]
     public AssocCollection<Model> ImportedModels => new(DbSession, ObjId, Fields.ImportedModels, Model.Fields.ImportedBy);
 
+
+    public static implicit operator RootEntity(Model value) => new RootEntity { DbSession = value.DbSession, ObjId = value.ObjId };
+
+    public static explicit operator Model(RootEntity value)
+    {
+        var actual = value.DbSession.GetTypId(value.ObjId);
+        if (!GeneratedCodeHelper.IsAssignableFrom(value.DbSession, TypId, actual))
+            throw new System.InvalidCastException("Cannot cast 'RootEntity' to 'Model'");
+        return new Model { DbSession = value.DbSession, ObjId = value.ObjId };
+    }
+
+    public static bool TryCastFrom(RootEntity value, out Model result)
+    {
+        var actual = value.DbSession.GetTypId(value.ObjId);
+        if (GeneratedCodeHelper.IsAssignableFrom(value.DbSession, TypId, actual))
+        {
+            result = new Model { DbSession = value.DbSession, ObjId = value.ObjId };
+            return true;
+        }
+        result = default;
+        return false;
+    }
+
     public static bool operator ==(Model a, Model b) => a.DbSession == b.DbSession && a.ObjId == b.ObjId;
     public static bool operator !=(Model a, Model b) => a.DbSession != b.DbSession || a.ObjId != b.ObjId;
     public bool Equals(Model other) => this == other;

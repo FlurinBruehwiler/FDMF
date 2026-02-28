@@ -40,6 +40,29 @@ public partial struct EnumDefinition : ITransactionObject, IEquatable<EnumDefini
     [MemoryPackIgnore]
     public AssocCollection<FieldDefinition> FieldUsage => new(DbSession, ObjId, Fields.FieldUsage, FieldDefinition.Fields.Enum);
 
+
+    public static implicit operator RootEntity(EnumDefinition value) => new RootEntity { DbSession = value.DbSession, ObjId = value.ObjId };
+
+    public static explicit operator EnumDefinition(RootEntity value)
+    {
+        var actual = value.DbSession.GetTypId(value.ObjId);
+        if (!GeneratedCodeHelper.IsAssignableFrom(value.DbSession, TypId, actual))
+            throw new System.InvalidCastException("Cannot cast 'RootEntity' to 'EnumDefinition'");
+        return new EnumDefinition { DbSession = value.DbSession, ObjId = value.ObjId };
+    }
+
+    public static bool TryCastFrom(RootEntity value, out EnumDefinition result)
+    {
+        var actual = value.DbSession.GetTypId(value.ObjId);
+        if (GeneratedCodeHelper.IsAssignableFrom(value.DbSession, TypId, actual))
+        {
+            result = new EnumDefinition { DbSession = value.DbSession, ObjId = value.ObjId };
+            return true;
+        }
+        result = default;
+        return false;
+    }
+
     public static bool operator ==(EnumDefinition a, EnumDefinition b) => a.DbSession == b.DbSession && a.ObjId == b.ObjId;
     public static bool operator !=(EnumDefinition a, EnumDefinition b) => a.DbSession != b.DbSession || a.ObjId != b.ObjId;
     public bool Equals(EnumDefinition other) => this == other;

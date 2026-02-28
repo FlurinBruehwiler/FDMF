@@ -65,6 +65,29 @@ public partial struct ReferenceFieldDefinition : ITransactionObject, IEquatable<
         set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.OtherReferenceFields, value.ObjId, FDMF.Core.DatabaseLayer.ReferenceFieldDefinition.Fields.OtherReferenceFields);
     }
 
+
+    public static implicit operator RootEntity(ReferenceFieldDefinition value) => new RootEntity { DbSession = value.DbSession, ObjId = value.ObjId };
+
+    public static explicit operator ReferenceFieldDefinition(RootEntity value)
+    {
+        var actual = value.DbSession.GetTypId(value.ObjId);
+        if (!GeneratedCodeHelper.IsAssignableFrom(value.DbSession, TypId, actual))
+            throw new System.InvalidCastException("Cannot cast 'RootEntity' to 'ReferenceFieldDefinition'");
+        return new ReferenceFieldDefinition { DbSession = value.DbSession, ObjId = value.ObjId };
+    }
+
+    public static bool TryCastFrom(RootEntity value, out ReferenceFieldDefinition result)
+    {
+        var actual = value.DbSession.GetTypId(value.ObjId);
+        if (GeneratedCodeHelper.IsAssignableFrom(value.DbSession, TypId, actual))
+        {
+            result = new ReferenceFieldDefinition { DbSession = value.DbSession, ObjId = value.ObjId };
+            return true;
+        }
+        result = default;
+        return false;
+    }
+
     public static bool operator ==(ReferenceFieldDefinition a, ReferenceFieldDefinition b) => a.DbSession == b.DbSession && a.ObjId == b.ObjId;
     public static bool operator !=(ReferenceFieldDefinition a, ReferenceFieldDefinition b) => a.DbSession != b.DbSession || a.ObjId != b.ObjId;
     public bool Equals(ReferenceFieldDefinition other) => this == other;

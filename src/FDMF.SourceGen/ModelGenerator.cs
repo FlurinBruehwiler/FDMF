@@ -293,7 +293,7 @@ public static class ModelGenerator
             return true;
 
         // RootEntity is part of the MetaModel.
-        if (entity.ObjId == Guid.Parse("0c6d2581-7b18-4c35-bd16-3ae403bbf7a4"))
+        if (entity.ObjId == RootEntity.TypId)
             return true;
 
         return false;
