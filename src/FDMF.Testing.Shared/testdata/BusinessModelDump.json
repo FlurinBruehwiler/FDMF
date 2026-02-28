@@ -7,6 +7,7 @@
       "EntityDefinitions": [
         "cd030f9b-24ed-4792-a48d-c187939cae85",
         "40d51f0a-31f0-4a04-9d16-77f454fd914e",
+        "e0fb19a6-a512-477b-8f30-2152ff7cf9c0",
         "81daacd7-4b3f-44bf-b73c-52c7012ad758",
         "3c498c35-ec98-4705-9c3e-442588838f4e",
         "30561d20-43d6-435d-a5db-9f151b3ec970",
@@ -41,7 +42,6 @@
       "Name": "Document",
       "Id": "40d51f0a-31f0-4a04-9d16-77f454fd914e",
       "Model": "e166943a-b841-4523-a513-8cb9510dea7e",
-      "Parent": "8a047a4b-d907-46c7-8d27-1c8b04ceae77",
       "FieldDefinitions": [
         "3d50a185-4c99-43ab-9e18-0398aedbfa49",
         "542d76bd-5a9d-450c-8eda-d4a76eba4b58",
@@ -59,6 +59,19 @@
         "35cfa966-9d9f-434f-95a7-507bb313f26f",
         "3f0771ed-7629-495c-bff2-5b8d3939f169"
       ]
+    },
+
+    "e0fb19a6-a512-477b-8f30-2152ff7cf9c0": {
+      "$type": "c15f876f-4f74-4034-9acb-03bc3b521e81",
+      "Key": "PdfDocument",
+      "Name": "PdfDocument",
+      "Id": "e0fb19a6-a512-477b-8f30-2152ff7cf9c0",
+      "Model": "e166943a-b841-4523-a513-8cb9510dea7e",
+      "Parent": "40d51f0a-31f0-4a04-9d16-77f454fd914e",
+      "FieldDefinitions": [
+        "1223cdc4-23ed-424e-a3cf-29d167702954"
+      ],
+      "ReferenceFieldDefinitions": []
     },
     "81daacd7-4b3f-44bf-b73c-52c7012ad758": {
       "$type": "c15f876f-4f74-4034-9acb-03bc3b521e81",
@@ -84,7 +97,6 @@
       "Name": "Session",
       "Id": "3c498c35-ec98-4705-9c3e-442588838f4e",
       "Model": "e166943a-b841-4523-a513-8cb9510dea7e",
-      "Parent": "8a047a4b-d907-46c7-8d27-1c8b04ceae77",
       "FieldDefinitions": [
         "7c8e8231-f6ed-4738-9a02-c3855d262cde",
         "7adfd10f-1b04-464f-81e3-875fc5148f1d",
@@ -253,6 +265,15 @@
       "DataType": "Integer",
       "IsIndexed": false,
       "OwningEntity": "40d51f0a-31f0-4a04-9d16-77f454fd914e"
+    },
+    "1223cdc4-23ed-424e-a3cf-29d167702954": {
+      "$type": "42a6f33d-a938-4ad8-9682-aabdc92a53d2",
+      "Key": "PageCount",
+      "Name": "PageCount",
+      "Id": "1223cdc4-23ed-424e-a3cf-29d167702954",
+      "DataType": "Integer",
+      "IsIndexed": true,
+      "OwningEntity": "e0fb19a6-a512-477b-8f30-2152ff7cf9c0"
     },
     "88bc11c2-903d-4517-b079-4f3fc5ce20b9": {
       "$type": "42a6f33d-a938-4ad8-9682-aabdc92a53d2",

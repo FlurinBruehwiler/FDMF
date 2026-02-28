@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
+using FDMF.Core;
 using LightningDB;
 
 namespace FDMF.Core.DatabaseLayer;
@@ -314,9 +315,9 @@ public static class Searcher
                 return true;
             case SearchQuery searchQuery:
                 if (searchQuery.SearchCriterion == null)
-                    return dbSession.GetTypId(obj) == searchQuery.TypId;
+                    return FDMF.Core.GeneratedCodeHelper.IsAssignableFrom(dbSession, searchQuery.TypId, dbSession.GetTypId(obj));
 
-                if (dbSession.GetTypId(obj) != searchQuery.TypId)
+                if (!FDMF.Core.GeneratedCodeHelper.IsAssignableFrom(dbSession, searchQuery.TypId, dbSession.GetTypId(obj)))
                     return false;
                 return MatchCriterion(dbSession, searchQuery.SearchCriterion, obj);
             case StringCriterion stringCriterion:
@@ -341,10 +342,17 @@ public static class Searcher
             case SearchQuery searchQuery:
                 if (searchQuery.SearchCriterion == null)
                 {
-                    return ExecuteTypeSearch(dbSession.DbEnvironment, dbSession.Store.ReadTransaction, searchQuery.TypId, addResult);
+                    return ExecuteTypeSearchAssignable(dbSession, dbSession.Store.ReadTransaction, searchQuery.TypId, addResult);
                 }
 
-                return SearchInternal(dbSession, searchQuery.SearchCriterion, addResult);
+                // Use the inner criterion for candidate generation (indexes), but still enforce the type constraint.
+                return SearchInternal(dbSession, searchQuery.SearchCriterion, guid =>
+                {
+                    if (FDMF.Core.GeneratedCodeHelper.IsAssignableFrom(dbSession, searchQuery.TypId, dbSession.GetTypId(guid)))
+                        return addResult(guid);
+
+                    return true;
+                });
 
             case MultiCriterion { Type: MultiCriterion.MultiType.OR } multiCriterion:
 
@@ -543,7 +551,7 @@ public static class Searcher
             {
                 // Not indexed for now.
                 // Returns all objects of the owning entity where the association has no entries.
-                return ExecuteTypeSearch(env, transaction, fld!.Value.OwningEntity.Id, objId =>
+                return ExecuteTypeSearchAssignable(dbSession, transaction, fld!.Value.OwningEntity.Id, objId =>
                 {
                     Span<byte> key = stackalloc byte[2 * 16];
                     MemoryMarshal.Write(key, objId);
@@ -567,7 +575,7 @@ public static class Searcher
             {
                 // Not indexed for now.
                 // Returns all objects of the owning entity where the association has at least one entry.
-                return ExecuteTypeSearch(env, transaction, fld!.Value.OwningEntity.Id, objId =>
+                return ExecuteTypeSearchAssignable(dbSession, transaction, fld!.Value.OwningEntity.Id, objId =>
                 {
                     Span<byte> key = stackalloc byte[2 * 16];
                     MemoryMarshal.Write(key, objId);
@@ -626,7 +634,7 @@ public static class Searcher
 
         if (!fld!.Value.IsIndexed)
         {
-            return ExecuteTypeSearch(dbSession.DbEnvironment, transaction, fld!.Value.OwningEntity.Id, (objId) =>
+            return ExecuteTypeSearchAssignable(dbSession, transaction, fld!.Value.OwningEntity.Id, (objId) =>
             {
                 if (MatchNonStringSearch(dbSession.DbEnvironment, transaction, objId, fieldId, from, to))
                 {
@@ -677,10 +685,10 @@ public static class Searcher
         if (!includesDefault)
             return true;
 
-        return AddMissingFieldValues(dbSession.DbEnvironment, transaction, fld!.Value.OwningEntity.Id, fieldId, seen!, addResult);
+        return AddMissingFieldValuesAssignable(dbSession, transaction, fld!.Value.OwningEntity.Id, fieldId, seen!, addResult);
     }
 
-    private static bool ExecuteTypeSearch(DbEnvironment dbEnvironment, LightningTransaction transaction, Guid typId, Func<Guid, bool> addResult)
+    private static bool ExecuteTypeSearchExact(DbEnvironment dbEnvironment, LightningTransaction transaction, Guid typId, Func<Guid, bool> addResult)
     {
         using var cursor = transaction.CreateCursor(dbEnvironment.NonStringSearchIndex);
 
@@ -707,6 +715,43 @@ public static class Searcher
         return true;
     }
 
+    private static bool ExecuteTypeSearchAssignable(DbSession dbSession, LightningTransaction transaction, Guid typId, Func<Guid, bool> addResult)
+    {
+        HashSet<Guid> seenTypes = [];
+        Queue<Guid> queue = new();
+
+        queue.Enqueue(typId);
+        while (queue.Count > 0)
+        {
+            var t = queue.Dequeue();
+            if (!seenTypes.Add(t))
+                continue;
+
+            var ed = dbSession.GetObjFromGuid<EntityDefinition>(t);
+            if (ed.HasValue)
+            {
+                foreach (var child in ed.Value.Children)
+                    queue.Enqueue(child.ObjId);
+            }
+        }
+
+        HashSet<Guid> seenObjs = [];
+        foreach (var t in seenTypes)
+        {
+            if (!ExecuteTypeSearchExact(dbSession.DbEnvironment, transaction, t, objId =>
+                {
+                    if (seenObjs.Add(objId))
+                        return addResult(objId);
+                    return true;
+                }))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private static ReadOnlySpan<T> GetFldValue<T>(DbEnvironment dbEnvironment, LightningTransaction transaction, Guid objId, Guid fldId) where T : unmanaged
     {
         Span<byte> keyBuf = stackalloc byte[2 * 16];
@@ -722,7 +767,36 @@ public static class Searcher
         return ReadOnlySpan<T>.Empty;
     }
 
-    private static bool AddMissingFieldValues(DbEnvironment dbEnvironment, LightningTransaction transaction, Guid typId, Guid fieldId, HashSet<Guid> seen, Func<Guid, bool> addResult)
+    private static bool AddMissingFieldValuesAssignable(DbSession dbSession, LightningTransaction transaction, Guid typId, Guid fieldId, HashSet<Guid> seen, Func<Guid, bool> addResult)
+    {
+        var typesSeen = new HashSet<Guid>();
+        var queue = new Queue<Guid>();
+        queue.Enqueue(typId);
+
+        while (queue.Count > 0)
+        {
+            var t = queue.Dequeue();
+            if (!typesSeen.Add(t))
+                continue;
+
+            var ed = dbSession.GetObjFromGuid<EntityDefinition>(t);
+            if (ed.HasValue)
+            {
+                foreach (var child in ed.Value.Children)
+                    queue.Enqueue(child.ObjId);
+            }
+        }
+
+        foreach (var t in typesSeen)
+        {
+            if (!AddMissingFieldValuesExact(dbSession.DbEnvironment, transaction, t, fieldId, seen, addResult))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static bool AddMissingFieldValuesExact(DbEnvironment dbEnvironment, LightningTransaction transaction, Guid typId, Guid fieldId, HashSet<Guid> seen, Func<Guid, bool> addResult)
     {
         using var typeCursor = transaction.CreateCursor(dbEnvironment.NonStringSearchIndex);
 
@@ -831,7 +905,7 @@ public static class Searcher
 
         if (!fld!.Value.IsIndexed)
         {
-            return ExecuteTypeSearch(dbSession.DbEnvironment, transaction, fld!.Value.OwningEntity.Id, objId =>
+            return ExecuteTypeSearchAssignable(dbSession, transaction, fld!.Value.OwningEntity.Id, objId =>
             {
                 if (MatchBooleanCriterion(dbSession.DbEnvironment, transaction, objId, criterion))
                 {
@@ -869,7 +943,7 @@ public static class Searcher
 
         if (criterion.Value == false)
         {
-            return AddMissingFieldValues(dbSession.DbEnvironment, transaction, fld!.Value.OwningEntity.Id, criterion.FieldId, seen!, addResult);
+            return AddMissingFieldValuesAssignable(dbSession, transaction, fld!.Value.OwningEntity.Id, criterion.FieldId, seen!, addResult);
         }
 
         return true;
@@ -881,7 +955,7 @@ public static class Searcher
 
         if (!fld!.Value.IsIndexed)
         {
-            return ExecuteTypeSearch(dbSession.DbEnvironment, transaction, fld!.Value.OwningEntity.Id, (objId) =>
+            return ExecuteTypeSearchAssignable(dbSession, transaction, fld!.Value.OwningEntity.Id, (objId) =>
             {
                 if (MatchStringCriterion(dbSession.DbEnvironment, transaction, objId, criterion))
                 {
@@ -913,7 +987,7 @@ public static class Searcher
 
             if (strValue.Length == 0)
             {
-                return AddMissingFieldValues(dbSession.DbEnvironment, transaction, fld!.Value.OwningEntity.Id, criterion.FieldId, seen!, addResult);
+                return AddMissingFieldValuesAssignable(dbSession, transaction, fld!.Value.OwningEntity.Id, criterion.FieldId, seen!, addResult);
             }
 
             return true;
