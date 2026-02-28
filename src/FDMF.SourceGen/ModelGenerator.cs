@@ -110,17 +110,17 @@ public static class ModelGenerator
 
             foreach (var refField in entity.ReferenceFieldDefinitions)
             {
-                if (refField.RefType is nameof(RefType.SingleMandatory) or nameof(RefType.SingleOptional))
+                if (refField.RefType is RefType.SingleMandatory or RefType.SingleOptional)
                 {
-                    var optional = refField.RefType == nameof(RefType.SingleOptional) ? "?" : string.Empty;
-                    var getMethod = refField.RefType == nameof(RefType.SingleOptional) ? "GetNullableAssoc" : "GetAssoc";
+                    var optional = refField.RefType == RefType.SingleOptional ? "?" : string.Empty;
+                    var getMethod = refField.RefType == RefType.SingleOptional ? "GetNullableAssoc" : "GetAssoc";
 
                     sourceBuilder.AppendLine("[MemoryPackIgnore]");
                     sourceBuilder.AppendLine($"public {refField.OtherReferenceFields.OwningEntity.Key}{optional} {refField.Key}");
                     sourceBuilder.AppendLine("{");
                     sourceBuilder.AddIndent();
 
-                    var valueAccess = refField.RefType == nameof(RefType.SingleOptional) ? "value?.ObjId ?? Guid.Empty" : "value.ObjId";
+                    var valueAccess = refField.RefType == RefType.SingleOptional ? "value?.ObjId ?? Guid.Empty" : "value.ObjId";
 
                     sourceBuilder.AppendLine($"get => GeneratedCodeHelper.{getMethod}<{refField.OtherReferenceFields.OwningEntity.Key}>(DbSession, ObjId, Fields.{refField.Key});");
                     sourceBuilder.AppendLine($"set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.{refField.Key}, {valueAccess}, {@namespace}.{refField.OtherReferenceFields.OwningEntity.Key}.Fields.{refField.OtherReferenceFields.Key});");
@@ -128,7 +128,7 @@ public static class ModelGenerator
                     sourceBuilder.RemoveIndent();
                     sourceBuilder.AppendLine("}");
                 }
-                else if (refField.RefType == nameof(RefType.Multiple))
+                else if (refField.RefType == RefType.Multiple)
                 {
                     sourceBuilder.AppendLine("[MemoryPackIgnore]");
                     sourceBuilder.AppendLine($"public AssocCollection<{refField.OtherReferenceFields.OwningEntity.Key}> {refField.Key} => new(DbSession, ObjId, Fields.{refField.Key}, {refField.OtherReferenceFields.OwningEntity.Key}.Fields.{refField.OtherReferenceFields.Key});");

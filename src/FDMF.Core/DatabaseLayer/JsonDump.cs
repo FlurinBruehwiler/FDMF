@@ -55,7 +55,7 @@ public static class JsonDump
                             collected.GetSpan(1)[0] = aso.ObjId;
                             collected.Advance(1);
 
-                            if (refField.RefType != nameof(RefType.Multiple))
+                            if (refField.RefType != RefType.Multiple)
                                 break;
                         }
 
@@ -64,7 +64,7 @@ public static class JsonDump
 
                         writer.WritePropertyName(refField.Key);
 
-                        if (refField.RefType == nameof(RefType.Multiple))
+                        if (refField.RefType == RefType.Multiple)
                         {
                             writer.WriteStartArray();
                             foreach (var id in collected.WrittenSpan)
@@ -265,7 +265,7 @@ public static class JsonDump
             // Always clear existing connections first so the DB matches the json.
             //dbSession.RemoveAllAso(objId, Guid.Parse(fldIdA));
 
-            if (refField.RefType == nameof(RefType.Multiple))
+            if (refField.RefType == RefType.Multiple)
             {
                 if (value.ValueKind == JsonValueKind.Array)
                 {
@@ -457,11 +457,4 @@ public static class JsonDump
                 return;
         }
     }
-}
-
-public enum RefType
-{
-    SingleOptional,
-    SingleMandatory,
-    Multiple
 }

@@ -149,6 +149,10 @@ public sealed class DbEnvironment : IDisposable
         var typEntityDefinition = Guid.Parse("c15f876f-4f74-4034-9acb-03bc3b521e81");
         var typFieldDefinition = Guid.Parse("42a6f33d-a938-4ad8-9682-aabdc92a53d2");
         var typReferenceFieldDefinition = Guid.Parse("2147ed0f-b37d-4429-a3f8-8312c1620383");
+        var typEnumDefinition = Guid.Parse("9daec113-7ff2-4c52-8ba1-3d400ac39b7b");
+
+        // FieldDataTypeEnum
+        var fieldDataTypeEnum = Guid.Parse("1c65eb40-1820-40e7-8ddc-53618d56ea9b");
 
         // Model (instance) fields
         var m_fld_name = Guid.Parse("efe4fee5-bbca-4b19-8c26-c96ba8b2c008");
@@ -163,8 +167,8 @@ public sealed class DbEnvironment : IDisposable
         var ed_aso_model = Guid.Parse("d2b98e24-5786-4502-b2cf-5dea14097765");
         var ed_aso_fieldDefinitions = Guid.Parse("8dc642e4-af58-403a-bed2-ce41baa95b21");
         var ed_aso_referenceFieldDefinitions = Guid.Parse("06950fac-de4f-487e-aa78-7095909805e4");
-        var ed_aso_parents = Guid.Parse("15928c28-398d-4caa-97d1-7c01e9020d9f");
-        var ed_aso_children = Guid.Parse("232c2342-682d-4526-a5fd-f943830d7bef");
+        // var ed_aso_parents = Guid.Parse("15928c28-398d-4caa-97d1-7c01e9020d9f");
+        // var ed_aso_children = Guid.Parse("232c2342-682d-4526-a5fd-f943830d7bef");
 
         // FieldDefinition fields
         var fd_fld_key = Guid.Parse("8a5d90d2-1b1c-428e-a010-9ae7d603dd30");
@@ -172,10 +176,10 @@ public sealed class DbEnvironment : IDisposable
         var fd_fld_id = Guid.Parse("f91613e2-a9f9-4e3b-96e3-38650319dc0c");
         var fd_fld_dataType = Guid.Parse("b4f55a8c-6f73-41bc-b051-cbaeb18b0390");
         var fd_fld_isIndexed = Guid.Parse("2e699a43-98b9-42f7-a26c-20256305b7cb");
-        var fd_fld_enumVariants = Guid.Parse("4d45c6c0-1eef-4eba-bab9-1cd3cf3ea49c");
 
         // FieldDefinition reference fields
         var fd_aso_owningEntity = Guid.Parse("f097fe25-1d11-47b3-a02c-0072a781a528");
+        var fd_aso_enumRef = Guid.Parse("ec74c01e-86b2-4334-b8cb-d800aaa827ae");
 
         // ReferenceFieldDefinition fields
         var rfd_fld_key = Guid.Parse("450c77f2-73ff-4125-a879-b75840275c99");
@@ -186,6 +190,14 @@ public sealed class DbEnvironment : IDisposable
         // ReferenceFieldDefinition reference fields
         var rfd_aso_owningEntity = Guid.Parse("500e3a9c-c469-4585-a7c4-e307dc295d88");
         var rfd_aso_otherReferenceFields = Guid.Parse("50ac96bd-7082-4821-95fa-57e9040246ab");
+
+        // EnumDefinition reference fields
+        var enumD_aso_fields = Guid.Parse("ec0d2deb-efe4-4620-9e77-92df907a5024");
+        var enumD_fld_name = Guid.Parse("30a6d113-3c2a-45a6-b035-4d4ad6987dd7");
+        var enumD_fld_variants = Guid.Parse("73b66d67-22c3-4a72-8309-d5ab81d483bc");
+
+        var enum_fldDatatype = Guid.Parse("f2c24ac5-23bc-4a81-b7e7-d58928e8835a");
+        var enum_asoRefType = Guid.Parse("daeb5769-8263-4444-ad3a-8d7a5ed4df61");
 
         static void SetGuid(DbSession s, Guid objId, Guid fldId, Guid value)
         {
@@ -213,7 +225,7 @@ public sealed class DbEnvironment : IDisposable
             session.CreateAso(entityId, ed_aso_model, baseModelId, m_aso_entityDefinitions);
         }
 
-        void CreateFieldDefinition(Guid fieldId, string key, FieldDataType fieldDataType, bool isIndexed, Guid owningEntity, string enumVariants = "")
+        void CreateFieldDefinition(Guid fieldId, string key, FieldDataType fieldDataType, bool isIndexed, Guid owningEntity, Guid enumDefinition = default)
         {
             session.CreateObj(typFieldDefinition, fieldId);
             SetString(session, fieldId, fd_fld_key, key);
@@ -221,11 +233,16 @@ public sealed class DbEnvironment : IDisposable
             SetGuid(session, fieldId, fd_fld_id, fieldId);
             session.SetFldValue(fieldId, fd_fld_dataType, fieldDataType.AsSpan());
             SetBool(session, fieldId, fd_fld_isIndexed, isIndexed);
-            if(enumVariants != "")
-                SetString(session, fieldId, fd_fld_enumVariants, enumVariants);
 
             // Link field definition to owning entity definition.
             session.CreateAso(fieldId, fd_aso_owningEntity, owningEntity, ed_aso_fieldDefinitions);
+
+            //link to enum if exists
+            if ((fieldDataType == FieldDataType.Enum) != (enumDefinition != Guid.Empty))
+                throw new Exception();
+
+            if (fieldDataType == FieldDataType.Enum)
+                session.CreateAso(fieldId, enumD_aso_fields, enum_fldDatatype, fd_aso_enumRef);
         }
 
         void CreateReferenceFieldDefinition(Guid refFieldId, string key, string refType, Guid owningEntity, Guid otherRefFieldId)
@@ -241,6 +258,13 @@ public sealed class DbEnvironment : IDisposable
 
             // Link to opposite reference field definition.
             session.CreateAso(refFieldId, rfd_aso_otherReferenceFields, otherRefFieldId, rfd_aso_otherReferenceFields);
+        }
+
+        void CreateEnumDefinition(Guid definitionGuid, string name, string variants)
+        {
+            session.CreateObj(typEnumDefinition, definitionGuid);
+            SetString(session, definitionGuid, enumD_fld_name, name);
+            SetString(session, definitionGuid, enumD_fld_variants, variants);
         }
 
         // 1) Create the base model instance.
@@ -262,19 +286,22 @@ public sealed class DbEnvironment : IDisposable
         CreateFieldDefinition(ed_fld_name, "Name", FieldDataType.String, false, typEntityDefinition);
         CreateFieldDefinition(ed_fld_id, "Id", FieldDataType.Guid, false, typEntityDefinition);
 
+        CreateEnumDefinition(enum_fldDatatype, "FieldDataType", "Integer,Decimal,String,DateTime,Boolean,Enum,Guid");
+
         // FieldDefinition
         CreateFieldDefinition(fd_fld_key, "Key", FieldDataType.String, false, typFieldDefinition);
         CreateFieldDefinition(fd_fld_name, "Name", FieldDataType.String, false, typFieldDefinition);
         CreateFieldDefinition(fd_fld_id, "Id", FieldDataType.Guid, false, typFieldDefinition);
-        CreateFieldDefinition(fd_fld_dataType, "DataType", FieldDataType.Enum, false, typFieldDefinition, "Integer,Decimal,String,DateTime,Boolean,Enum,Guid");
+        CreateFieldDefinition(fd_fld_dataType, "DataType", FieldDataType.Enum, false, typFieldDefinition, enumDefinition: enum_fldDatatype);
         CreateFieldDefinition(fd_fld_isIndexed, "IsIndexed", FieldDataType.Boolean, false, typFieldDefinition);
-        CreateFieldDefinition(fd_fld_enumVariants, "EnumVariants", FieldDataType.String, false, typFieldDefinition);
+
+        CreateEnumDefinition(enum_asoRefType, "RefType", "SingleMandatory,SingleOptional,Multiple");
 
         // ReferenceFieldDefinition
         CreateFieldDefinition(rfd_fld_key, "Key", FieldDataType.String, false, typReferenceFieldDefinition);
         CreateFieldDefinition(rfd_fld_name, "Name", FieldDataType.String, false, typReferenceFieldDefinition);
         CreateFieldDefinition(rfd_fld_id, "Id", FieldDataType.Guid, false, typReferenceFieldDefinition);
-        CreateFieldDefinition(rfd_fld_refType, "RefType", FieldDataType.String, false, typReferenceFieldDefinition);
+        CreateFieldDefinition(rfd_fld_refType, "RefType", FieldDataType.Enum, false, typReferenceFieldDefinition, enum_asoRefType);
 
         // 4) Create reference field definitions.
         // ModelDefinition
@@ -301,10 +328,14 @@ public sealed class DbEnvironment : IDisposable
 
         // FieldDefinition (inverse for rf_entity_fieldDefinitions)
         CreateReferenceFieldDefinition(fd_aso_owningEntity, "OwningEntity", "SingleMandatory", typFieldDefinition, rf_entity_fieldDefinitions);
+        CreateReferenceFieldDefinition(fd_aso_enumRef, "Enum", "SingleOptional", typFieldDefinition, enumD_aso_fields);
 
         // ReferenceFieldDefinition (owning entity + self-loop)
         CreateReferenceFieldDefinition(rfd_aso_owningEntity, "OwningEntity", "SingleMandatory", typReferenceFieldDefinition, rf_entity_referenceFieldDefinitions);
         CreateReferenceFieldDefinition(rfd_aso_otherReferenceFields, "OtherReferenceFields", "SingleMandatory", typReferenceFieldDefinition, rfd_aso_otherReferenceFields);
+
+        // EnumDefinition
+        CreateReferenceFieldDefinition(enumD_aso_fields, "Fields", "Multiple", typEnumDefinition, fd_aso_enumRef);
 
         // Finish
         session.Commit();

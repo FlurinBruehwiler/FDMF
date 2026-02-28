@@ -90,7 +90,7 @@ public static class ObjListCommand
 
     private static string DecodeRefValue(DbSession session, Guid objId, ReferenceFieldDefinition rf)
     {
-        if (rf.RefType == nameof(RefType.Multiple))
+        if (rf.RefType == RefType.Multiple)
         {
             var ids = new List<Guid>();
             foreach (var other in session.EnumerateAso(objId, rf.Id))

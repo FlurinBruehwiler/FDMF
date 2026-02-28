@@ -38,10 +38,10 @@ public partial struct ReferenceFieldDefinition : ITransactionObject, IEquatable<
     }
 
     [MemoryPackIgnore]
-    public string RefType
+    public RefType RefType
     {
-        get => Encoding.Unicode.GetString(DbSession.GetFldValue(ObjId, Fields.RefType));
-        set => DbSession.SetFldValue(ObjId, Fields.RefType, Encoding.Unicode.GetBytes(value));
+        get => MemoryMarshal.Read<RefType>(DbSession.GetFldValue(ObjId, Fields.RefType));
+        set => DbSession.SetFldValue(ObjId, Fields.RefType, value.AsSpan());
     }
 
     [MemoryPackIgnore]

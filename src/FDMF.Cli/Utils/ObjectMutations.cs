@@ -43,7 +43,7 @@ public static class ObjectMutations
                 if (parts.Length == 0)
                     continue;
 
-                if (rf.RefType is nameof(RefType.SingleMandatory) or nameof(RefType.SingleOptional))
+                if (rf.RefType is RefType.SingleMandatory or RefType.SingleOptional)
                 {
                     if (parts.Length != 1)
                         throw new Exception($"Reference field '{k}' is single-valued. Provide exactly one ObjId.");
@@ -83,7 +83,7 @@ public static class ObjectMutations
     {
         foreach (var rf in entity.ReferenceFieldDefinitions)
         {
-            if (rf.RefType != nameof(RefType.SingleMandatory))
+            if (rf.RefType != RefType.SingleMandatory)
                 continue;
 
             var val = session.GetSingleAsoValue(objId, rf.Id);

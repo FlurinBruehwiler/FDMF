@@ -51,7 +51,7 @@ public static class ObjShowCommand
                 {
                     Console.WriteLine($"{rf.Key}:");
 
-                    if (rf.RefType == nameof(RefType.Multiple))
+                    if (rf.RefType == RefType.Multiple)
                     {
                         int shown = 0;
                         foreach (var other in session.EnumerateAso(objId, rf.Id))
