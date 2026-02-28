@@ -1,4 +1,4 @@
-﻿namespace FDMF.Core.DatabaseLayer;
+namespace FDMF.Core.DatabaseLayer;
 
 public enum FieldDataType
 {
@@ -8,5 +8,5 @@ public enum FieldDataType
     DateTime,
     Boolean,
     Enum,
-    Guid
+    Guid,
 }

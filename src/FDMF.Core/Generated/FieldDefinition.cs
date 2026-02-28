@@ -59,17 +59,17 @@ public partial struct FieldDefinition : ITransactionObject, IEquatable<FieldDefi
     }
 
     [MemoryPackIgnore]
+    public EnumDefinition? Enum
+    {
+        get => GeneratedCodeHelper.GetNullableAssoc<EnumDefinition>(DbSession, ObjId, Fields.Enum);
+        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Enum, value?.ObjId ?? Guid.Empty, FDMF.Core.DatabaseLayer.EnumDefinition.Fields.FieldUsage);
+    }
+
+    [MemoryPackIgnore]
     public EntityDefinition OwningEntity
     {
         get => GeneratedCodeHelper.GetAssoc<EntityDefinition>(DbSession, ObjId, Fields.OwningEntity);
         set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.OwningEntity, value.ObjId, FDMF.Core.DatabaseLayer.EntityDefinition.Fields.FieldDefinitions);
-    }
-
-    [MemoryPackIgnore]
-    public EnumDefinition Enum
-    {
-        get => GeneratedCodeHelper.GetAssoc<EnumDefinition>(DbSession, ObjId, Fields.OwningEntity);
-        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Enum, value.ObjId, FDMF.Core.DatabaseLayer.EnumDefinition.Fields.FieldUsage);
     }
 
     public static bool operator ==(FieldDefinition a, FieldDefinition b) => a.DbSession == b.DbSession && a.ObjId == b.ObjId;
@@ -90,14 +90,13 @@ public partial struct FieldDefinition : ITransactionObject, IEquatable<FieldDefi
         public static readonly Guid IsIndexed = new Guid([67, 154, 105, 46, 185, 152, 247, 66, 162, 108, 32, 37, 99, 5, 183, 203]);
         ///b4f55a8c-6f73-41bc-b051-cbaeb18b0390
         public static readonly Guid DataType = new Guid([140, 90, 245, 180, 115, 111, 188, 65, 176, 81, 203, 174, 177, 139, 3, 144]);
-        ///4d45c6c0-1eef-4eba-bab9-1cd3cf3ea49c
-        public static readonly Guid EnumVariants = new Guid([192, 198, 69, 77, 239, 30, 186, 78, 186, 185, 28, 211, 207, 62, 164, 156]);
         ///8a5d90d2-1b1c-428e-a010-9ae7d603dd30
         public static readonly Guid Key = new Guid([210, 144, 93, 138, 28, 27, 142, 66, 160, 16, 154, 231, 214, 3, 221, 48]);
         ///f91613e2-a9f9-4e3b-96e3-38650319dc0c
         public static readonly Guid Id = new Guid([226, 19, 22, 249, 249, 169, 59, 78, 150, 227, 56, 101, 3, 25, 220, 12]);
+        ///ec74c01e-86b2-4334-b8cb-d800aaa827ae
+        public static readonly Guid Enum = new Guid([30, 192, 116, 236, 178, 134, 52, 67, 184, 203, 216, 0, 170, 168, 39, 174]);
         ///f097fe25-1d11-47b3-a02c-0072a781a528
         public static readonly Guid OwningEntity = new Guid([37, 254, 151, 240, 17, 29, 179, 71, 160, 44, 0, 114, 167, 129, 165, 40]);
-        public static readonly Guid Enum = new Guid([30, 192, 116, 236, 178, 134, 52, 67, 184, 203, 216, 0, 170, 168, 39, 174]);
     }
 }

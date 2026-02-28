@@ -1,8 +1,8 @@
-﻿namespace FDMF.Core.DatabaseLayer;
+namespace FDMF.Core.DatabaseLayer;
 
 public enum RefType
 {
     SingleMandatory,
     SingleOptional,
-    Multiple
+    Multiple,
 }

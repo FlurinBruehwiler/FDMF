@@ -237,21 +237,22 @@ public sealed class DbEnvironment : IDisposable
             // Link field definition to owning entity definition.
             session.CreateAso(fieldId, fd_aso_owningEntity, owningEntity, ed_aso_fieldDefinitions);
 
-            //link to enum if exists
+            // Link to EnumDefinition for enum-typed scalar fields.
             if ((fieldDataType == FieldDataType.Enum) != (enumDefinition != Guid.Empty))
                 throw new Exception();
 
             if (fieldDataType == FieldDataType.Enum)
-                session.CreateAso(fieldId, enumD_aso_fields, enum_fldDatatype, fd_aso_enumRef);
+                session.CreateAso(fieldId, fd_aso_enumRef, enumDefinition, enumD_aso_fields);
         }
 
-        void CreateReferenceFieldDefinition(Guid refFieldId, string key, string refType, Guid owningEntity, Guid otherRefFieldId)
+        void CreateReferenceFieldDefinition(Guid refFieldId, string key, RefType refType, Guid owningEntity, Guid otherRefFieldId)
         {
             session.CreateObj(typReferenceFieldDefinition, refFieldId);
             SetString(session, refFieldId, rfd_fld_key, key);
             SetString(session, refFieldId, rfd_fld_name, key);
             SetGuid(session, refFieldId, rfd_fld_id, refFieldId);
-            SetString(session, refFieldId, rfd_fld_refType, refType);
+            var refTypeOrdinal = (int)refType;
+            session.SetFldValue(refFieldId, rfd_fld_refType, refTypeOrdinal.AsSpan());
 
             // Link ref field definition to owning entity definition.
             session.CreateAso(refFieldId, rfd_aso_owningEntity, owningEntity, ed_aso_referenceFieldDefinitions);
@@ -276,6 +277,7 @@ public sealed class DbEnvironment : IDisposable
         CreateEntityDefinition(typEntityDefinition, "EntityDefinition");
         CreateEntityDefinition(typFieldDefinition, "FieldDefinition");
         CreateEntityDefinition(typReferenceFieldDefinition, "ReferenceFieldDefinition");
+        CreateEntityDefinition(typEnumDefinition, "EnumDefinition");
 
         // 3) Create field definitions (scalars) for each entity.
         // Model
@@ -310,9 +312,9 @@ public sealed class DbEnvironment : IDisposable
         var rf_model_importedModels = Guid.Parse("ca3470c1-cf36-415a-88c1-47c2700fc37d");
         var rf_model_importedBy = Guid.Parse("bff6be49-6aed-4998-91ab-28702a3e29b0");
 
-        CreateReferenceFieldDefinition(rf_model_entityDefinitions, "EntityDefinitions", "Multiple", typModel, rf_entity_model);
-        CreateReferenceFieldDefinition(rf_model_importedModels, "ImportedModels", "Multiple", typModel, rf_model_importedBy);
-        CreateReferenceFieldDefinition(rf_model_importedBy, "ImportedBy", "Multiple", typModel, rf_model_importedModels);
+        CreateReferenceFieldDefinition(rf_model_entityDefinitions, "EntityDefinitions", RefType.Multiple, typModel, rf_entity_model);
+        CreateReferenceFieldDefinition(rf_model_importedModels, "ImportedModels", RefType.Multiple, typModel, rf_model_importedBy);
+        CreateReferenceFieldDefinition(rf_model_importedBy, "ImportedBy", RefType.Multiple, typModel, rf_model_importedModels);
 
         // EntityDefinition
         var rf_entity_fieldDefinitions = Guid.Parse("8dc642e4-af58-403a-bed2-ce41baa95b21");
@@ -320,22 +322,22 @@ public sealed class DbEnvironment : IDisposable
         //var rf_entity_parents = Guid.Parse("15928c28-398d-4caa-97d1-7c01e9020d9f");
         //var rf_entity_children = Guid.Parse("232c2342-682d-4526-a5fd-f943830d7bef");
 
-        CreateReferenceFieldDefinition(rf_entity_model, "Model", "SingleMandatory", typEntityDefinition, rf_model_entityDefinitions);
-        CreateReferenceFieldDefinition(rf_entity_fieldDefinitions, "FieldDefinitions", "Multiple", typEntityDefinition, fd_aso_owningEntity);
-        CreateReferenceFieldDefinition(rf_entity_referenceFieldDefinitions, "ReferenceFieldDefinitions", "Multiple", typEntityDefinition, rfd_aso_owningEntity);
+        CreateReferenceFieldDefinition(rf_entity_model, "Model", RefType.SingleMandatory, typEntityDefinition, rf_model_entityDefinitions);
+        CreateReferenceFieldDefinition(rf_entity_fieldDefinitions, "FieldDefinitions", RefType.Multiple, typEntityDefinition, fd_aso_owningEntity);
+        CreateReferenceFieldDefinition(rf_entity_referenceFieldDefinitions, "ReferenceFieldDefinitions", RefType.Multiple, typEntityDefinition, rfd_aso_owningEntity);
         //CreateReferenceFieldDefinition(rf_entity_parents, "Parents", "Multiple", typEntityDefinition, rf_entity_children);
         //CreateReferenceFieldDefinition(rf_entity_children, "Children", "Multiple", typEntityDefinition, rf_entity_parents);
 
         // FieldDefinition (inverse for rf_entity_fieldDefinitions)
-        CreateReferenceFieldDefinition(fd_aso_owningEntity, "OwningEntity", "SingleMandatory", typFieldDefinition, rf_entity_fieldDefinitions);
-        CreateReferenceFieldDefinition(fd_aso_enumRef, "Enum", "SingleOptional", typFieldDefinition, enumD_aso_fields);
+        CreateReferenceFieldDefinition(fd_aso_owningEntity, "OwningEntity", RefType.SingleMandatory, typFieldDefinition, rf_entity_fieldDefinitions);
+        CreateReferenceFieldDefinition(fd_aso_enumRef, "Enum", RefType.SingleOptional, typFieldDefinition, enumD_aso_fields);
 
         // ReferenceFieldDefinition (owning entity + self-loop)
-        CreateReferenceFieldDefinition(rfd_aso_owningEntity, "OwningEntity", "SingleMandatory", typReferenceFieldDefinition, rf_entity_referenceFieldDefinitions);
-        CreateReferenceFieldDefinition(rfd_aso_otherReferenceFields, "OtherReferenceFields", "SingleMandatory", typReferenceFieldDefinition, rfd_aso_otherReferenceFields);
+        CreateReferenceFieldDefinition(rfd_aso_owningEntity, "OwningEntity", RefType.SingleMandatory, typReferenceFieldDefinition, rf_entity_referenceFieldDefinitions);
+        CreateReferenceFieldDefinition(rfd_aso_otherReferenceFields, "OtherReferenceFields", RefType.SingleMandatory, typReferenceFieldDefinition, rfd_aso_otherReferenceFields);
 
         // EnumDefinition
-        CreateReferenceFieldDefinition(enumD_aso_fields, "FieldUsage", "Multiple", typEnumDefinition, fd_aso_enumRef);
+        CreateReferenceFieldDefinition(enumD_aso_fields, "FieldUsage", RefType.Multiple, typEnumDefinition, fd_aso_enumRef);
         CreateFieldDefinition(enumD_fld_name, "Name", FieldDataType.String, false, typEnumDefinition);
         CreateFieldDefinition(enumD_fld_variants, "Variants", FieldDataType.String, false, typEnumDefinition);
 

@@ -13,10 +13,31 @@ namespace FDMF.Core.DatabaseLayer;
 
 public static class JsonDump
 {
+    private static List<EntityDefinition> GetAllEntityDefinitions(Model root)
+    {
+        var result = new List<EntityDefinition>();
+        var seenModels = new HashSet<Guid>();
+
+        AddFromModel(root);
+        return result;
+
+        void AddFromModel(Model mdl)
+        {
+            if (!seenModels.Add(mdl.ObjId))
+                return;
+
+            foreach (var importedModel in mdl.ImportedModels)
+                AddFromModel(importedModel);
+
+            foreach (var ed in mdl.EntityDefinitions)
+                result.Add(ed);
+        }
+    }
+
     public static string GetJsonDump(DbSession dbSession)
     {
         var model = dbSession.GetObjFromGuid<Model>(dbSession.DbEnvironment.ModelGuid);
-        var entityById = model!.Value.GetAllEntityDefinitions().ToDictionary(x => x.Id, x => x);
+        var entityById = GetAllEntityDefinitions(model!.Value).ToDictionary(x => x.Id, x => x);
 
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
@@ -135,7 +156,7 @@ public static class JsonDump
 
     private static void ParseEntities(DbSession dbSession, JsonElement entities, Model model)
     {
-        var _ = model.GetAllEntityDefinitions().ToDictionary(x => x.Id, x => x);
+        var _ = GetAllEntityDefinitions(model).ToDictionary(x => x.Id, x => x);
 
         //todo we would actually need to first discover the new entities that are defined
 
@@ -184,7 +205,7 @@ public static class JsonDump
             }
         }
 
-        var entityById = model.GetAllEntityDefinitions().ToDictionary(x => x.Id, x => x);
+        var entityById = GetAllEntityDefinitions(model).ToDictionary(x => x.Id, x => x);
 
         //TODO: better error handling
 
@@ -404,7 +425,11 @@ public static class JsonDump
 
                 if (value.GetString() is { } s)
                 {
-                    var enumVariants = fld.Enum.Variants.AsSpan();
+                    var enumDef = fld.Enum;
+                    if (!enumDef.HasValue)
+                        throw new Exception("Enum field missing EnumDefinition association");
+
+                    var enumVariants = enumDef.Value.Variants.AsSpan();
 
                     int idx = 0;
                     foreach (var s1 in enumVariants.Split(','))

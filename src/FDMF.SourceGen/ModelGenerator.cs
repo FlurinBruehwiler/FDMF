@@ -14,7 +14,73 @@ public static class ModelGenerator
 
         var @namespace = targetNamespace;
 
-        foreach (var entity in model.GetAllEntityDefinitions())
+        static List<EntityDefinition> GetAllEntityDefinitions(Model root)
+        {
+            var result = new List<EntityDefinition>();
+            var seenModels = new HashSet<Guid>();
+
+            AddFromModel(root);
+            return result;
+
+            void AddFromModel(Model mdl)
+            {
+                if (!seenModels.Add(mdl.ObjId))
+                    return;
+
+                foreach (var importedModel in mdl.ImportedModels)
+                    AddFromModel(importedModel);
+
+                foreach (var ed in mdl.EntityDefinitions)
+                    result.Add(ed);
+            }
+        }
+
+        // Generate C# enums for any EnumDefinition used by fields.
+        var enumNameToVariants = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var entity in GetAllEntityDefinitions(model))
+        {
+            if (!includeMetaModel && (entity.ObjId == EntityDefinition.TypId || entity.ObjId == FieldDefinition.TypId || entity.ObjId == ReferenceFieldDefinition.TypId || entity.ObjId == Model.TypId))
+                continue;
+
+            foreach (var field in entity.FieldDefinitions)
+            {
+                if (field.DataType != FieldDataType.Enum)
+                    continue;
+
+                var enumDef = field.Enum;
+                if (string.IsNullOrWhiteSpace(enumDef.Name))
+                    throw new Exception($"Enum-typed field '{field.Key}' is missing EnumDefinition name");
+
+                if (!enumNameToVariants.TryAdd(enumDef.Name, enumDef.Variants))
+                {
+                    if (!string.Equals(enumNameToVariants[enumDef.Name], enumDef.Variants, StringComparison.Ordinal))
+                        throw new Exception($"Conflicting enum variants for '{enumDef.Name}'");
+                }
+            }
+        }
+
+        foreach (var (enumName, variantsRaw) in enumNameToVariants)
+        {
+            var enumBuilder = new SourceBuilder();
+            enumBuilder.AppendLine($"namespace {@namespace};");
+            enumBuilder.AppendLine();
+            enumBuilder.AppendLine($"public enum {enumName}");
+            enumBuilder.AppendLine("{");
+            enumBuilder.AddIndent();
+
+            foreach (var v in variantsRaw.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            {
+                enumBuilder.AppendLine($"{SanitizeIdentifier(v)},");
+            }
+
+            enumBuilder.RemoveIndent();
+            enumBuilder.AppendLine("}");
+
+            var enumPath = Path.Combine(targetDir, $"{enumName}.cs");
+            File.WriteAllText(enumPath, enumBuilder.ToString());
+        }
+
+        foreach (var entity in GetAllEntityDefinitions(model))
         {
             if(!includeMetaModel && (entity.ObjId == EntityDefinition.TypId || entity.ObjId == FieldDefinition.TypId || entity.ObjId == ReferenceFieldDefinition.TypId || entity.ObjId == Model.TypId))
                 continue;
@@ -60,6 +126,8 @@ public static class ModelGenerator
 
             foreach (var field in entity.FieldDefinitions)
             {
+                var enumTypeName = field.DataType == FieldDataType.Enum ? field.Enum.Name : string.Empty;
+
                 var dataType = field.DataType switch
                 {
                     FieldDataType.Integer => "long",
@@ -68,7 +136,7 @@ public static class ModelGenerator
                     FieldDataType.DateTime => "DateTime",
                     FieldDataType.Boolean => "bool",
                     FieldDataType.Guid => "Guid",
-                    FieldDataType.Enum => "FieldDataType", //todo
+                    FieldDataType.Enum => enumTypeName,
                     _ => throw new ArgumentOutOfRangeException()
                 };
 
@@ -80,7 +148,7 @@ public static class ModelGenerator
                     FieldDataType.DateTime => "MemoryMarshal.Read<DateTime>({0})",
                     FieldDataType.Boolean => "MemoryMarshal.Read<bool>({0})",
                     FieldDataType.Guid => "MemoryMarshal.Read<Guid>({0})",
-                    FieldDataType.Enum => "MemoryMarshal.Read<FieldDataType>({0})",
+                    FieldDataType.Enum => $"MemoryMarshal.Read<{enumTypeName}>({{0}})",
                     _ => throw new ArgumentOutOfRangeException()
                 };
 
@@ -177,6 +245,29 @@ public static class ModelGenerator
             var generatedPath = Path.Combine(targetDir, $"{entity.Key}.cs");
             File.WriteAllText(generatedPath, sourceBuilder.ToString());
         }
+    }
+
+    private static string SanitizeIdentifier(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return "_";
+
+        Span<char> buf = stackalloc char[raw.Length];
+        var len = 0;
+        foreach (var ch in raw)
+        {
+            if (char.IsLetterOrDigit(ch) || ch == '_')
+                buf[len++] = ch;
+            else
+                buf[len++] = '_';
+        }
+
+        var s = new string(buf.Slice(0, len));
+
+        if (char.IsDigit(s[0]))
+            s = "_" + s;
+
+        return s;
     }
 
     public static string GetGuidLiteral(Guid guid)

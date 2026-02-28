@@ -5,7 +5,7 @@ using MemoryPack;
 using FDMF.Core;
 using FDMF.Core.DatabaseLayer;
 
-namespace FDMF.Core.DatabaseLayer;
+namespace FDMF.Testing.Shared.TestModelModel;
 
 [MemoryPackable]
 public partial struct EnumDefinition : ITransactionObject, IEquatable<EnumDefinition>
