@@ -52,6 +52,16 @@ public partial struct EntityDefinition : ITransactionObject, IEquatable<EntityDe
     }
 
     [MemoryPackIgnore]
+    public EntityDefinition? Parent
+    {
+        get => GeneratedCodeHelper.GetNullableAssoc<EntityDefinition>(DbSession, ObjId, Fields.Parent);
+        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Parent, value?.ObjId ?? Guid.Empty, FDMF.Core.DatabaseLayer.EntityDefinition.Fields.Children);
+    }
+
+    [MemoryPackIgnore]
+    public AssocCollection<EntityDefinition> Children => new(DbSession, ObjId, Fields.Children, EntityDefinition.Fields.Parent);
+
+    [MemoryPackIgnore]
     public AssocCollection<ReferenceFieldDefinition> ReferenceFieldDefinitions => new(DbSession, ObjId, Fields.ReferenceFieldDefinitions, ReferenceFieldDefinition.Fields.OwningEntity);
 
     [MemoryPackIgnore]
@@ -77,6 +87,10 @@ public partial struct EntityDefinition : ITransactionObject, IEquatable<EntityDe
         public static readonly Guid Name = new Guid([234, 235, 70, 69, 82, 53, 152, 65, 135, 48, 137, 24, 45, 201, 26, 52]);
         ///d2b98e24-5786-4502-b2cf-5dea14097765
         public static readonly Guid Model = new Guid([36, 142, 185, 210, 134, 87, 2, 69, 178, 207, 93, 234, 20, 9, 119, 101]);
+        ///15928c28-398d-4caa-97d1-7c01e9020d9f
+        public static readonly Guid Parent = new Guid([40, 140, 146, 21, 141, 57, 170, 76, 151, 209, 124, 1, 233, 2, 13, 159]);
+        ///232c2342-682d-4526-a5fd-f943830d7bef
+        public static readonly Guid Children = new Guid([66, 35, 44, 35, 45, 104, 38, 69, 165, 253, 249, 67, 131, 13, 123, 239]);
         ///06950fac-de4f-487e-aa78-7095909805e4
         public static readonly Guid ReferenceFieldDefinitions = new Guid([172, 15, 149, 6, 79, 222, 126, 72, 170, 120, 112, 149, 144, 152, 5, 228]);
         ///8dc642e4-af58-403a-bed2-ce41baa95b21

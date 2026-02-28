@@ -16,9 +16,9 @@ public static class ModelGenerator
 
         HashSet<EnumDefinition> enumsToGenerate = [];
 
-        foreach (var entity in model.GetAllEntityDefinitions())
+        foreach (var entity in GetAllEntityDefinitions(model))
         {
-            if(!includeMetaModel && (entity.ObjId == EntityDefinition.TypId || entity.ObjId == FieldDefinition.TypId || entity.ObjId == ReferenceFieldDefinition.TypId || entity.ObjId == Model.TypId))
+            if (ShouldSkipEntity(entity, includeMetaModel))
                 continue;
 
             var sourceBuilder = new SourceBuilder();
@@ -60,13 +60,22 @@ public static class ModelGenerator
             sourceBuilder.AppendLine("public Guid ObjId { get; set; }");
             sourceBuilder.AppendLine();
 
-            foreach (var field in entity.FieldDefinitions)
+            var flattenedFields = FlattenFieldDefinitions(entity);
+            var flattenedRefFields = FlattenReferenceFieldDefinitions(entity);
+            var lineage = GetLineage(entity);
+            var ancestors = lineage.Count > 1 ? lineage.GetRange(0, lineage.Count - 1) : [];
+
+            foreach (var field in flattenedFields)
             {
                 string? enumTypeName = null;
                 if (field.DataType == FieldDataType.Enum)
                 {
-                    enumTypeName = field.Enum!.Value.Name;
-                    enumsToGenerate.Add(field.Enum!.Value);
+                    var enumDefOpt = field.Enum;
+                    if (!enumDefOpt.HasValue)
+                        throw new Exception($"Enum-typed field '{entity.Key}.{field.Key}' is missing EnumDefinition association");
+
+                    enumTypeName = enumDefOpt.Value.Name;
+                    enumsToGenerate.Add(enumDefOpt.Value);
                 }
 
                 var dataType = field.DataType switch
@@ -117,7 +126,7 @@ public static class ModelGenerator
                 sourceBuilder.AppendLine();
             }
 
-            foreach (var refField in entity.ReferenceFieldDefinitions)
+            foreach (var refField in flattenedRefFields)
             {
                 if (refField.RefType is RefType.SingleMandatory or RefType.SingleOptional)
                 {
@@ -146,6 +155,49 @@ public static class ModelGenerator
                 sourceBuilder.AppendLine();
             }
 
+            if (ancestors.Count > 0)
+            {
+                sourceBuilder.AppendLine();
+                foreach (var ancestor in ancestors)
+                {
+                    sourceBuilder.AppendLine($"public static implicit operator {ancestor.Key}({entity.Key} value) => new {ancestor.Key} {{ DbSession = value.DbSession, ObjId = value.ObjId }};");
+                }
+
+                sourceBuilder.AppendLine();
+                foreach (var ancestor in ancestors)
+                {
+                    sourceBuilder.AppendLine($"public static explicit operator {entity.Key}({ancestor.Key} value)");
+                    sourceBuilder.AppendLine("{");
+                    sourceBuilder.AddIndent();
+                    sourceBuilder.AppendLine("var actual = value.DbSession.GetTypId(value.ObjId);");
+                    sourceBuilder.AppendLine("if (!GeneratedCodeHelper.IsAssignableFrom(value.DbSession, TypId, actual))");
+                    sourceBuilder.AddIndent();
+                    sourceBuilder.AppendLine($"throw new System.InvalidCastException(\"Cannot cast '{ancestor.Key}' to '{entity.Key}'\");");
+                    sourceBuilder.RemoveIndent();
+                    sourceBuilder.AppendLine($"return new {entity.Key} {{ DbSession = value.DbSession, ObjId = value.ObjId }};");
+                    sourceBuilder.RemoveIndent();
+                    sourceBuilder.AppendLine("}");
+                    sourceBuilder.AppendLine();
+
+                    sourceBuilder.AppendLine($"public static bool TryCastFrom({ancestor.Key} value, out {entity.Key} result)");
+                    sourceBuilder.AppendLine("{");
+                    sourceBuilder.AddIndent();
+                    sourceBuilder.AppendLine("var actual = value.DbSession.GetTypId(value.ObjId);");
+                    sourceBuilder.AppendLine("if (GeneratedCodeHelper.IsAssignableFrom(value.DbSession, TypId, actual))");
+                    sourceBuilder.AppendLine("{");
+                    sourceBuilder.AddIndent();
+                    sourceBuilder.AppendLine($"result = new {entity.Key} {{ DbSession = value.DbSession, ObjId = value.ObjId }};");
+                    sourceBuilder.AppendLine("return true;");
+                    sourceBuilder.RemoveIndent();
+                    sourceBuilder.AppendLine("}");
+                    sourceBuilder.AppendLine("result = default;");
+                    sourceBuilder.AppendLine("return false;");
+                    sourceBuilder.RemoveIndent();
+                    sourceBuilder.AppendLine("}");
+                    sourceBuilder.AppendLine();
+                }
+            }
+
             sourceBuilder.AppendLine($"public static bool operator ==({entity.Key} a, {entity.Key} b) => a.DbSession == b.DbSession && a.ObjId == b.ObjId;");
             sourceBuilder.AppendLine($"public static bool operator !=({entity.Key} a, {entity.Key} b) => a.DbSession != b.DbSession || a.ObjId != b.ObjId;");
 
@@ -164,13 +216,13 @@ public static class ModelGenerator
             sourceBuilder.AppendLine("{");
             sourceBuilder.AddIndent();
 
-            foreach (var fieldDefinition in entity.FieldDefinitions)
+            foreach (var fieldDefinition in flattenedFields)
             {
                 sourceBuilder.AppendLine($"///{fieldDefinition.Id}");
                 sourceBuilder.AppendLine($"public static readonly Guid {fieldDefinition.Key} = {GetGuidLiteral(fieldDefinition.Id)};");
             }
 
-            foreach (var fieldDefinition in entity.ReferenceFieldDefinitions)
+            foreach (var fieldDefinition in flattenedRefFields)
             {
                 sourceBuilder.AppendLine($"///{fieldDefinition.Id}");
                 sourceBuilder.AppendLine($"public static readonly Guid {fieldDefinition.Key} = {GetGuidLiteral(fieldDefinition.Id)};");
@@ -192,7 +244,8 @@ public static class ModelGenerator
             var enumBuilder = new SourceBuilder();
             enumBuilder.AppendLine($"namespace {@namespace};");
             enumBuilder.AppendLine();
-            enumBuilder.AppendLine($"public enum {enumDefinition.Name}");
+            var enumName = enumDefinition.Name;
+            enumBuilder.AppendLine($"public enum {enumName}");
             enumBuilder.AppendLine("{");
             enumBuilder.AddIndent();
 
@@ -204,10 +257,108 @@ public static class ModelGenerator
             enumBuilder.RemoveIndent();
             enumBuilder.AppendLine("}");
 
-            var enumPath = Path.Combine(targetDir, $"{enumDefinition.Name}.cs");
+            var enumPath = Path.Combine(targetDir, $"{enumName}.cs");
             File.WriteAllText(enumPath, enumBuilder.ToString());
         }
     }
+
+    private static List<EntityDefinition> GetAllEntityDefinitions(Model root)
+    {
+        var result = new List<EntityDefinition>();
+        var seenModels = new HashSet<Guid>();
+
+        AddFromModel(root);
+        return result;
+
+        void AddFromModel(Model mdl)
+        {
+            if (!seenModels.Add(mdl.ObjId))
+                return;
+
+            foreach (var importedModel in mdl.ImportedModels)
+                AddFromModel(importedModel);
+
+            foreach (var ed in mdl.EntityDefinitions)
+                result.Add(ed);
+        }
+    }
+
+    private static bool ShouldSkipEntity(EntityDefinition entity, bool includeMetaModel)
+    {
+        if (includeMetaModel)
+            return false;
+
+        // Skip MetaModel entities when generating domain models.
+        if (entity.ObjId == EntityDefinition.TypId || entity.ObjId == FieldDefinition.TypId || entity.ObjId == ReferenceFieldDefinition.TypId || entity.ObjId == Model.TypId)
+            return true;
+
+        // RootEntity is part of the MetaModel.
+        if (entity.ObjId == Guid.Parse("0c6d2581-7b18-4c35-bd16-3ae403bbf7a4"))
+            return true;
+
+        return false;
+    }
+
+    private static List<EntityDefinition> GetLineage(EntityDefinition entity)
+    {
+        var chain = new List<EntityDefinition>();
+        var seen = new HashSet<Guid>();
+
+        var current = entity;
+        while (true)
+        {
+            chain.Add(current);
+            var parent = current.Parent;
+            if (!parent.HasValue)
+                break;
+
+            current = parent.Value;
+            if (!seen.Add(current.ObjId))
+                throw new Exception($"Inheritance cycle detected at '{current.Key}'");
+        }
+
+        chain.Reverse();
+        return chain;
+    }
+
+    private static List<FieldDefinition> FlattenFieldDefinitions(EntityDefinition entity)
+    {
+        var lineage = GetLineage(entity);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var result = new List<FieldDefinition>();
+
+        foreach (var e in lineage)
+        {
+            foreach (var f in e.FieldDefinitions)
+            {
+                if (!seen.Add(f.Key))
+                    throw new Exception($"Duplicate field key '{f.Key}' in inheritance chain for '{entity.Key}'");
+                result.Add(f);
+            }
+        }
+
+        return result;
+    }
+
+    private static List<ReferenceFieldDefinition> FlattenReferenceFieldDefinitions(EntityDefinition entity)
+    {
+        var lineage = GetLineage(entity);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var result = new List<ReferenceFieldDefinition>();
+
+        foreach (var e in lineage)
+        {
+            foreach (var f in e.ReferenceFieldDefinitions)
+            {
+                if (!seen.Add(f.Key))
+                    throw new Exception($"Duplicate reference field key '{f.Key}' in inheritance chain for '{entity.Key}'");
+                result.Add(f);
+            }
+        }
+
+        return result;
+    }
+
 
     public static string GetGuidLiteral(Guid guid)
     {

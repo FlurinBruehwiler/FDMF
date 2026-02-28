@@ -7,6 +7,42 @@ namespace FDMF.Core;
 
 public static class GeneratedCodeHelper
 {
+    public static bool IsAssignableFrom(DbSession dbSession, Guid baseTypId, Guid derivedTypId)
+    {
+        if (baseTypId == Guid.Empty || derivedTypId == Guid.Empty)
+            return false;
+
+        if (baseTypId == derivedTypId)
+            return true;
+
+        // Walk derived -> parent chain.
+        var seen = new HashSet<Guid>();
+        var current = derivedTypId;
+        while (seen.Add(current))
+        {
+            var ed = dbSession.GetObjFromGuid<EntityDefinition>(current);
+            if (!ed.HasValue)
+                return false;
+
+            var parent = ed.Value.Parent;
+            if (!parent.HasValue)
+                return false;
+
+            current = parent.Value.ObjId;
+            if (current == baseTypId)
+                return true;
+        }
+
+        // Cycle in inheritance graph.
+        return false;
+    }
+
+    public static bool CanCastTo(DbSession dbSession, Guid objId, Guid targetTypId)
+    {
+        var actualTypId = dbSession.GetTypId(objId);
+        return IsAssignableFrom(dbSession, targetTypId, actualTypId);
+    }
+
     public static T? GetNullableAssoc<T>(DbSession dbSession, Guid objId, Guid fldId) where T : struct, ITransactionObject
     {
         var asoValue = dbSession.GetSingleAsoValue(objId, fldId);
@@ -151,4 +187,3 @@ public struct AssocCollection<T> : ICollection<T> where T : struct, ITransaction
     public bool IsReadOnly => false;
 
 }
-

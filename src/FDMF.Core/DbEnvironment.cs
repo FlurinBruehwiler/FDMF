@@ -167,8 +167,8 @@ public sealed class DbEnvironment : IDisposable
         var ed_aso_model = Guid.Parse("d2b98e24-5786-4502-b2cf-5dea14097765");
         var ed_aso_fieldDefinitions = Guid.Parse("8dc642e4-af58-403a-bed2-ce41baa95b21");
         var ed_aso_referenceFieldDefinitions = Guid.Parse("06950fac-de4f-487e-aa78-7095909805e4");
-        // var ed_aso_parents = Guid.Parse("15928c28-398d-4caa-97d1-7c01e9020d9f");
-        // var ed_aso_children = Guid.Parse("232c2342-682d-4526-a5fd-f943830d7bef");
+        var ed_aso_parent = Guid.Parse("15928c28-398d-4caa-97d1-7c01e9020d9f");
+        var ed_aso_children = Guid.Parse("232c2342-682d-4526-a5fd-f943830d7bef");
 
         // FieldDefinition fields
         var fd_fld_key = Guid.Parse("8a5d90d2-1b1c-428e-a010-9ae7d603dd30");
@@ -273,6 +273,9 @@ public sealed class DbEnvironment : IDisposable
         SetString(session, baseModelId, m_fld_name, "BaseModel");
 
         // 2) Create entity definitions.
+        var typRootEntity = Guid.Parse("0c6d2581-7b18-4c35-bd16-3ae403bbf7a4");
+        CreateEntityDefinition(typRootEntity, "RootEntity");
+
         CreateEntityDefinition(typModel, "Model");
         CreateEntityDefinition(typEntityDefinition, "EntityDefinition");
         CreateEntityDefinition(typFieldDefinition, "FieldDefinition");
@@ -319,14 +322,14 @@ public sealed class DbEnvironment : IDisposable
         // EntityDefinition
         var rf_entity_fieldDefinitions = Guid.Parse("8dc642e4-af58-403a-bed2-ce41baa95b21");
         var rf_entity_referenceFieldDefinitions = Guid.Parse("06950fac-de4f-487e-aa78-7095909805e4");
-        //var rf_entity_parents = Guid.Parse("15928c28-398d-4caa-97d1-7c01e9020d9f");
-        //var rf_entity_children = Guid.Parse("232c2342-682d-4526-a5fd-f943830d7bef");
+        var rf_entity_parent = Guid.Parse("15928c28-398d-4caa-97d1-7c01e9020d9f");
+        var rf_entity_children = Guid.Parse("232c2342-682d-4526-a5fd-f943830d7bef");
 
         CreateReferenceFieldDefinition(rf_entity_model, "Model", RefType.SingleMandatory, typEntityDefinition, rf_model_entityDefinitions);
         CreateReferenceFieldDefinition(rf_entity_fieldDefinitions, "FieldDefinitions", RefType.Multiple, typEntityDefinition, fd_aso_owningEntity);
         CreateReferenceFieldDefinition(rf_entity_referenceFieldDefinitions, "ReferenceFieldDefinitions", RefType.Multiple, typEntityDefinition, rfd_aso_owningEntity);
-        //CreateReferenceFieldDefinition(rf_entity_parents, "Parents", "Multiple", typEntityDefinition, rf_entity_children);
-        //CreateReferenceFieldDefinition(rf_entity_children, "Children", "Multiple", typEntityDefinition, rf_entity_parents);
+        CreateReferenceFieldDefinition(rf_entity_parent, "Parent", RefType.SingleOptional, typEntityDefinition, rf_entity_children);
+        CreateReferenceFieldDefinition(rf_entity_children, "Children", RefType.Multiple, typEntityDefinition, rf_entity_parent);
 
         // FieldDefinition (inverse for rf_entity_fieldDefinitions)
         CreateReferenceFieldDefinition(fd_aso_owningEntity, "OwningEntity", RefType.SingleMandatory, typFieldDefinition, rf_entity_fieldDefinitions);
@@ -340,6 +343,14 @@ public sealed class DbEnvironment : IDisposable
         CreateReferenceFieldDefinition(enumD_aso_fields, "FieldUsage", RefType.Multiple, typEnumDefinition, fd_aso_enumRef);
         CreateFieldDefinition(enumD_fld_name, "Name", FieldDataType.String, false, typEnumDefinition);
         CreateFieldDefinition(enumD_fld_variants, "Variants", FieldDataType.String, false, typEnumDefinition);
+
+        // 5) Wire up the MetaModel inheritance tree.
+        // RootEntity has no parent.
+        session.CreateAso(typModel, ed_aso_parent, typRootEntity, ed_aso_children);
+        session.CreateAso(typEntityDefinition, ed_aso_parent, typRootEntity, ed_aso_children);
+        session.CreateAso(typFieldDefinition, ed_aso_parent, typRootEntity, ed_aso_children);
+        session.CreateAso(typReferenceFieldDefinition, ed_aso_parent, typRootEntity, ed_aso_children);
+        session.CreateAso(typEnumDefinition, ed_aso_parent, typRootEntity, ed_aso_children);
 
         // Finish
         session.Commit();
