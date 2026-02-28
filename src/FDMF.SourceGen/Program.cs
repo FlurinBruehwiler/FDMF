@@ -21,6 +21,7 @@ using (var session = new DbSession(env2))
 //Test Data
 GenerateModel(Path.Combine(root, "FDMF.Testing.Shared/testdata/TestModelDump.json"));
 GenerateModel(Path.Combine(root, "FDMF.Testing.Shared/testdata/BusinessModelDump.json"));
+GenerateModel(Path.Combine(root, "FDMF.Testing.Shared/testdata/InheritanceModelDump.json"));
 
 void GenerateModel(string path)
 {
@@ -36,7 +37,6 @@ void GenerateModel(string path)
 //Networking
 NetworkingGenerator.Generate(Path.Combine(root, "FDMF.Core/IServerProcedures.cs"));
 NetworkingGenerator.Generate(Path.Combine(root, "FDMF.Core/IClientProcedures.cs"));
-
 
 
 

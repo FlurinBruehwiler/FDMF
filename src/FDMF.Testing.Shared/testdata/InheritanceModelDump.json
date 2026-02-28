@@ -1,0 +1,129 @@
+{
+  "modelGuid": "06615f18-d825-48c1-8f4d-3892dc7386d7",
+  "entities": {
+    "06615f18-d825-48c1-8f4d-3892dc7386d7": {
+      "$type": "5739ae0d-e179-4d46-bae2-081f99d699da",
+      "Name": "InheritanceModel",
+      "EntityDefinitions": [
+        "6144822d-3e49-4965-bf9c-628ede806504",
+        "898a5155-92c0-4d7c-b1f2-1d3425b47e4d",
+        "aca85dd2-48ed-4a3a-8b26-90ba93941938",
+        "b6603986-8485-452e-9ad6-b39f7d9312d8"
+      ]
+    },
+
+    "6144822d-3e49-4965-bf9c-628ede806504": {
+      "$type": "c15f876f-4f74-4034-9acb-03bc3b521e81",
+      "Key": "Group",
+      "Name": "Group",
+      "Id": "6144822d-3e49-4965-bf9c-628ede806504",
+      "Model": "06615f18-d825-48c1-8f4d-3892dc7386d7",
+      "FieldDefinitions": [
+        "2b517398-e101-4e1f-9d5c-73d8f1cfe0a7"
+      ],
+      "ReferenceFieldDefinitions": [
+        "7eee79bf-e568-4b0f-a3c5-e6952b7bd425"
+      ]
+    },
+
+    "898a5155-92c0-4d7c-b1f2-1d3425b47e4d": {
+      "$type": "c15f876f-4f74-4034-9acb-03bc3b521e81",
+      "Key": "BaseItem",
+      "Name": "BaseItem",
+      "Id": "898a5155-92c0-4d7c-b1f2-1d3425b47e4d",
+      "Model": "06615f18-d825-48c1-8f4d-3892dc7386d7",
+      "FieldDefinitions": [
+        "f7d083b3-c3d2-43ca-af3b-a5f0e0310139"
+      ],
+      "ReferenceFieldDefinitions": [
+        "562f8a49-f54f-4331-9495-bcef384cc915"
+      ]
+    },
+
+    "aca85dd2-48ed-4a3a-8b26-90ba93941938": {
+      "$type": "c15f876f-4f74-4034-9acb-03bc3b521e81",
+      "Key": "ChildItem",
+      "Name": "ChildItem",
+      "Id": "aca85dd2-48ed-4a3a-8b26-90ba93941938",
+      "Model": "06615f18-d825-48c1-8f4d-3892dc7386d7",
+      "Parent": "898a5155-92c0-4d7c-b1f2-1d3425b47e4d",
+      "FieldDefinitions": [
+        "5bd92bb5-6b8a-4486-b818-35582c72a5aa"
+      ],
+      "ReferenceFieldDefinitions": []
+    },
+
+    "b6603986-8485-452e-9ad6-b39f7d9312d8": {
+      "$type": "c15f876f-4f74-4034-9acb-03bc3b521e81",
+      "Key": "GrandChildItem",
+      "Name": "GrandChildItem",
+      "Id": "b6603986-8485-452e-9ad6-b39f7d9312d8",
+      "Model": "06615f18-d825-48c1-8f4d-3892dc7386d7",
+      "Parent": "aca85dd2-48ed-4a3a-8b26-90ba93941938",
+      "FieldDefinitions": [
+        "972904b4-9d4d-472b-9a0e-fe951aead4c6"
+      ],
+      "ReferenceFieldDefinitions": []
+    },
+
+    "2b517398-e101-4e1f-9d5c-73d8f1cfe0a7": {
+      "$type": "42a6f33d-a938-4ad8-9682-aabdc92a53d2",
+      "Key": "Name",
+      "Name": "Name",
+      "Id": "2b517398-e101-4e1f-9d5c-73d8f1cfe0a7",
+      "DataType": "String",
+      "IsIndexed": true,
+      "OwningEntity": "6144822d-3e49-4965-bf9c-628ede806504"
+    },
+
+    "f7d083b3-c3d2-43ca-af3b-a5f0e0310139": {
+      "$type": "42a6f33d-a938-4ad8-9682-aabdc92a53d2",
+      "Key": "BaseName",
+      "Name": "BaseName",
+      "Id": "f7d083b3-c3d2-43ca-af3b-a5f0e0310139",
+      "DataType": "String",
+      "IsIndexed": true,
+      "OwningEntity": "898a5155-92c0-4d7c-b1f2-1d3425b47e4d"
+    },
+
+    "5bd92bb5-6b8a-4486-b818-35582c72a5aa": {
+      "$type": "42a6f33d-a938-4ad8-9682-aabdc92a53d2",
+      "Key": "ChildValue",
+      "Name": "ChildValue",
+      "Id": "5bd92bb5-6b8a-4486-b818-35582c72a5aa",
+      "DataType": "Integer",
+      "IsIndexed": true,
+      "OwningEntity": "aca85dd2-48ed-4a3a-8b26-90ba93941938"
+    },
+
+    "972904b4-9d4d-472b-9a0e-fe951aead4c6": {
+      "$type": "42a6f33d-a938-4ad8-9682-aabdc92a53d2",
+      "Key": "GrandChildFlag",
+      "Name": "GrandChildFlag",
+      "Id": "972904b4-9d4d-472b-9a0e-fe951aead4c6",
+      "DataType": "Boolean",
+      "IsIndexed": true,
+      "OwningEntity": "b6603986-8485-452e-9ad6-b39f7d9312d8"
+    },
+
+    "7eee79bf-e568-4b0f-a3c5-e6952b7bd425": {
+      "$type": "2147ed0f-b37d-4429-a3f8-8312c1620383",
+      "Key": "Items",
+      "Name": "Items",
+      "Id": "7eee79bf-e568-4b0f-a3c5-e6952b7bd425",
+      "RefType": "Multiple",
+      "OwningEntity": "6144822d-3e49-4965-bf9c-628ede806504",
+      "OtherReferenceFields": "562f8a49-f54f-4331-9495-bcef384cc915"
+    },
+
+    "562f8a49-f54f-4331-9495-bcef384cc915": {
+      "$type": "2147ed0f-b37d-4429-a3f8-8312c1620383",
+      "Key": "Group",
+      "Name": "Group",
+      "Id": "562f8a49-f54f-4331-9495-bcef384cc915",
+      "RefType": "SingleOptional",
+      "OwningEntity": "898a5155-92c0-4d7c-b1f2-1d3425b47e4d",
+      "OtherReferenceFields": "7eee79bf-e568-4b0f-a3c5-e6952b7bd425"
+    }
+  }
+}

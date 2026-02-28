@@ -28,6 +28,11 @@ public static class TempDbHelper
         return Path.Combine(AppContext.BaseDirectory, "testdata", "BusinessModelDump.json");
     }
 
+    public static string GetInheritanceModelDumpFile()
+    {
+        return Path.Combine(AppContext.BaseDirectory, "testdata", "InheritanceModelDump.json");
+    }
+
     public struct TempDbDisposable : IDisposable
     {
         public string Dir;
