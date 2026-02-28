@@ -16,6 +16,7 @@ public sealed class DbEnvironment : IDisposable
     public required LightningDatabase FieldPresenceIndex;
     public required Guid ModelGuid;
     public required string DbDir;
+    public IncrementalId LastCommitId;
 
     public static DbEnvironment CreateDatabase(string dbName, string dumpFile = "")
     {

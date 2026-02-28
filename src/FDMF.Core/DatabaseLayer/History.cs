@@ -62,27 +62,64 @@ public readonly struct HistoryEvent
 
 public sealed class HistoryCommit
 {
-    public required SortedId CommitId;
+    public required GuidV8 CommitId;
     public required DateTime TimestampUtc;
     public required Guid UserId;
 
     public required Dictionary<Guid, List<HistoryEvent>> EventsByObject;
 }
 
+[InlineArray(8)]
+public struct IncrementalId
+{
+    public byte First;
+
+    public static IncrementalId Create(IncrementalId last)
+    {
+        long unixTs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var currentTsStart = unixTs.AsSpan().Slice(0, 6);
+
+        var id = new IncrementalId();
+
+        //first 6 bytes is the timestamp
+        currentTsStart.CopyToReverse(id.AsSpan());
+
+        short num = 0;
+
+        Span<byte> lastTsStart = stackalloc byte[6];
+        last.AsSpan().Slice(0, 6).CopyToReverse(lastTsStart);
+
+        //same ms
+        if (currentTsStart.SequenceEqual(lastTsStart))
+        {
+            //extract counter
+            short lastCounter = 0;
+            last.AsSpan().Slice(6, 2).CopyToReverse(lastCounter.AsSpan());
+            num = (short)(lastCounter + 1);
+        }
+
+        //last 2 bytes are the incremental counter
+        num.AsSpan().CopyToReverse(id.AsSpan().Slice(6));
+
+        return id;
+    }
+}
+
+
 //id according to GuidV8 custom format (https://www.rfc-editor.org/rfc/rfc9562#name-uuid-version-8)
 //should be the same as guid v7, but with a better memory layout so that
 //it works for sorting with lmdb without a custom compare function
 [InlineArray(16)]
-public struct SortedId
+public struct GuidV8
 {
     public byte First;
 
     //todo performance test this....
-    public static SortedId Create()
+    public static GuidV8 Create()
     {
         long unixTs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-        var id = new SortedId();
+        var id = new GuidV8();
 
         //the first 6bytes (48 bits) are the timestamp
         unixTs.AsSpan().Slice(0, 6).CopyToReverse(id.AsSpan());
@@ -200,7 +237,8 @@ public static class History
             UserId = userId,
         });
 
-        var commitKey = SortedId.Create();
+        var commitKey = IncrementalId.Create(dbEnvironment.LastCommitId); //todo this currently has a timestamp + randomness, this is not sufficient for ordering, commits always happen behind a lock so it would be fine to have just an incremental id
+        dbEnvironment.LastCommitId = commitKey;
 
         Guid currentObjId = Guid.Empty;
         bool hasCurrentObj = false;
@@ -357,7 +395,7 @@ public static class History
         writeTransaction.Put(dbEnvironment.HistoryDb, commitKey.AsSpan(), commitData);
     }
 
-    public static IEnumerable<SortedId> GetCommitsForObject(DbEnvironment dbEnvironment, LightningTransaction readTransaction, Guid objId)
+    public static IEnumerable<GuidV8> GetCommitsForObject(DbEnvironment dbEnvironment, LightningTransaction readTransaction, Guid objId)
     {
         using var cursor = readTransaction.CreateCursor(dbEnvironment.HistoryObjIndexDb);
 
@@ -367,11 +405,11 @@ public static class History
         do
         {
             var (_, _, value) = cursor.GetCurrent();
-            yield return MemoryMarshal.Read<SortedId>(value.AsSpan());
+            yield return MemoryMarshal.Read<GuidV8>(value.AsSpan());
         } while (cursor.NextDuplicate().resultCode == MDBResultCode.Success);
     }
 
-    public static HistoryCommit? TryGetCommit(DbEnvironment dbEnvironment, LightningTransaction readTransaction, SortedId commitId)
+    public static HistoryCommit? TryGetCommit(DbEnvironment dbEnvironment, LightningTransaction readTransaction, GuidV8 commitId)
     {
         var (rc, _, value) = readTransaction.Get(dbEnvironment.HistoryDb, commitId.AsSpan());
         if (rc != MDBResultCode.Success)
@@ -395,7 +433,7 @@ public static class History
             if (keySpan.Length != 16)
                 continue;
 
-            var commitId = MemoryMarshal.Read<SortedId>(keySpan);
+            var commitId = MemoryMarshal.Read<GuidV8>(keySpan);
             yield return DecodeCommitValue(commitId, value.AsSlice());
 
             count++;
@@ -427,7 +465,7 @@ public static class History
         return Read<T>(data, ptr.Offset);
     }
 
-    private static unsafe HistoryCommit DecodeCommitValue(SortedId commitId, Slice<byte> data)
+    private static unsafe HistoryCommit DecodeCommitValue(GuidV8 commitId, Slice<byte> data)
     {
         var header = Read<CommitHeader>(data, 0);
 

@@ -109,7 +109,6 @@ public sealed class HistoryTests
             long value = 123;
             session.SetFldValue(objId, TestingFolder.Fields.TestIntegerField, value.AsSpan());
             session.Commit();
-            Thread.Sleep(1);
 
             // Delete VAL entry -> default value
             session.SetFldValue(objId, TestingFolder.Fields.TestIntegerField, ReadOnlySpan<byte>.Empty);
@@ -210,7 +209,6 @@ public sealed class HistoryTests
 
                 a.Parent = b;
                 session.Commit();
-                Thread.Sleep(1);
 
                 session.DeleteObj(bId);
                 session.Commit();
