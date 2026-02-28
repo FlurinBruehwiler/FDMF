@@ -45,13 +45,6 @@ public partial struct FieldDefinition : ITransactionObject, IEquatable<FieldDefi
     }
 
     [MemoryPackIgnore]
-    public string EnumVariants
-    {
-        get => Encoding.Unicode.GetString(DbSession.GetFldValue(ObjId, Fields.EnumVariants));
-        set => DbSession.SetFldValue(ObjId, Fields.EnumVariants, Encoding.Unicode.GetBytes(value));
-    }
-
-    [MemoryPackIgnore]
     public string Key
     {
         get => Encoding.Unicode.GetString(DbSession.GetFldValue(ObjId, Fields.Key));
@@ -70,6 +63,13 @@ public partial struct FieldDefinition : ITransactionObject, IEquatable<FieldDefi
     {
         get => GeneratedCodeHelper.GetAssoc<EntityDefinition>(DbSession, ObjId, Fields.OwningEntity);
         set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.OwningEntity, value.ObjId, FDMF.Core.DatabaseLayer.EntityDefinition.Fields.FieldDefinitions);
+    }
+
+    [MemoryPackIgnore]
+    public EnumDefinition Enum
+    {
+        get => GeneratedCodeHelper.GetAssoc<EnumDefinition>(DbSession, ObjId, Fields.OwningEntity);
+        set => GeneratedCodeHelper.SetAssoc(DbSession, ObjId, Fields.Enum, value.ObjId, FDMF.Core.DatabaseLayer.EnumDefinition.Fields.FieldUsage);
     }
 
     public static bool operator ==(FieldDefinition a, FieldDefinition b) => a.DbSession == b.DbSession && a.ObjId == b.ObjId;
@@ -98,5 +98,6 @@ public partial struct FieldDefinition : ITransactionObject, IEquatable<FieldDefi
         public static readonly Guid Id = new Guid([226, 19, 22, 249, 249, 169, 59, 78, 150, 227, 56, 101, 3, 25, 220, 12]);
         ///f097fe25-1d11-47b3-a02c-0072a781a528
         public static readonly Guid OwningEntity = new Guid([37, 254, 151, 240, 17, 29, 179, 71, 160, 44, 0, 114, 167, 129, 165, 40]);
+        public static readonly Guid Enum = new Guid([30, 192, 116, 236, 178, 134, 52, 67, 184, 203, 216, 0, 170, 168, 39, 174]);
     }
 }

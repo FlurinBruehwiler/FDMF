@@ -335,7 +335,9 @@ public sealed class DbEnvironment : IDisposable
         CreateReferenceFieldDefinition(rfd_aso_otherReferenceFields, "OtherReferenceFields", "SingleMandatory", typReferenceFieldDefinition, rfd_aso_otherReferenceFields);
 
         // EnumDefinition
-        CreateReferenceFieldDefinition(enumD_aso_fields, "Fields", "Multiple", typEnumDefinition, fd_aso_enumRef);
+        CreateReferenceFieldDefinition(enumD_aso_fields, "FieldUsage", "Multiple", typEnumDefinition, fd_aso_enumRef);
+        CreateFieldDefinition(enumD_fld_name, "Name", FieldDataType.String, false, typEnumDefinition);
+        CreateFieldDefinition(enumD_fld_variants, "Variants", FieldDataType.String, false, typEnumDefinition);
 
         // Finish
         session.Commit();

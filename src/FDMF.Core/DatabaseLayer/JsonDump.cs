@@ -404,7 +404,7 @@ public static class JsonDump
 
                 if (value.GetString() is { } s)
                 {
-                    var enumVariants = fld.EnumVariants.AsSpan();
+                    var enumVariants = fld.Enum.Variants.AsSpan();
 
                     int idx = 0;
                     foreach (var s1 in enumVariants.Split(','))
