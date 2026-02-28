@@ -62,7 +62,7 @@ public readonly struct HistoryEvent
 
 public sealed class HistoryCommit
 {
-    public required GuidV8 CommitId;
+    public required IncrementalId CommitId;
     public required DateTime TimestampUtc;
     public required Guid UserId;
 
@@ -395,7 +395,7 @@ public static class History
         writeTransaction.Put(dbEnvironment.HistoryDb, commitKey.AsSpan(), commitData);
     }
 
-    public static IEnumerable<GuidV8> GetCommitsForObject(DbEnvironment dbEnvironment, LightningTransaction readTransaction, Guid objId)
+    public static IEnumerable<IncrementalId> GetCommitsForObject(DbEnvironment dbEnvironment, LightningTransaction readTransaction, Guid objId)
     {
         using var cursor = readTransaction.CreateCursor(dbEnvironment.HistoryObjIndexDb);
 
@@ -405,11 +405,11 @@ public static class History
         do
         {
             var (_, _, value) = cursor.GetCurrent();
-            yield return MemoryMarshal.Read<GuidV8>(value.AsSpan());
+            yield return MemoryMarshal.Read<IncrementalId>(value.AsSpan());
         } while (cursor.NextDuplicate().resultCode == MDBResultCode.Success);
     }
 
-    public static HistoryCommit? TryGetCommit(DbEnvironment dbEnvironment, LightningTransaction readTransaction, GuidV8 commitId)
+    public static HistoryCommit? TryGetCommit(DbEnvironment dbEnvironment, LightningTransaction readTransaction, IncrementalId commitId)
     {
         var (rc, _, value) = readTransaction.Get(dbEnvironment.HistoryDb, commitId.AsSpan());
         if (rc != MDBResultCode.Success)
@@ -430,10 +430,7 @@ public static class History
             var (_, key, value) = cursor.GetCurrent();
             var keySpan = key.AsSpan();
 
-            if (keySpan.Length != 16)
-                continue;
-
-            var commitId = MemoryMarshal.Read<GuidV8>(keySpan);
+            var commitId = MemoryMarshal.Read<IncrementalId>(keySpan);
             yield return DecodeCommitValue(commitId, value.AsSlice());
 
             count++;
@@ -465,7 +462,7 @@ public static class History
         return Read<T>(data, ptr.Offset);
     }
 
-    private static unsafe HistoryCommit DecodeCommitValue(GuidV8 commitId, Slice<byte> data)
+    private static unsafe HistoryCommit DecodeCommitValue(IncrementalId commitId, Slice<byte> data)
     {
         var header = Read<CommitHeader>(data, 0);
 
