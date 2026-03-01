@@ -540,13 +540,9 @@ public static class Searcher
                         return true;
                     });
                 }
-                else
-                {
-                    Logging.Log(LogFlags.Error, "A SearchCriterion needs to be specified if the search type is Subquery");
-                    return true;
-                }
 
-                break;
+                Logging.Log(LogFlags.Error, "A SearchCriterion needs to be specified if the search type is Subquery");
+                return true;
             case AssocCriterion.AssocCriterionType.Null:
             {
                 // Not indexed for now.

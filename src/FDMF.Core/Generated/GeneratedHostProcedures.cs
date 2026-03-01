@@ -39,7 +39,7 @@ public sealed class GeneratedHostProceduresDispatcher(global::FDMF.Core.IHostPro
             {
                 if (args.Length != 1) return false;
                 var p_msg = MemoryPackSerializer.Deserialize<string>(args[0].Span, RpcCodec.SerializerOptions);
-                task = Wrap(impl.Echo(p_msg));
+                task = Wrap(impl.Echo(p_msg!));
                 return true;
             }
             default:
