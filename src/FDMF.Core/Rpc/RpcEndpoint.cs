@@ -7,23 +7,37 @@ public sealed class RpcEndpoint
 {
     private readonly IRpcFrameTransport _transport;
     private readonly object _handler;
+    private readonly int _protocolVersion;
+
+    private readonly TaskCompletionSource _connectedTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private volatile bool _connected;
 
     private readonly Dictionary<Guid, PendingRequest> _pending = new();
     private readonly Dictionary<string, MethodInfo> _methodCache = new(StringComparer.Ordinal);
 
-    public RpcEndpoint(IRpcFrameTransport transport, object handler)
+    public RpcEndpoint(IRpcFrameTransport transport, object handler, int protocolVersion = RpcProtocol.Version)
     {
         _transport = transport;
         _handler = handler;
+        _protocolVersion = protocolVersion;
     }
+
+    public Task Connected => _connectedTcs.Task;
 
     public Guid SendRequest(string methodName, object[] parameters, bool isNotification)
     {
         var requestId = Guid.NewGuid();
         var msgType = isNotification ? MessageType.Notification : MessageType.Request;
         var frame = RpcCodec.EncodeRequest(msgType, requestId, methodName, parameters);
-        _ = _transport.SendFrameAsync(frame);
+
+        _ = SendFrameWhenConnected(frame);
         return requestId;
+    }
+
+    private async Task SendFrameWhenConnected(byte[] frame)
+    {
+        await Connected.ConfigureAwait(false);
+        await _transport.SendFrameAsync(frame).ConfigureAwait(false);
     }
 
     public Task<T> WaitForResponse<T>(Guid requestId)
@@ -41,6 +55,17 @@ public sealed class RpcEndpoint
 
     public async Task RunAsync(CancellationToken cancellationToken = default)
     {
+        // Initiate handshake.
+        try
+        {
+            await _transport.SendFrameAsync(RpcCodec.EncodeHello(_protocolVersion), cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            _connectedTcs.TrySetException(e);
+            throw;
+        }
+
         while (!cancellationToken.IsCancellationRequested)
         {
             var frame = await _transport.ReceiveFrameAsync(cancellationToken);
@@ -50,8 +75,31 @@ public sealed class RpcEndpoint
             if (!RpcCodec.TryDecode(frame, out var msg))
                 continue;
 
+            if (!_connected)
+            {
+                if (msg.Type != MessageType.Hello)
+                    throw new InvalidOperationException($"Expected RPC hello, got {msg.Type}");
+
+                if (!msg.HelloVersion.HasValue)
+                    throw new InvalidOperationException("Malformed RPC hello");
+
+                if (msg.HelloVersion.Value != _protocolVersion)
+                {
+                    var ex = new InvalidOperationException($"RPC protocol version mismatch. Local={_protocolVersion}, Remote={msg.HelloVersion.Value}");
+                    _connectedTcs.TrySetException(ex);
+                    throw ex;
+                }
+
+                _connected = true;
+                _connectedTcs.TrySetResult();
+                continue;
+            }
+
             switch (msg.Type)
             {
+                case MessageType.Hello:
+                    // Ignore redundant hellos.
+                    break;
                 case MessageType.Request:
                 case MessageType.Notification:
                     await HandleIncomingRequest(msg, cancellationToken);

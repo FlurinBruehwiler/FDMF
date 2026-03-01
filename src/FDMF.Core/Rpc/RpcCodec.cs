@@ -9,7 +9,8 @@ public readonly record struct RpcDecodedMessage(
     Guid RequestId,
     string? MethodName,
     ReadOnlyMemory<byte>[]? ArgPayloads,
-    ReadOnlyMemory<byte> Payload);
+    ReadOnlyMemory<byte> Payload,
+    int? HelloVersion);
 
 public static class RpcCodec
 {
@@ -17,6 +18,14 @@ public static class RpcCodec
     {
         ServiceProvider = new ServiceProvider()
     };
+
+    public static byte[] EncodeHello(int version)
+    {
+        var buf = new byte[1 + 4];
+        buf[0] = (byte)MessageType.Hello;
+        MemoryMarshal.Write(buf.AsSpan(1, 4), version);
+        return buf;
+    }
 
     public static byte[] EncodeRequest(MessageType type, Guid requestId, string methodName, object[] parameters)
     {
@@ -64,6 +73,19 @@ public static class RpcCodec
     {
         msg = default;
         var span = frame.Span;
+        if (span.Length < 1)
+            return false;
+
+        if ((MessageType)span[0] == MessageType.Hello)
+        {
+            if (span.Length < 1 + 4)
+                return false;
+
+            var ver = MemoryMarshal.Read<int>(span.Slice(1, 4));
+            msg = new RpcDecodedMessage(MessageType.Hello, Guid.Empty, null, null, ReadOnlyMemory<byte>.Empty, ver);
+            return true;
+        }
+
         if (span.Length < 1 + 16)
             return false;
 
@@ -83,7 +105,7 @@ public static class RpcCodec
         if (type == MessageType.Response)
         {
             var payload = frame.Slice(reader.CurrentOffset);
-            msg = new RpcDecodedMessage(type, requestId, null, null, payload);
+            msg = new RpcDecodedMessage(type, requestId, null, null, payload, null);
             return true;
         }
 
@@ -106,12 +128,12 @@ public static class RpcCodec
                 payloads[i] = frame.Slice(start, len);
             }
 
-            msg = new RpcDecodedMessage(type, requestId, methodName, payloads, ReadOnlyMemory<byte>.Empty);
+            msg = new RpcDecodedMessage(type, requestId, methodName, payloads, ReadOnlyMemory<byte>.Empty, null);
             return true;
         }
 
         // ConnectionClosed or unknown: treat as no-op.
-        msg = new RpcDecodedMessage(type, requestId, null, null, ReadOnlyMemory<byte>.Empty);
+        msg = new RpcDecodedMessage(type, requestId, null, null, ReadOnlyMemory<byte>.Empty, null);
         return true;
     }
 }

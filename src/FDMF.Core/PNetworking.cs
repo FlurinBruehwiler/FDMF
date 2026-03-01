@@ -20,6 +20,7 @@ public enum MessageType : byte
     Request = 1,
     Response = 2,
     Notification = 3,
+    Hello = 4,
 }
 
 public sealed class PNetworking

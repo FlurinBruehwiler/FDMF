@@ -27,6 +27,8 @@ public sealed class LocalRpcTransportTests
         var hostLoop = hostEndpoint.RunAsync(cts.Token);
         var pluginLoop = pluginEndpoint.RunAsync(cts.Token);
 
+        await Task.WhenAll(hostEndpoint.Connected, pluginEndpoint.Connected);
+
         // Host -> Plugin request/response
         var sum = await hostToPlugin.Add(10, 32);
         Assert.Equal(42, sum);
