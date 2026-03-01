@@ -1,3 +1,4 @@
+// ReSharper disable All
 namespace FDMF.Core.DatabaseLayer;
 
 public enum FieldDataType

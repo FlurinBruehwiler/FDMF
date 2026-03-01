@@ -32,6 +32,7 @@ public static class NetworkingGenerator
     {
         var sb = new SourceBuilder();
 
+        sb.AppendLine("// ReSharper disable All");
         sb.AppendLine("using System;");
         sb.AppendLine("using System.Threading.Tasks;");
         sb.AppendLine("using FDMF.Core.Rpc;");

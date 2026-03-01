@@ -1,3 +1,4 @@
+// ReSharper disable All
 using System;
 using System.Threading.Tasks;
 using FDMF.Core.Rpc;

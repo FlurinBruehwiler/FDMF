@@ -243,6 +243,7 @@ public static class ModelGenerator
         foreach (var enumDefinition in enumsToGenerate)
         {
             var enumBuilder = new SourceBuilder();
+            enumBuilder.AppendLine("// ReSharper disable All");
             enumBuilder.AppendLine($"namespace {@namespace};");
             enumBuilder.AppendLine();
             var enumName = enumDefinition.Name;
