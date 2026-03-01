@@ -29,7 +29,8 @@ static async Task RunPluginPipeHost()
 
         var transport = new NamedPipeFrameTransport(pipe);
         var hostHandler = new HostProceduresImpl();
-        var endpoint = new RpcEndpoint(transport, hostHandler);
+        var dispatcher = new GeneratedHostProceduresDispatcher(hostHandler);
+        var endpoint = new RpcEndpoint(transport, dispatcher);
         var plugin = new GeneratedPluginProcedures(endpoint);
         _ = endpoint.RunAsync();
 

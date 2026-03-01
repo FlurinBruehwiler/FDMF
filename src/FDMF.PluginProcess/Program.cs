@@ -15,7 +15,8 @@ await pipe.ConnectAsync();
 
 var transport = new NamedPipeFrameTransport(pipe);
 var handler = new PluginProceduresImpl();
-var endpoint = new RpcEndpoint(transport, handler);
+var dispatcher = new GeneratedPluginProceduresDispatcher(handler);
+var endpoint = new RpcEndpoint(transport, dispatcher);
 
 var host = new GeneratedHostProcedures(endpoint);
 

@@ -35,6 +35,7 @@ public static class NetworkingGenerator
         sb.AppendLine("using System;");
         sb.AppendLine("using System.Threading.Tasks;");
         sb.AppendLine("using FDMF.Core.Rpc;");
+        sb.AppendLine("using MemoryPack;");
         sb.AppendLine();
 
         var interfaceNamespace = GetContainingNamespace(interfaceDeclarationSyntax) ?? "";
@@ -90,6 +91,86 @@ public static class NetworkingGenerator
             sb.RemoveIndent();
             sb.AppendLine("}");
         }
+
+        sb.RemoveIndent();
+        sb.AppendLine("}");
+
+        sb.AppendLine();
+        sb.AppendLine($"public sealed class {className}Dispatcher({ifaceFullName} impl) : IRpcDispatcher");
+        sb.AppendLine("{");
+        sb.AddIndent();
+        sb.AppendLine("public bool TryDispatch(RpcDecodedMessage msg, out Task<object?> task)");
+        sb.AppendLine("{");
+        sb.AddIndent();
+        sb.AppendLine("task = Task.FromResult<object?>(null);");
+        sb.AppendLine("if (msg.MethodName is null) return false;");
+        sb.AppendLine("var args = msg.ArgPayloads ?? Array.Empty<ReadOnlyMemory<byte>>();");
+        sb.AppendLine("switch (msg.MethodName)");
+        sb.AppendLine("{");
+        sb.AddIndent();
+
+        foreach (MethodDeclarationSyntax interfaceMember in interfaceDeclarationSyntax.Members.OfType<MethodDeclarationSyntax>())
+        {
+            var methodName = interfaceMember.Identifier.Text;
+            var parameters = interfaceMember.ParameterList.Parameters;
+
+            sb.AppendLine($"case nameof({ifaceFullName}.{methodName}):");
+            sb.AppendLine("{");
+            sb.AddIndent();
+            sb.AppendLine($"if (args.Length != {parameters.Count}) return false;");
+
+            for (int i = 0; i < parameters.Count; i++)
+            {
+                var p = parameters[i];
+                var pName = p.Identifier.Text;
+                var pType = p.Type!.ToString();
+                sb.AppendLine($"var p_{pName} = MemoryPackSerializer.Deserialize<{pType}>(args[{i}].Span, RpcCodec.SerializerOptions);");
+            }
+
+            var isVoid = interfaceMember.ReturnType is PredefinedTypeSyntax pts && pts.Keyword.IsKind(SyntaxKind.VoidKeyword);
+            if (isVoid)
+            {
+                var callArgs = string.Join(", ", parameters.Select(x => "p_" + x.Identifier.Text));
+                sb.AppendLine($"impl.{methodName}({callArgs});");
+                sb.AppendLine("task = Task.FromResult<object?>(null);");
+                sb.AppendLine("return true;");
+            }
+            else
+            {
+                if (TryGetTaskTypeArgumentSyntax(interfaceMember, out var _))
+                {
+                    var callArgs = string.Join(", ", parameters.Select(x => "p_" + x.Identifier.Text));
+                    sb.AppendLine($"task = Wrap(impl.{methodName}({callArgs}));");
+                    sb.AppendLine("return true;");
+                }
+                else
+                {
+                    sb.AppendLine("return false;");
+                }
+            }
+
+            sb.RemoveIndent();
+            sb.AppendLine("}");
+        }
+
+        sb.AppendLine("default:");
+        sb.AddIndent();
+        sb.AppendLine("return false;");
+        sb.RemoveIndent();
+
+        sb.RemoveIndent();
+        sb.AppendLine("}");
+        sb.RemoveIndent();
+        sb.AppendLine("}");
+
+        sb.AppendLine();
+        sb.AppendLine("private static async Task<object?> Wrap<T>(Task<T> t)");
+        sb.AppendLine("{");
+        sb.AddIndent();
+        sb.AppendLine("var r = await t.ConfigureAwait(false);");
+        sb.AppendLine("return r;");
+        sb.RemoveIndent();
+        sb.AppendLine("}");
 
         sb.RemoveIndent();
         sb.AppendLine("}");

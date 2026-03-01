@@ -16,8 +16,8 @@ public sealed class LocalRpcTransportTests
         var hostHandler = new HostHandler();
         var pluginHandler = new PluginHandler();
 
-        var hostEndpoint = new RpcEndpoint(aTransport, hostHandler);
-        var pluginEndpoint = new RpcEndpoint(bTransport, pluginHandler);
+        var hostEndpoint = new RpcEndpoint(aTransport, new GeneratedHostProceduresDispatcher(hostHandler));
+        var pluginEndpoint = new RpcEndpoint(bTransport, new GeneratedPluginProceduresDispatcher(pluginHandler));
 
         var hostToPlugin = new GeneratedPluginProcedures(hostEndpoint);
         var pluginToHost = new GeneratedHostProcedures(pluginEndpoint);

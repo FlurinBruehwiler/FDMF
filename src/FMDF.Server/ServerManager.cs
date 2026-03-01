@@ -66,7 +66,9 @@ public sealed class ServerManager
                     Rpc = null!,
                     ClientProcedures = null!,
                 };
-                connectedClient.Rpc = new RpcEndpoint(transport, new ServerProceduresImpl(connectedClient));
+                var serverImpl = new ServerProceduresImpl(connectedClient);
+                var dispatcher = new GeneratedServerProceduresDispatcher(serverImpl);
+                connectedClient.Rpc = new RpcEndpoint(transport, dispatcher);
                 connectedClient.ClientProcedures = new GeneratedClientProcedures(connectedClient.Rpc);
 
                 ConnectedClients.Add(connectedClient);

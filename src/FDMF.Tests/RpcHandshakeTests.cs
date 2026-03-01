@@ -11,8 +11,8 @@ public sealed class RpcHandshakeTests
         await using var _a = aTransport;
         await using var _b = bTransport;
 
-        var a = new RpcEndpoint(aTransport, handler: new object(), protocolVersion: 1);
-        var b = new RpcEndpoint(bTransport, handler: new object(), protocolVersion: 2);
+        var a = new RpcEndpoint(aTransport, NullRpcDispatcher.Instance, protocolVersion: 1);
+        var b = new RpcEndpoint(bTransport, NullRpcDispatcher.Instance, protocolVersion: 2);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 

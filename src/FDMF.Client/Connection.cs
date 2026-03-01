@@ -29,7 +29,8 @@ public static class Connection
             wsWrapper.CurrentWebSocket = ws;
 
             var transport = new WebSocketFrameTransport(ws);
-            var endpoint = new RpcEndpoint(transport, clientProcedures);
+            var dispatcher = new GeneratedClientProceduresDispatcher(clientProcedures);
+            var endpoint = new RpcEndpoint(transport, dispatcher);
 
             // Remote server proxy (example usage, caller can keep reference).
             _ = new GeneratedServerProcedures(endpoint);

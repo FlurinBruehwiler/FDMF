@@ -13,10 +13,10 @@ public sealed class GeneratedNetworkingProceduresTests
         await using var _b = bTransport;
 
         var server = new TestProceduresImpl();
-        var serverEndpoint = new RpcEndpoint(aTransport, server);
+        var serverEndpoint = new RpcEndpoint(aTransport, new GeneratedTestProceduresDispatcher(server));
 
         // Client doesn't need to handle incoming requests for this test.
-        var clientEndpoint = new RpcEndpoint(bTransport, handler: new object());
+        var clientEndpoint = new RpcEndpoint(bTransport, NullRpcDispatcher.Instance);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         var serverLoop = serverEndpoint.RunAsync(cts.Token);
