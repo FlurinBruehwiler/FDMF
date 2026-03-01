@@ -1,22 +1,53 @@
-﻿using System.IO.Pipes;
+using System.IO.Pipes;
 using FDMF.Core;
+using FDMF.Core.Generated;
+using FDMF.Core.Rpc;
+using FDMF.Server;
 
-//we can store all fields objId+fieldIds that where changed in a dictionary within the transaction,
-//when saving, we have a separate table where we store the "history" of all objects
-//we could directly add the entries to hist db in a new transaction.
-//what we want is to group often used objects together for better cache efficiency, and so that these pages can be unloaded from memory
+Logging.LogFlags = LogFlags.Info | LogFlags.Error;
 
-var x = new NamedPipeServerStream("FDMF");
-await x.WaitForConnectionAsync();
+var serverManager = new ServerManager();
+_ = serverManager.ListenForConnections();
 
-var handler = new PipeMessageHandler();
+// Local plugin IPC (duplex) demo.
+_ = RunPluginPipeHost();
 
-NetworkingClient.SendRequest(handler, "HelloWorld", [], true);
+await Task.Delay(Timeout.Infinite);
 
-class PipeMessageHandler : IMessageHandler
+static async Task RunPluginPipeHost()
 {
-    public void SendMessage(ReadOnlyMemory<byte> data)
+    while (true)
     {
+        await using var pipe = new NamedPipeServerStream(
+            "FDMF.Plugin",
+            PipeDirection.InOut,
+            NamedPipeServerStream.MaxAllowedServerInstances,
+            PipeTransmissionMode.Byte,
+            PipeOptions.Asynchronous);
 
+        await pipe.WaitForConnectionAsync();
+
+        var transport = new NamedPipeFrameTransport(pipe);
+        var hostHandler = new HostProceduresImpl();
+        var endpoint = new RpcEndpoint(transport, hostHandler);
+        var plugin = new GeneratedPluginProcedures(endpoint);
+        _ = endpoint.RunAsync();
+
+        // Exercise duplex.
+        var sum = await plugin.Add(1, 2);
+        Logging.Log(LogFlags.Business, $"Plugin Add(1,2) = {sum}");
+    }
+}
+
+sealed class HostProceduresImpl : IHostProcedures
+{
+    public void Ping()
+    {
+        Logging.Log(LogFlags.Business, "Plugin pinged host");
+    }
+
+    public Task<string> Echo(string msg)
+    {
+        return Task.FromResult(msg);
     }
 }

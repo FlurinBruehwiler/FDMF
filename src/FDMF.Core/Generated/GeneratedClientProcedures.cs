@@ -1,11 +1,13 @@
-using System.Threading.Channels;
+using System;
+using System.Threading.Tasks;
+using FDMF.Core.Rpc;
 
 namespace FDMF.Core.Generated;
 
-public sealed class GeneratedClientProcedures(IMessageHandler messageHandler, Dictionary<Guid, PendingRequest> callbacks) : IClientProcedures
+public sealed class GeneratedClientProcedures(RpcEndpoint rpc) : global::FDMF.Core.IClientProcedures
 {
     public void Ping()
     {
-        var guid = NetworkingClient.SendRequest(messageHandler, nameof(Ping), [  ], true);
+        var guid = rpc.SendRequest(nameof(Ping), [  ], true);
     }
 }

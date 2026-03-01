@@ -21,7 +21,9 @@ public static class NetworkingGenerator
         foreach (var i in interfaces)
         {
             var (genText, className) = GenerateInterfaceImplementation(i);
-            var genFilePath = Path.Combine(Path.GetDirectoryName(interfaceFilePath)!, "Generated" , className + ".cs");
+            var genDir = Path.Combine(Path.GetDirectoryName(interfaceFilePath)!, "Generated");
+            Directory.CreateDirectory(genDir);
+            var genFilePath = Path.Combine(genDir, className + ".cs");
             File.WriteAllText(genFilePath, genText);
         }
     }
@@ -30,10 +32,15 @@ public static class NetworkingGenerator
     {
         var sb = new SourceBuilder();
 
-        sb.AppendLine("using System.Threading.Channels;");
+        sb.AppendLine("using System;");
+        sb.AppendLine("using System.Threading.Tasks;");
+        sb.AppendLine("using FDMF.Core.Rpc;");
         sb.AppendLine();
 
-        sb.AppendLine("namespace FDMF.Core.Generated;");
+        var interfaceNamespace = GetContainingNamespace(interfaceDeclarationSyntax) ?? "";
+        var generatedNamespace = string.IsNullOrWhiteSpace(interfaceNamespace) ? "Generated" : interfaceNamespace + ".Generated";
+
+        sb.AppendLine($"namespace {generatedNamespace};");
         sb.AppendLine();
 
         var interfaceName = interfaceDeclarationSyntax.Identifier.Text;
@@ -42,13 +49,21 @@ public static class NetworkingGenerator
 
         var className = "Generated" + interfaceName.Substring(1);
 
-        sb.AppendLine($"public sealed class {className}(Channel<Stream> sendMessage, Dictionary<Guid, PendingRequest> callbacks) : {interfaceName}");
+        var ifaceFullName = string.IsNullOrWhiteSpace(interfaceNamespace)
+            ? interfaceName
+            : $"global::{interfaceNamespace}.{interfaceName}";
+
+        sb.AppendLine($"public sealed class {className}(RpcEndpoint rpc) : {ifaceFullName}");
         sb.AppendLine("{");
         sb.AddIndent();
 
         foreach (MethodDeclarationSyntax interfaceMember in interfaceDeclarationSyntax.Members.OfType<MethodDeclarationSyntax>())
         {
-            sb.AppendLine(interfaceMember.ToFullString().Trim().TrimEnd(';'));
+            var signature = interfaceMember.ToFullString().Trim().TrimEnd(';');
+            if (!signature.StartsWith("public ", StringComparison.Ordinal))
+                signature = "public " + signature;
+
+            sb.AppendLine(signature);
             sb.AppendLine("{");
             sb.AddIndent();
 
@@ -57,13 +72,13 @@ public static class NetworkingGenerator
 
             var isVoid = interfaceMember.ReturnType is PredefinedTypeSyntax pts && pts.Keyword.IsKind(SyntaxKind.VoidKeyword);
 
-            sb.AppendLine($"var guid = NetworkingClient.SendRequest(sendMessage, nameof({methodName}), [ {p} ], {isVoid.ToString().ToLower()});");
+            sb.AppendLine($"var guid = rpc.SendRequest(nameof({methodName}), [ {p} ], {isVoid.ToString().ToLower()});");
 
             if (!isVoid)
             {
                 if (TryGetTaskTypeArgumentSyntax(interfaceMember, out var argType))
                 {
-                    sb.AppendLine($"return NetworkingClient.WaitForResponse<{argType.ToString()}>(callbacks, guid);");
+                    sb.AppendLine($"return rpc.WaitForResponse<{argType.ToString()}>(guid);");
                 }
                 else
                 {
@@ -80,6 +95,22 @@ public static class NetworkingGenerator
         sb.AppendLine("}");
 
         return (sb.ToString(), className);
+    }
+
+    private static string? GetContainingNamespace(SyntaxNode node)
+    {
+        for (SyntaxNode? current = node; current != null; current = current.Parent)
+        {
+            switch (current)
+            {
+                case NamespaceDeclarationSyntax nd:
+                    return nd.Name.ToString();
+                case FileScopedNamespaceDeclarationSyntax fd:
+                    return fd.Name.ToString();
+            }
+        }
+
+        return null;
     }
 
     private static bool TryGetTaskTypeArgumentSyntax(

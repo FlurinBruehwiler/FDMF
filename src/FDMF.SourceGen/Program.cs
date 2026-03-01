@@ -37,7 +37,8 @@ void GenerateModel(string path)
 //Networking
 NetworkingGenerator.Generate(Path.Combine(root, "FDMF.Core/IServerProcedures.cs"));
 NetworkingGenerator.Generate(Path.Combine(root, "FDMF.Core/IClientProcedures.cs"));
-
+NetworkingGenerator.Generate(Path.Combine(root, "FDMF.Core/IPluginProcedures.cs"));
+NetworkingGenerator.Generate(Path.Combine(root, "FDMF.Tests/ITestProcedures.cs"));
 
 
 

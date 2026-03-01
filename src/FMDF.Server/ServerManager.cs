@@ -1,16 +1,17 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Net;
 using System.Net.WebSockets;
-using System.Threading.Channels;
 using FDMF.Core;
 using FDMF.Core.DatabaseLayer;
 using FDMF.Core.Generated;
+using FDMF.Core.Rpc;
 
 namespace FDMF.Server;
 
 public sealed class ConnectedClient
 {
     public required IClientProcedures ClientProcedures;
+    public required RpcEndpoint Rpc;
 }
 
 
@@ -58,16 +59,19 @@ public sealed class ServerManager
 
                 Logging.Log(LogFlags.Info, "FDMF.Client connected!");
 
-                var handler = new WebSocketMessageHandler(wsContext.WebSocket);
+                var transport = new WebSocketFrameTransport(wsContext.WebSocket);
 
                 var connectedClient = new ConnectedClient
                 {
-                    ClientProcedures = new GeneratedClientProcedures(handler, Callbacks)
+                    Rpc = null!,
+                    ClientProcedures = null!,
                 };
+                connectedClient.Rpc = new RpcEndpoint(transport, new ServerProceduresImpl(connectedClient));
+                connectedClient.ClientProcedures = new GeneratedClientProcedures(connectedClient.Rpc);
 
                 ConnectedClients.Add(connectedClient);
 
-                _ = NetworkingClient.ProcessMessagesForWebSocket(wsContext.WebSocket, handler, new ServerProceduresImpl(connectedClient), Callbacks).ContinueWith(x =>
+                _ = connectedClient.Rpc.RunAsync().ContinueWith(x =>
                 {
                     if(x.Exception != null)
                         Logging.LogException(x.Exception);

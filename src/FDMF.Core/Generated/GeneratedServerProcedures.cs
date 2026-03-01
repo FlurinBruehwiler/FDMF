@@ -1,12 +1,14 @@
-using System.Threading.Channels;
+using System;
+using System.Threading.Tasks;
+using FDMF.Core.Rpc;
 
 namespace FDMF.Core.Generated;
 
-public sealed class GeneratedServerProcedures(IMessageHandler handler, Dictionary<Guid, PendingRequest> callbacks) : IServerProcedures
+public sealed class GeneratedServerProcedures(RpcEndpoint rpc) : global::FDMF.Core.IServerProcedures
 {
     public Task<ServerStatus> GetStatus(int a, int b)
     {
-        var guid = NetworkingClient.SendRequest(handler, nameof(GetStatus), [ a, b ], false);
-        return NetworkingClient.WaitForResponse<ServerStatus>(callbacks, guid);
+        var guid = rpc.SendRequest(nameof(GetStatus), [ a, b ], false);
+        return rpc.WaitForResponse<ServerStatus>(guid);
     }
 }
